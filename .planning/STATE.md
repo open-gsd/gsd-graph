@@ -6,30 +6,23 @@
 ## Current position
 
 - **Milestone:** v0.1.0 foundation  
-- **Phase:** 1 — Foundation & identity — **COMPLETE**  
-- **Status:** Verified PASSED  
-- **Next action:** Plan or execute Phase 2 — Build pipeline (`/gsd-plan-phase 2` then `/gsd-execute-phase 2`)
+- **Phase:** 2 — Build pipeline — **PLANNED** (plan-check PASS)  
+- **Status:** Ready to execute  
+- **Next action:** `/gsd-execute-phase 2`
 
 ## Progress
 
 | Artifact | Status |
 |----------|--------|
-| Phase 1 plans 01-01..01-03 | ✓ executed |
-| Phase 1 VERIFICATION | ✓ PASSED |
-| Tests | 54/54 pass |
-| Coverage | 86.15% lines |
+| Phase 1 | ✓ Complete + verified |
+| Phase 2 CONTEXT + RESEARCH | ✓ |
+| Phase 2 plans 02-01..02-04 | ✓ plan-check PASS |
+| Phase 2 VALIDATION | ✓ |
 
-## Completed this session
+## Next
 
-- Package `@opengsd/gsd-graph` CJS+types bootstrap
-- Schemas + general ontology pack + policy matrix
-- Store IO: paths, lock, dual-write, loadGraphV1
+Execute extract → normalize → review → build/status pipeline.
 
 ## Blockers
 
 None.
-
-## Notes
-
-- Design: `docs/DESIGN.md`
-- Critical path remaining: Phases 2–5 → 0.1.0
