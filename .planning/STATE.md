@@ -5,13 +5,13 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: build-pipeline
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-08-03T03:31:48.806Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-08-03T03:35:35.839Z"
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 9
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -50,15 +50,19 @@ None.
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 02-build-pipeline P01 | 7min | 3 tasks | 11 files |
+| Phase 02-build-pipeline P02 | 2min | 2 tasks | 5 files |
 
 ## Decisions
 
 - [Phase 02-01]: OQ-1 six-rule MD grammar locked in markdown.ts module header
 - [Phase 02-01]: discoverSources returns { files, diagnostics } with FILE_TOO_LARGE skips
 - [Phase 02-01]: Free prose yields no EXTRACTED typed multi-hop predicates (D-01 honesty)
+- [Phase ?]: multi-hop fixture uses Concept--causes-->Concept chain (general-pack allowlisted)
+- [Phase ?]: Invalid JSONL lines → diagnostic and continue (no whole-file throw)
+- [Phase ?]: extractByPath fingerprints unless contentHash provided; never network/LLM
 
 ## Session
 
-**Last session:** 2026-08-03T03:31:48.798Z  
-**Stopped at:** Completed 02-01-PLAN.md  
+**Last session:** 2026-08-03T03:35:35.831Z
+**Stopped at:** Completed 02-02-PLAN.md
 **Resume file:** None

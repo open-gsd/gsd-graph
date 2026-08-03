@@ -28,7 +28,7 @@
 ### Extract & normalize
 
 - [x] **EXT-01**: Deterministic Markdown/text extract (links, headings, explicit edge lines)
-- [ ] **EXT-02**: JSON/JSONL structured extract maps fields to EXTRACTED triples
+- [x] **EXT-02**: JSON/JSONL structured extract maps fields to EXTRACTED triples
 - [x] **EXT-03**: Source fingerprints support incremental rebuild
 - [ ] **NORM-01**: Multiset provenance per triple with per-entry confidence; triple confidence = best_tier(entries)
 - [ ] **NORM-02**: Auto-merge only exact same-type id/alias; `same_as` is advisory until review
@@ -102,7 +102,7 @@
 | STORE-04 | Phase 1 | Complete |
 | STORE-05 | Phase 1 | Complete |
 | EXT-01 | Phase 2 | Complete |
-| EXT-02 | Phase 2 | Pending |
+| EXT-02 | Phase 2 | Complete |
 | EXT-03 | Phase 2 | Complete |
 | NORM-01 | Phase 2 | Pending |
 | NORM-02 | Phase 2 | Pending |
