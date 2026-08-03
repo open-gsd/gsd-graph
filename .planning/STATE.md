@@ -23,8 +23,9 @@ progress:
 
 - **Milestone:** v0.1.0 foundation  
 - **Phase:** 5 (ground-prove-0-1-0) — EXECUTING
-- **Status:** Executing Phase 5
-- **Next action:** `/gsd-execute-phase 5`
+- **Current Plan:** 2 of 4 (05-02 next)
+- **Status:** Executing Phase 5 — 05-01 complete
+- **Next action:** Execute 05-02-PLAN.md (deterministic answer + abstain)
 
 ## Progress
 
@@ -34,6 +35,7 @@ progress:
 | Phase 5 CONTEXT + RESEARCH | ✓ |
 | Phase 5 plans 05-01..05-04 | ✓ plan-check PASS |
 | Phase 5 VALIDATION | ✓ |
+| 05-01 packSubgraph | ✓ Complete |
 
 ## Blockers
 
@@ -47,9 +49,9 @@ None.
 
 ## Decisions
 
-- [Phase ?]: Expand pack seeds by id via expandHops; never seedAndExpand(label) re-match
-- [Phase ?]: Path pairs via public query({path}) among top min(3,seeds); maxDepth hops+2
-- [Phase ?]: PACK_STOPWORDS is exact DESIGN set; empty pack returns empty shape without throw
+- [Phase 5]: Expand pack seeds by id via expandHops; never seedAndExpand(label) re-match
+- [Phase 5]: Path pairs via public query({path}) among top min(3,seeds); maxDepth hops+2
+- [Phase 5]: PACK_STOPWORDS is exact DESIGN set; empty pack returns empty shape without throw
 
 ## Session
 
