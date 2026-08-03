@@ -24,6 +24,8 @@ export {
 export { loadOntologyPack } from './ontology/load-pack';
 export type { LoadOntologyPackOptions } from './ontology/load-pack';
 
+export { applyUnknownPolicy } from './ontology/policy';
+
 export type {
   UnknownPolicy,
   OntologyPredicate,
