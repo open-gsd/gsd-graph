@@ -373,3 +373,27 @@ export interface RepairResult {
   projection_written: true;
   reason: string;
 }
+
+// --- Init (CLI-03 / D-05) ---
+
+/** Options for init() — create store layout + optional gitignore append. */
+export interface InitOptions {
+  /** Store directory override (absolute or relative to cwd). */
+  dir?: string;
+  /** Ontology pack id or path recorded in config (default: general). */
+  ontology?: string;
+  /** Working directory for relative resolution and .gitignore lookup. */
+  cwd?: string;
+}
+
+/**
+ * Result of init() — JSON-serializable for CLI stdout (K22).
+ * `created` is true when the store root was newly created or config.json
+ * was written on this call.
+ */
+export interface InitResult {
+  store_dir: string;
+  created: boolean;
+  gitignore_appended: boolean;
+  ontology: string;
+}

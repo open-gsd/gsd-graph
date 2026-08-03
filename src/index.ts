@@ -39,6 +39,8 @@ export type {
   DiffResult,
   RepairOptions,
   RepairResult,
+  InitOptions,
+  InitResult,
 } from './types';
 
 export {
@@ -174,3 +176,6 @@ export { diff, resolveBaseline } from './pipeline/diff';
 
 // Repair (03-04 / REP-01)
 export { repair } from './pipeline/repair';
+
+// Init (04-01 / CLI-03)
+export { init } from './pipeline/init';

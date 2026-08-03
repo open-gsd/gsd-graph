@@ -6,6 +6,9 @@
   "author": "Jeremy McSpadden <jeremy@fluxlabs.net>",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "gsd-graph": "./bin/gsd-graph.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -15,6 +18,7 @@
   },
   "files": [
     "dist",
+    "bin",
     "schemas",
     "ontology-packs",
     "LICENSE",
@@ -32,7 +36,9 @@
   },
   "dependencies": {
     "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.1"
+    "ajv-formats": "^3.0.1",
+    "commander": "^14.0.3",
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
