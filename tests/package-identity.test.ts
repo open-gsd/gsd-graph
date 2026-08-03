@@ -137,3 +137,40 @@ describe('package identity (PKG-01, PKG-02)', () => {
     );
   });
 });
+
+describe('package identity bin (PKG-03, D-01, D-09)', () => {
+  it('publishes bin gsd-graph → ./bin/gsd-graph.js and files includes bin', () => {
+    const pkg = readPackageJson();
+    const bin = pkg.bin as Record<string, string> | undefined;
+    assert.ok(bin, 'bin field required');
+    assert.equal(bin['gsd-graph'], './bin/gsd-graph.js');
+
+    const files = pkg.files as string[] | undefined;
+    assert.ok(Array.isArray(files), 'files array required');
+    assert.equal(files.includes('bin'), true, 'files must include bin');
+  });
+
+  it('bin/gsd-graph.js has node shebang and invokes main(process.argv)', () => {
+    const binPath = join(root, 'bin', 'gsd-graph.js');
+    assert.equal(existsSync(binPath), true, 'bin/gsd-graph.js missing');
+    const source = readFileSync(binPath, 'utf8');
+    const firstLine = source.split(/\r?\n/)[0] ?? '';
+    assert.equal(firstLine, '#!/usr/bin/env node');
+    assert.match(source, /require\(['"]\.\.\/dist\/cli\.js['"]\)/);
+    assert.match(source, /main\(process\.argv\)/);
+  });
+
+  it('pins commander to 14.x (not 15) in dependencies', () => {
+    const pkg = readPackageJson();
+    const deps = pkg.dependencies as Record<string, string> | undefined;
+    assert.ok(deps, 'dependencies required');
+    const range = deps.commander;
+    assert.equal(typeof range, 'string', 'commander dependency required');
+    assert.match(range as string, /\^?14(\.|$)/, `commander must be 14.x, got ${range}`);
+    assert.equal(
+      /^\s*[\^~]?15/.test(range as string),
+      false,
+      `commander must not be 15.x (engines mismatch), got ${range}`,
+    );
+  });
+});
