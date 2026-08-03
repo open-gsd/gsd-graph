@@ -70,7 +70,7 @@ created: 2026-08-03
 
 | Criterion / Req | Command | Expected |
 |-----------------|---------|----------|
-| PKG-03 bin publish | `npm test` (package identity) | bin.gsd-graph + files includes bin + shebang |
+| PKG-03 bin publish | `npm test` (package identity) | bin.gsd-graph + files includes bin + shebang + bin calls main(process.argv) |
 | CLI-03 init gitignore | `npm test` (init) | append iff exists; idempotent; custom --dir |
 | CLI-02 K22 exits | `npm test` (init/cli exit) | 0 JSON; 1 usage; 2 GraphError; 3 build_locked |
 | CLI-01 command surface | `npm test` (cli-commands) | all Phase 4 verbs; pack/answer exit 1 |
