@@ -198,3 +198,120 @@ describe('snapshot save/list/restore round-trip (SNAP-01, D-07, D-10)', () => {
     }
   });
 });
+
+describe('snapshot name confinement + restore validation (SNAP-01, D-07, STORE-05)', () => {
+  it('snapshotSave rejects traversal-like names with PATH_ESCAPE', () => {
+    const corpus = tempDir('gsd-snap-esc-c-');
+    const store = tempDir('gsd-snap-esc-s-');
+    copyFixture('structured-edges.md', corpus);
+    mod.build({ corpus, dir: store, full: true });
+
+    const badNames = ['..', '../x', 'a/b', 'a\\b', ''];
+    for (const name of badNames) {
+      assert.throws(
+        () => mod.snapshotSave({ dir: store, name }),
+        (err: unknown) => {
+          assert.ok(err instanceof mod.GraphError, `expected GraphError for ${JSON.stringify(name)}`);
+          assert.equal(
+            (err as { reason: string }).reason,
+            mod.GSD_GRAPH_REASON.PATH_ESCAPE,
+            `PATH_ESCAPE for ${JSON.stringify(name)}`,
+          );
+          return true;
+        },
+      );
+    }
+  });
+
+  it('snapshotRestore of missing name throws SCHEMA_INVALID (not silent success)', () => {
+    const corpus = tempDir('gsd-snap-miss-c-');
+    const store = tempDir('gsd-snap-miss-s-');
+    copyFixture('structured-edges.md', corpus);
+    mod.build({ corpus, dir: store, full: true });
+
+    assert.throws(
+      () => mod.snapshotRestore({ dir: store, name: 'does-not-exist' }),
+      (err: unknown) => {
+        assert.ok(err instanceof mod.GraphError);
+        assert.equal(
+          (err as { reason: string }).reason,
+          mod.GSD_GRAPH_REASON.SCHEMA_INVALID,
+        );
+        assert.match((err as Error).message, /not found/i);
+        return true;
+      },
+    );
+
+    // Lock released after failed restore
+    const lock = mod.acquireBuildLock(store, 'test');
+    lock.release();
+  });
+
+  it('corrupt snapshot failing Ajv does not publish; prior graph.v1 intact', () => {
+    const corpus = tempDir('gsd-snap-corr-c-');
+    const store = tempDir('gsd-snap-corr-s-');
+    copyFixture('structured-edges.md', corpus);
+    mod.build({ corpus, dir: store, full: true });
+
+    const before = tripleIds(store);
+    const beforeRaw = fs.readFileSync(
+      path.join(store, 'graph.v1.json'),
+      'utf8',
+    );
+
+    // Plant a corrupt snapshot file that looks like a named snapshot
+    const snapDir = path.join(store, 'snapshots');
+    fs.mkdirSync(snapDir, { recursive: true });
+    const corruptName = '2026-01-01T00-00-00.000Z-corrupt-snap.json';
+    fs.writeFileSync(
+      path.join(snapDir, corruptName),
+      JSON.stringify({ schema_version: 1, not: 'a-valid-graph' }),
+      'utf8',
+    );
+
+    assert.throws(
+      () => mod.snapshotRestore({ dir: store, name: 'corrupt-snap' }),
+      (err: unknown) => {
+        assert.ok(err instanceof mod.GraphError);
+        assert.equal(
+          (err as { reason: string }).reason,
+          mod.GSD_GRAPH_REASON.SCHEMA_INVALID,
+        );
+        return true;
+      },
+    );
+
+    assert.deepEqual(tripleIds(store), before);
+    assert.equal(
+      fs.readFileSync(path.join(store, 'graph.v1.json'), 'utf8'),
+      beforeRaw,
+      'prior graph.v1 must remain byte-identical after failed restore',
+    );
+
+    // Lock released after failed restore
+    const lock = mod.acquireBuildLock(store, 'test');
+    lock.release();
+  });
+
+  it('snapshotRestore rejects PATH_ESCAPE names and releases lock', () => {
+    const corpus = tempDir('gsd-snap-rest-esc-c-');
+    const store = tempDir('gsd-snap-rest-esc-s-');
+    copyFixture('structured-edges.md', corpus);
+    mod.build({ corpus, dir: store, full: true });
+
+    assert.throws(
+      () => mod.snapshotRestore({ dir: store, name: '../x' }),
+      (err: unknown) => {
+        assert.ok(err instanceof mod.GraphError);
+        assert.equal(
+          (err as { reason: string }).reason,
+          mod.GSD_GRAPH_REASON.PATH_ESCAPE,
+        );
+        return true;
+      },
+    );
+
+    const lock = mod.acquireBuildLock(store, 'test');
+    lock.release();
+  });
+});
