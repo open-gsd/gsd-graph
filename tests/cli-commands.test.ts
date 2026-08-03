@@ -648,3 +648,42 @@ describe('cli-commands communities detect (COM-01, D-06, D-10)', () => {
     assert.equal(err.reason, 'usage');
   });
 });
+
+describe('cli-commands communities report (COM-01, D-06)', () => {
+  it('communities report after detect exits 0 with index_path and report_paths', () => {
+    const dir = publishTwoCliquesStore();
+    const detect = run(['--dir', dir, 'communities', 'detect']);
+    assert.equal(detect.code, 0, detect.stderr);
+
+    const result = run(['--dir', dir, 'communities', 'report']);
+    assert.equal(result.code, 0, result.stderr);
+    const body = result.json as {
+      ok: boolean;
+      index_path: string;
+      report_paths: string[];
+    };
+    assert.equal(body.ok, true);
+    assert.equal(typeof body.index_path, 'string');
+    assert.ok(body.index_path.includes(path.join('communities', 'index.json')));
+    assert.ok(fs.existsSync(body.index_path));
+    assert.ok(Array.isArray(body.report_paths));
+    assert.ok(body.report_paths.length >= 1);
+    for (const p of body.report_paths) {
+      assert.ok(fs.existsSync(p), `report path missing: ${p}`);
+    }
+  });
+
+  it('communities report without prior detect exits non-zero GraphError path', () => {
+    const dir = publishTwoCliquesStore();
+    const result = run(['--dir', dir, 'communities', 'report']);
+    assert.equal(result.code, 2, result.stderr);
+    const err = JSON.parse(result.stderr) as {
+      ok: false;
+      reason: string;
+      message: string;
+    };
+    assert.equal(err.ok, false);
+    assert.equal(err.reason, 'schema_invalid');
+    assert.match(err.message, /detectCommunities first|index\.json missing/i);
+  });
+});

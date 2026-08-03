@@ -42,6 +42,11 @@ describe('package identity (PKG-01, PKG-02)', () => {
     assert.match(nodeEngine as string, />=\s*22/);
   });
 
+  it('package version is 0.2.0 (global themes milestone, D-07)', () => {
+    const pkg = readPackageJson();
+    assert.equal(pkg.version, '0.2.0');
+  });
+
   it('description positions Graph Engineering toolkit', () => {
     const pkg = readPackageJson();
     assert.equal(typeof pkg.description, 'string');
