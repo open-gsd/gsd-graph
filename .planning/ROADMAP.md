@@ -19,7 +19,7 @@ Critical path to **0.1.0**: Phases 1–5. Phase 6 is optional for the tag. Phase
 - [x] **Phase 4: CLI surface** - `gsd-graph` machine contract over library ops
 - [x] **Phase 5: Ground & prove 0.1.0** - packSubgraph, cited answers, G0–G4 goldens, release tag
 - [x] **Phase 6: Optional agents** - LLM providers, MCP read tools, example packs, minimal report
-- [ ] **Phase 7: Global themes 0.2** - Community detection and theme reports
+- [x] **Phase 7: Global themes 0.2** - Community detection and theme reports
 
 ## Phase Details
 
