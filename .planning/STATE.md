@@ -17,14 +17,15 @@ progress:
 # Project State
 
 **Project:** gsd-graph  
-**Updated:** 2026-08-02  
+**Updated:** 2026-08-03  
 
 ## Current position
 
-- **Milestone:** v0.1.0 foundation  
-- **Phase:** 2 (build-pipeline) — EXECUTING
-- **Status:** Executing Phase 2
-- **Next action:** `/gsd-execute-phase 2`
+- **Milestone:** v0.2.0  
+- **Phase:** 2 (build-pipeline) — EXECUTING  
+- **Plan:** 02-01 complete; next 02-02  
+- **Status:** Executing Phase 2  
+- **Next action:** Execute `02-02-PLAN.md` (JSONL extract / remaining pipeline)
 
 ## Progress
 
@@ -34,10 +35,11 @@ progress:
 | Phase 2 CONTEXT + RESEARCH | ✓ |
 | Phase 2 plans 02-01..02-04 | ✓ plan-check PASS |
 | Phase 2 VALIDATION | ✓ |
+| 02-01 extract + fingerprint + discover | ✓ Complete |
 
 ## Next
 
-Execute extract → normalize → review → build/status pipeline.
+Execute remaining Phase 2 plans: JSONL extract → normalize → review → build/status.
 
 ## Blockers
 
@@ -51,12 +53,12 @@ None.
 
 ## Decisions
 
-- [Phase ?]: OQ-1 six-rule MD grammar locked in markdown.ts module header
-- [Phase ?]: discoverSources returns { files, diagnostics } with FILE_TOO_LARGE skips
-- [Phase ?]: Free prose yields no EXTRACTED typed multi-hop predicates (D-01 honesty)
+- [Phase 02-01]: OQ-1 six-rule MD grammar locked in markdown.ts module header
+- [Phase 02-01]: discoverSources returns { files, diagnostics } with FILE_TOO_LARGE skips
+- [Phase 02-01]: Free prose yields no EXTRACTED typed multi-hop predicates (D-01 honesty)
 
 ## Session
 
-**Last session:** 2026-08-03T03:31:48.798Z
-**Stopped at:** Completed 02-01-PLAN.md
+**Last session:** 2026-08-03T03:31:48.798Z  
+**Stopped at:** Completed 02-01-PLAN.md  
 **Resume file:** None
