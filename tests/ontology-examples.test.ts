@@ -63,6 +63,32 @@ const RESEARCH_PREDICATES = [
   'same_as',
 ] as const;
 
+const ENGINEERING_TYPES = [
+  'Entity',
+  'Person',
+  'Organization',
+  'Service',
+  'API',
+  'Incident',
+  'Decision',
+  'Change',
+  'Document',
+  'Concept',
+  'Event',
+] as const;
+
+const ENGINEERING_PREDICATES = [
+  'related_to',
+  'depends_on',
+  'owns',
+  'mitigates',
+  'deploys',
+  'causes',
+  'about',
+  'part_of',
+  'same_as',
+] as const;
+
 function assertNoExtendsInRaw(packDir: string): void {
   const raw = JSON.parse(
     readFileSync(join(root, 'ontology-packs', packDir, 'ontology.json'), 'utf8'),
@@ -122,5 +148,60 @@ describe('example ontology packs (ONT-04, D-09)', () => {
       assertPackHashMatchesFile('research', loaded.packHash);
       assertNoExtendsInRaw('research');
     });
+  });
+
+  describe('engineering pack', () => {
+    it('loads via packIdOrPath engineering with DESIGN types/predicates', () => {
+      const loaded = mod.loadOntologyPack({ packIdOrPath: 'engineering' });
+      assert.equal(loaded.pack.id, 'engineering');
+      assert.equal(loaded.pack.strict, true);
+      assert.equal(loaded.pack.unknown_type_policy, 'review');
+      assert.equal(loaded.pack.unknown_predicate_policy, 'review');
+
+      for (const t of ENGINEERING_TYPES) {
+        assert.equal(loaded.typeSet.has(t), true, `typeSet missing ${t}`);
+      }
+      for (const p of ENGINEERING_PREDICATES) {
+        assert.equal(
+          loaded.predicateSet.has(p),
+          true,
+          `predicateSet missing ${p}`,
+        );
+      }
+
+      for (const t of [
+        'Service',
+        'Incident',
+        'Decision',
+        'Change',
+        'API',
+      ] as const) {
+        assert.equal(loaded.typeSet.has(t), true, `DESIGN type missing ${t}`);
+      }
+      for (const p of [
+        'depends_on',
+        'owns',
+        'mitigates',
+        'deploys',
+      ] as const) {
+        assert.equal(
+          loaded.predicateSet.has(p),
+          true,
+          `DESIGN predicate missing ${p}`,
+        );
+      }
+
+      assert.ok(loaded.packHash);
+      assertPackHashMatchesFile('engineering', loaded.packHash);
+      assertNoExtendsInRaw('engineering');
+    });
+  });
+
+  it('both packs load replace-only offline in one suite', () => {
+    const research = mod.loadOntologyPack({ packIdOrPath: 'research' });
+    const engineering = mod.loadOntologyPack({ packIdOrPath: 'engineering' });
+    assert.equal(research.pack.id, 'research');
+    assert.equal(engineering.pack.id, 'engineering');
+    assert.notEqual(research.packHash, engineering.packHash);
   });
 });

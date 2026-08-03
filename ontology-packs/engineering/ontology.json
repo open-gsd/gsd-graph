@@ -1,0 +1,56 @@
+{
+  "id": "engineering",
+  "version": "1",
+  "title": "Engineering systems",
+  "node_types": [
+    "Entity",
+    "Person",
+    "Organization",
+    "Service",
+    "API",
+    "Incident",
+    "Decision",
+    "Change",
+    "Document",
+    "Concept",
+    "Event"
+  ],
+  "predicates": [
+    { "id": "related_to", "domain": ["*"], "range": ["*"] },
+    {
+      "id": "depends_on",
+      "domain": ["Service", "API", "Change"],
+      "range": ["Service", "API"]
+    },
+    {
+      "id": "owns",
+      "domain": ["Person", "Organization"],
+      "range": ["Service", "API", "Document"]
+    },
+    {
+      "id": "mitigates",
+      "domain": ["Change", "Decision", "Service"],
+      "range": ["Incident"]
+    },
+    {
+      "id": "deploys",
+      "domain": ["Change", "Person", "Organization"],
+      "range": ["Service", "API"]
+    },
+    {
+      "id": "causes",
+      "domain": ["Event", "Change", "Incident"],
+      "range": ["Incident", "Event"]
+    },
+    {
+      "id": "about",
+      "domain": ["Document", "Decision", "Incident"],
+      "range": ["Service", "API", "Concept"]
+    },
+    { "id": "part_of", "domain": ["*"], "range": ["*"] },
+    { "id": "same_as", "domain": ["*"], "range": ["*"] }
+  ],
+  "strict": true,
+  "unknown_predicate_policy": "review",
+  "unknown_type_policy": "review"
+}
