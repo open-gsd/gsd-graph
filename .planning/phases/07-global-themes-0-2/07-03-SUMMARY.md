@@ -111,7 +111,7 @@ Each task was committed atomically (TDD RED → GREEN):
 3. **Task 2 RED: report CLI + 0.2.0 version tests** - `afd8ba7` (test)
 4. **Task 2 GREEN: report CLI + version/docs** - `7635a5b` (feat)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `d7035da` (docs: complete plan)
 
 _Note: TDD tasks used separate RED/GREEN commits_
 
