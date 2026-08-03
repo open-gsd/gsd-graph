@@ -199,7 +199,8 @@ export { init } from './pipeline/init';
 export { packSubgraph, PACK_STOPWORDS, tokenizeQuestion, scoreSeeds } from './pipeline/pack';
 
 // Deterministic grounded answer (05-02 / ANS-01 / ANS-02)
-export { answer, formatDeterministicMarkdown } from './pipeline/answer';
+export { answer, answerHttp, formatDeterministicMarkdown } from './pipeline/answer';
+export type { AnswerHttpOptions } from './pipeline/answer';
 
 // Optional LLM providers (06-01 / LLM-01 / D-01..D-05)
 export {
@@ -216,6 +217,15 @@ export type {
 
 export { resolveLlmMode } from './llm/provider';
 export type { ResolveLlmModeInput } from './llm/provider';
+
+export {
+  httpChatCompletion,
+  parseHttpPromptResultJson,
+} from './llm/http-client';
+export type {
+  HttpChatCompletionOptions,
+  HttpChatCompletionResult,
+} from './llm/http-client';
 
 export {
   writePromptRequest,

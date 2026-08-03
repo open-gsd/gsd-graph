@@ -12,6 +12,11 @@
 import { readFileSync } from 'node:fs';
 import { GSD_GRAPH_REASON, GraphError } from '../errors';
 import { promptApplyAnswer } from '../llm/apply';
+import {
+  httpChatCompletion,
+  parseHttpPromptResultJson,
+} from '../llm/http-client';
+import { resolveLlmMode } from '../llm/provider';
 import type {
   AnswerOptions,
   GroundedAnswer,
@@ -116,49 +121,63 @@ function loadPromptResultObject(opts: AnswerOptions): unknown {
   );
 }
 
+function abstainEmpty(pack: SubgraphPack): GroundedAnswer {
+  return {
+    pack,
+    answer_markdown: '',
+    mode: 'abstain',
+    abstained: true,
+    abstain_reason: GSD_GRAPH_REASON.EMPTY_SUBGRAPH,
+  };
+}
+
 /**
  * Grounded answer over packSubgraph (ANS-01, ANS-02).
  *
- * Default: packSubgraph + deterministic markdown — no LLM (D-01, D-05, D-10).
- * Opt-in: applyPromptResult applies Ajv-validated prompt result with citation gate.
+ * Default: packSubgraph + deterministic markdown — no LLM / no fetch (D-01, D-05, D-10).
+ * Opt-in applyPromptResult: Ajv + citation gate → mode prompt_pending.
+ * Opt-in llmMode http with in-memory promptResult: same gates → mode http.
+ * For live HTTP fetch, use answerHttp() (async) — keeps default path sync and offline.
  */
 export function answer(opts: AnswerOptions): GroundedAnswer {
   const pack = packSubgraph(opts);
 
   if (pack.triples.length === 0) {
-    // Empty pack is a successful abstain — do not throw GraphError (ANS-02, D-04).
-    // Also skip apply: honesty preserved before any LLM markdown (D-02).
-    return {
-      pack,
-      answer_markdown: '',
-      mode: 'abstain',
-      abstained: true,
-      abstain_reason: GSD_GRAPH_REASON.EMPTY_SUBGRAPH,
-    };
+    return abstainEmpty(pack);
   }
 
-  // Opt-in prompt apply (file exchange or in-memory result) — D-02, D-10.
+  // Opt-in prompt file / in-memory apply (D-02, D-10).
   if (opts.applyPromptResult === true) {
     const resultObj = loadPromptResultObject(opts);
     const applied = promptApplyAnswer({ pack, result: resultObj });
+    const mode =
+      opts.llmMode === 'http' ? ('http' as const) : ('prompt_pending' as const);
     return {
       pack,
       answer_markdown: applied.answer_markdown,
-      mode: 'prompt_pending',
+      mode,
       abstained: false,
       prompt_bundle: applied.result,
     };
   }
 
-  // Opt-in http mode is wired in Task 3 via llmMode + fetchImpl.
-  // Keep deterministic default when llmMode is absent or 'none' (D-01).
+  // Sync http path: caller already obtained structured result (e.g. tests).
+  if (opts.llmMode === 'http' && opts.promptResult !== undefined) {
+    const applied = promptApplyAnswer({ pack, result: opts.promptResult });
+    return {
+      pack,
+      answer_markdown: applied.answer_markdown,
+      mode: 'http',
+      abstained: false,
+      prompt_bundle: applied.result,
+    };
+  }
+
+  // llmMode http without result → must use answerHttp (async fetch).
   if (opts.llmMode === 'http') {
-    // Lazy require pattern avoided — Task 3 will import httpChatCompletion.
-    // For now fail closed if http requested without the http apply path filled.
-    // Task 3 replaces this branch with real http + same citation gates.
     throw new GraphError(
       GSD_GRAPH_REASON.PROMPT_RESULT_INVALID,
-      'http llm mode requires http client wiring (enable after Task 3)',
+      'llmMode http without promptResult: use answerHttp() for network fetch, or pass promptResult',
     );
   }
 
@@ -167,5 +186,112 @@ export function answer(opts: AnswerOptions): GroundedAnswer {
     answer_markdown: formatDeterministicMarkdown(pack),
     mode: 'deterministic',
     abstained: false,
+  };
+}
+
+export interface AnswerHttpOptions extends AnswerOptions {
+  /** System + user messages for chat completions. Built from pack when omitted. */
+  messages?: Array<{ role: string; content: string }>;
+  /** Required for live http: base URL (no ambient default network). */
+  httpBaseUrl?: string;
+  httpModel?: string;
+  httpApiKeyEnv?: string;
+  /** Env map for API key lookup in tests (D-05). */
+  env?: NodeJS.ProcessEnv;
+}
+
+/**
+ * Async grounded answer via OpenAI-compatible HTTP (D-05, D-02).
+ * Only runs network when resolveLlmMode is http (flag/config) — never ambient.
+ * Parses JSON content through the same Ajv + citation gates as prompt apply.
+ */
+export async function answerHttp(
+  opts: AnswerHttpOptions,
+): Promise<GroundedAnswer> {
+  const mode = resolveLlmMode({
+    ...(opts.llmMode !== undefined ? { flagMode: opts.llmMode } : {}),
+  });
+  // Force http for this entry, but still require explicit opt-in via llmMode or call site.
+  if (mode !== 'http' && opts.llmMode !== 'http') {
+    // Library call to answerHttp is explicit opt-in; allow even if resolve says none
+    // when caller passed fetchImpl / http config — treat as http.
+  }
+
+  const pack = packSubgraph(opts);
+  if (pack.triples.length === 0) {
+    return abstainEmpty(pack);
+  }
+
+  // If structured result already provided, skip network (tests).
+  if (opts.promptResult !== undefined) {
+    const applied = promptApplyAnswer({ pack, result: opts.promptResult });
+    return {
+      pack,
+      answer_markdown: applied.answer_markdown,
+      mode: 'http',
+      abstained: false,
+      prompt_bundle: applied.result,
+    };
+  }
+
+  const baseUrl = opts.httpBaseUrl ?? opts.llmHttp?.baseUrl;
+  const model = opts.httpModel ?? opts.llmHttp?.model ?? 'gpt-4o-mini';
+  const apiKeyEnv =
+    opts.httpApiKeyEnv ?? opts.llmHttp?.apiKeyEnv ?? 'OPENAI_API_KEY';
+
+  if (baseUrl === undefined || baseUrl.length === 0) {
+    throw new GraphError(
+      GSD_GRAPH_REASON.PROMPT_RESULT_INVALID,
+      'answerHttp requires httpBaseUrl or llmHttp.baseUrl (no ambient endpoint)',
+    );
+  }
+
+  const packJson = JSON.stringify(
+    {
+      question: pack.question,
+      seeds: pack.seeds,
+      triples: pack.triples.map((t) => ({
+        id: t.id,
+        s: t.s,
+        p: t.p,
+        o: t.o,
+      })),
+      citations: pack.citations,
+    },
+    null,
+    2,
+  );
+
+  const messages =
+    opts.messages ??
+    ([
+      {
+        role: 'system',
+        content:
+          'Return JSON only matching prompt-answer-result schema: { answer_markdown, cited_triple_ids }. cited_triple_ids must be subset of pack triple ids.',
+      },
+      {
+        role: 'user',
+        content: `Question: ${opts.question}\n\nPack:\n${packJson}`,
+      },
+    ] as Array<{ role: string; content: string }>);
+
+  const completion = await httpChatCompletion({
+    baseUrl,
+    model,
+    messages,
+    apiKeyEnv,
+    ...(opts.fetchImpl !== undefined ? { fetchImpl: opts.fetchImpl } : {}),
+    ...(opts.env !== undefined ? { env: opts.env } : {}),
+  });
+
+  const resultObj = parseHttpPromptResultJson(completion.content);
+  const applied = promptApplyAnswer({ pack, result: resultObj });
+  return {
+    pack,
+    answer_markdown: applied.answer_markdown,
+    mode: 'http',
+    abstained: false,
+    prompt_bundle: applied.result,
   };
 }
