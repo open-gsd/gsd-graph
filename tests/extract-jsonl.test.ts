@@ -171,4 +171,130 @@ describe('extractJsonl (EXT-02 / D-03)', () => {
     assert.equal(result.triples[0]!.s, 'Concept:alpha');
     assert.equal(result.triples[0]!.o, 'Concept:beta');
   });
+
+  it('JSON array file produces same nodes/triples as equivalent JSONL', () => {
+    const records = [
+      {
+        type: 'Concept',
+        label: 'Alpha',
+        edges: [{ p: 'related_to', o: { type: 'Concept', label: 'Beta' } }],
+      },
+      { type: 'Concept', label: 'Beta' },
+    ];
+    const jsonl = records.map((r) => JSON.stringify(r)).join('\n');
+    const arrayDoc = JSON.stringify(records, null, 2);
+
+    const fromJsonl = mod.extractJsonl('mem://a.jsonl', jsonl, 'sha256:j');
+    const fromArray = mod.extractJsonl('mem://a.json', arrayDoc, 'sha256:a');
+
+    assert.equal(fromArray.nodes.length, fromJsonl.nodes.length);
+    assert.equal(fromArray.triples.length, fromJsonl.triples.length);
+
+    const jsonlIds = new Set(fromJsonl.nodes.map((n) => n.id));
+    for (const n of fromArray.nodes) {
+      assert.ok(jsonlIds.has(n.id), `array node ${n.id} present in jsonl`);
+    }
+    const jsonlEdges = new Set(
+      fromJsonl.triples.map((t) => `${t.s}|${t.p}|${t.o}`),
+    );
+    for (const t of fromArray.triples) {
+      assert.ok(
+        jsonlEdges.has(`${t.s}|${t.p}|${t.o}`),
+        `array triple ${t.s} ${t.p} ${t.o}`,
+      );
+      assert.equal(t.confidence, 'EXTRACTED');
+    }
+  });
+});
+
+describe('extractByPath router (EXT-02 / D-01 / D-12)', () => {
+  it('routes multi-hop.jsonl and matches direct extractJsonl', () => {
+    const content = fs.readFileSync(fixturePath, 'utf8');
+    const contentHash = mod.fingerprintFile(fixturePath);
+    const direct = mod.extractJsonl(fixturePath, content, contentHash);
+    const routed = mod.extractByPath(fixturePath);
+
+    assert.equal(routed.nodes.length, direct.nodes.length);
+    assert.equal(routed.triples.length, direct.triples.length);
+    assert.deepEqual(
+      routed.nodes.map((n) => n.id).sort(),
+      direct.nodes.map((n) => n.id).sort(),
+    );
+    assert.deepEqual(
+      routed.triples.map((t) => t.id).sort(),
+      direct.triples.map((t) => t.id).sort(),
+    );
+    for (const t of routed.triples) {
+      assert.equal(t.confidence, 'EXTRACTED');
+      assert.equal(t.provenance[0]!.content_hash, contentHash);
+      assert.equal(t.provenance[0]!.extractor, 'jsonl/field-map');
+    }
+  });
+
+  it('routes .json array with two linked records', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-extract-'));
+    const jsonPath = path.join(dir, 'linked.json');
+    const records = [
+      {
+        type: 'Concept',
+        label: 'Cause',
+        edges: [{ p: 'causes', o: { type: 'Concept', label: 'Effect' } }],
+      },
+      { type: 'Concept', label: 'Effect' },
+    ];
+    fs.writeFileSync(jsonPath, JSON.stringify(records, null, 2), 'utf8');
+
+    const result = mod.extractByPath(jsonPath);
+    assert.ok(result.nodes.length >= 2);
+    assert.equal(result.triples.length, 1);
+    assert.equal(result.triples[0]!.p, 'causes');
+    assert.equal(result.triples[0]!.confidence, 'EXTRACTED');
+    assert.equal(
+      result.triples[0]!.provenance[0]!.content_hash,
+      mod.fingerprintFile(jsonPath),
+    );
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('routes .md via extractMarkdown', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-extract-md-'));
+    const mdPath = path.join(dir, 'edge.md');
+    fs.writeFileSync(
+      mdPath,
+      '[[Alpha]] --related_to--> [[Beta]]\n',
+      'utf8',
+    );
+    const result = mod.extractByPath(mdPath);
+    assert.ok(result.nodes.length >= 2);
+    const edge = result.triples.find((t) => t.p === 'related_to');
+    assert.ok(edge);
+    assert.equal(edge!.confidence, 'EXTRACTED');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('unsupported extension yields UNSUPPORTED_EXTENSION diagnostic', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-extract-x-'));
+    const binPath = path.join(dir, 'data.bin');
+    fs.writeFileSync(binPath, 'not extracted', 'utf8');
+    const result = mod.extractByPath(binPath);
+    assert.equal(result.nodes.length, 0);
+    assert.equal(result.triples.length, 0);
+    assert.ok(
+      result.diagnostics.some((d) => d.code === 'UNSUPPORTED_EXTENSION'),
+    );
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('honors provided contentHash without re-fingerprint mismatch on extract', () => {
+    const content = fs.readFileSync(fixturePath, 'utf8');
+    const forced = 'sha256:deadbeef';
+    const result = mod.extractByPath(fixturePath, { contentHash: forced });
+    assert.ok(result.triples.length >= 2);
+    for (const t of result.triples) {
+      assert.equal(t.provenance[0]!.content_hash, forced);
+    }
+    // content still extracted from disk
+    void content;
+  });
 });

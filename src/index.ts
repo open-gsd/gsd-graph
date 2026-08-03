@@ -76,6 +76,8 @@ export {
 export { fingerprintFile } from './sources/fingerprint';
 export { extractMarkdown } from './sources/markdown';
 export { extractJsonl } from './sources/jsonl';
+export { extractByPath } from './pipeline/extract';
+export type { ExtractByPathOptions } from './pipeline/extract';
 export { redactSecrets } from './sources/redact';
 export { discoverSources, DEFAULT_MAX_BYTES } from './sources/discover';
 export type {
