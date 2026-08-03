@@ -48,7 +48,7 @@
 - [ ] **SNAP-01**: Snapshot save/list/restore of graph.v1
 - [ ] **DIFF-01**: Diff current graph vs snapshot / last-diff-base (± nodes & triples by id)
 - [ ] **REP-01**: Repair regenerates projection from v1 without inventing triples
-- [ ] **STAT-01**: Status reports node/triple counts, engine identity, freshness signals
+- [x] **STAT-01**: Status reports node/triple counts, engine identity, freshness signals
 
 ### CLI & agent contract
 
@@ -107,7 +107,7 @@
 | NORM-01 | Phase 2 | Complete |
 | NORM-02 | Phase 2 | Complete |
 | REV-01 | Phase 2 | Complete |
-| STAT-01 | Phase 2 | Pending |
+| STAT-01 | Phase 2 | Complete |
 | QRY-01 | Phase 3 | Pending |
 | QRY-02 | Phase 3 | Pending |
 | MNT-01 | Phase 3 | Pending |

@@ -5,13 +5,13 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: build-pipeline
 status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-08-03T03:43:52.216Z"
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-08-03T03:50:53.645Z"
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -54,6 +54,7 @@ None.
 | Phase 02-build-pipeline P01 | 7min | 3 tasks | 11 files |
 | Phase 02-build-pipeline P02 | 2min | 2 tasks | 5 files |
 | Phase 02 P03 | 6min | 3 tasks | 8 files |
+| Phase 02 P04 | 4min | 3 tasks | 6 files |
 
 ## Decisions
 
@@ -66,9 +67,11 @@ None.
 - [Phase 02-03]: Tasks 1–2 co-committed: merge + multiset shipped together (shared normalize module)
 - [Phase 02-03]: predicate_unknown accept without extendOntology coerces p→related_to (fail-closed)
 - [Phase 02-03]: mergeReviewItems never reopens accepted/rejected when decisions[] contains id
+- [Phase ?]: Incremental build strips provenance for changed paths and always re-normalizes (EXT-03 Phase 2 scope)
+- [Phase ?]: status() composes STAT-01 from graph.v1 + lock + queue; never projection as SoT
 
 ## Session
 
-**Last session:** 2026-08-03T03:43:52.205Z
-**Stopped at:** Completed 02-03-PLAN.md
+**Last session:** 2026-08-03T03:50:53.631Z
+**Stopped at:** Completed 02-04-PLAN.md
 **Resume file:** None
