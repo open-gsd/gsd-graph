@@ -66,7 +66,7 @@
 
 - [x] **LLM-01**: Optional LLM providers (`prompt` | `http`) for extract/normalize/answer with fail-closed schema
 - [x] **MCP-01**: Optional MCP tools for status/query/pack/answer; build/review-write off by default
-- [ ] **RPT-01**: Minimal GRAPH_REPORT.md writer
+- [x] **RPT-01**: Minimal GRAPH_REPORT.md writer
 - [x] **ONT-04**: Example research and engineering ontology packs
 
 ## v2 Requirements
@@ -125,7 +125,7 @@
 | GOLD-03 | Phase 5 | Complete |
 | LLM-01 | Phase 6 | Complete |
 | MCP-01 | Phase 6 | Complete |
-| RPT-01 | Phase 6 | Pending |
+| RPT-01 | Phase 6 | Complete |
 | ONT-04 | Phase 6 | Complete |
 | COM-01 | Phase 7 | Pending |
 
