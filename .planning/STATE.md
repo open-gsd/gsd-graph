@@ -35,6 +35,8 @@ progress:
 | Phase 6 CONTEXT + RESEARCH | ✓ |
 | Phase 6 plans 06-01..06-04 | ✓ plan-check PASS |
 | Phase 6 VALIDATION | ✓ |
+| 06-01 LLM providers | ✓ complete |
+| 06-04 Example packs | ✓ complete |
 
 ## Blockers
 
