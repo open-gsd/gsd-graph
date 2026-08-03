@@ -6,9 +6,11 @@ import pc from 'picocolors';
 import { GSD_GRAPH_REASON, GraphError } from './errors';
 import { resolveStoreRoot } from './io/paths';
 import { loadOntologyPack } from './ontology/load-pack';
+import { answer } from './pipeline/answer';
 import { build } from './pipeline/build';
 import { diff } from './pipeline/diff';
 import { init } from './pipeline/init';
+import { packSubgraph } from './pipeline/pack';
 import { query } from './pipeline/query';
 import { repair } from './pipeline/repair';
 import { loadReviewQueue, reviewResolve } from './pipeline/review';
@@ -337,7 +339,42 @@ function buildProgram(): Command {
       });
     });
 
-  // pack / answer intentionally unregistered until Phase 5 (D-02)
+  // Phase 5 grounding verbs — thin K22 adapters over packSubgraph / answer (D-06)
+  program
+    .command('pack')
+    .description('Pack a grounded subgraph for a natural-language question')
+    .argument('<question>', 'question text')
+    .option('--budget <n>', 'token budget', parseIntOpt)
+    .action((question: string, opts: { budget?: number }, cmd: Command) => {
+      const result = packSubgraph(
+        withDir(
+          {
+            question,
+            ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
+          },
+          globalDir(cmd),
+        ),
+      );
+      writeOk(result);
+    });
+
+  program
+    .command('answer')
+    .description('Deterministic grounded answer with triple citations')
+    .argument('<question>', 'question text')
+    .option('--budget <n>', 'token budget', parseIntOpt)
+    .action((question: string, opts: { budget?: number }, cmd: Command) => {
+      const result = answer(
+        withDir(
+          {
+            question,
+            ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
+          },
+          globalDir(cmd),
+        ),
+      );
+      writeOk(result);
+    });
 
   return program;
 }
