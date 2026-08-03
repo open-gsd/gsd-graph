@@ -98,7 +98,13 @@ Plans:
   3. `init` creates the store layout and appends the store dir to `.gitignore` when a gitignore exists
   4. Happy path init → build → query → path returns structured JSON without a TTY
 
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+
+- [ ] 04-01-PLAN.md — Bin publish + K22 CLI skeleton + library/CLI init (PKG-03, CLI-02, CLI-03)
+- [ ] 04-02-PLAN.md — Wire build/query/path/status/diff/snapshot/review/repair/ontology (CLI-01)
+- [ ] 04-03-PLAN.md — E2E spawn happy path + exit 0/1/2/3 matrix (PKG-03, CLI-01..03)
 
 ### Phase 5: Ground & prove 0.1.0
 
@@ -153,7 +159,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Foundation & identity | 3/3 | Complete | 2026-08-02 |
 | 2. Build pipeline | 4/4 | Complete |  |
 | 3. Query, lifecycle & maintain | 4/4 | Complete | 2026-08-03 |
-| 4. CLI surface | 0/TBD | Not started | - |
+| 4. CLI surface | 0/3 | Not started | - |
 | 5. Ground & prove 0.1.0 | 0/TBD | Not started | - |
 | 6. Optional agents | 0/TBD | Not started | - |
 | 7. Global themes 0.2 | 0/TBD | Not started | - |
