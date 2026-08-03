@@ -78,3 +78,45 @@ export interface GraphV1Document {
   communities?: unknown[];
   stats?: GraphStats;
 }
+
+// --- Review queue (REV-01 / D-08) — schema is authority ---
+
+/** Review queue item kinds (DESIGN review queue table). */
+export type ReviewKind =
+  | 'entity_merge'
+  | 'predicate_unknown'
+  | 'type_unknown'
+  | 'schema_drift';
+
+/** Decision embedded on a resolved review item. */
+export interface ReviewItemDecision {
+  action: 'accept' | 'reject';
+  at: string;
+  extend_ontology?: boolean;
+}
+
+/** Single review-queue item (pending or resolved). */
+export interface ReviewItem {
+  id: string;
+  kind: ReviewKind;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+  updated_at: string | null;
+  payload: Record<string, unknown>;
+  decision: ReviewItemDecision | null;
+}
+
+/** Append-only decision log entry on the queue document. */
+export interface ReviewDecisionRecord {
+  id: string;
+  action: 'accept' | 'reject';
+  at: string;
+  extend_ontology?: boolean;
+}
+
+/** review-queue.json document (store sidecar; schema authority). */
+export interface ReviewQueueDocument {
+  schema_version: 1;
+  items: ReviewItem[];
+  decisions: ReviewDecisionRecord[];
+}

@@ -15,6 +15,11 @@ export type {
   GraphV1Document,
   ExtractDiagnostic,
   ExtractResult,
+  ReviewKind,
+  ReviewItemDecision,
+  ReviewItem,
+  ReviewDecisionRecord,
+  ReviewQueueDocument,
 } from './types';
 
 export {
@@ -84,3 +89,10 @@ export type {
   DiscoverSourcesOptions,
   DiscoverSourcesResult,
 } from './sources/discover';
+
+// Normalize (02-03)
+export { normalize } from './pipeline/normalize';
+export type {
+  NormalizeInput,
+  NormalizeOutput,
+} from './pipeline/normalize';
