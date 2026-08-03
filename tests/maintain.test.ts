@@ -27,8 +27,30 @@ const mod = require(path.join(root, 'dist', 'index.js')) as {
     full?: boolean;
     writeProjection?: boolean;
   }) => BuildResult;
+  projectGraph: (v1: {
+    schema_version: 1;
+    engine: 'gsd-graph';
+    engine_version: string;
+    ontology_pack_id: string;
+    ontology_version: string;
+    built_at: string;
+    nodes: Array<{ id: string; type: string; label: string }>;
+    triples: Triple[];
+  }) => {
+    nodes: Array<{ id: string; type: string; label: string }>;
+    edges: Array<{
+      source: string;
+      target: string;
+      relation: string;
+      label: string;
+      confidence: Confidence;
+      id: string;
+    }>;
+  };
   loadGraphV1: (storeRoot: string) => {
     schema_version: number;
+    engine: string;
+    engine_version: string;
     nodes: Array<{ id: string; type: string; label: string }>;
     triples: Triple[];
     stats?: { node_count?: number; triple_count?: number };
@@ -351,5 +373,113 @@ describe('build({ full: false }) deleted-source gap (D-06)', () => {
     }
 
     void dropTripleBefore;
+  });
+});
+
+describe('projectGraph + writeProjection + last-diff-base (D-09 / OQ-3)', () => {
+  it('projectGraph maps triples to edges only — no invented triples', () => {
+    const t = triple('Concept:a', 'related_to', 'Concept:b', [
+      prov('/corpus/a.md', 'EXTRACTED'),
+    ]);
+    const v1 = {
+      schema_version: 1 as const,
+      engine: 'gsd-graph' as const,
+      engine_version: '0.1.0',
+      ontology_pack_id: 'general',
+      ontology_version: '1.0.0',
+      built_at: '2026-01-01T00:00:00.000Z',
+      nodes: [
+        { id: 'Concept:a', type: 'Concept', label: 'A' },
+        { id: 'Concept:b', type: 'Concept', label: 'B' },
+      ],
+      triples: [t],
+    };
+    const proj = mod.projectGraph(v1);
+    assert.equal(proj.nodes.length, 2);
+    assert.equal(proj.edges.length, 1);
+    assert.equal(proj.edges[0]!.source, 'Concept:a');
+    assert.equal(proj.edges[0]!.target, 'Concept:b');
+    assert.equal(proj.edges[0]!.relation, 'related_to');
+    assert.equal(proj.edges[0]!.label, 'related_to');
+    assert.equal(proj.edges[0]!.confidence, 'EXTRACTED');
+    assert.equal(proj.edges[0]!.id, t.id);
+  });
+
+  it('build({ writeProjection: true }) writes graph.json with edge_count = triple_count', () => {
+    const corpus = tempDir('gsd-mnt-proj-c-');
+    const store = tempDir('gsd-mnt-proj-s-');
+    fs.writeFileSync(
+      path.join(corpus, 'edges.md'),
+      '# Proj\n\n[[PA]] --related_to--> [[PB]]\n',
+      'utf8',
+    );
+
+    const result = mod.build({
+      corpus,
+      dir: store,
+      writeProjection: true,
+    });
+    assert.ok(result.triple_count >= 1);
+
+    const projPath = path.join(store, 'graph.json');
+    assert.equal(fs.existsSync(projPath), true);
+    const proj = JSON.parse(fs.readFileSync(projPath, 'utf8')) as {
+      nodes: unknown[];
+      edges: unknown[];
+    };
+    assert.equal(proj.edges.length, result.triple_count);
+    assert.equal(proj.nodes.length, result.node_count);
+
+    const graph = mod.loadGraphV1(store);
+    assert.equal(proj.edges.length, graph.triples.length);
+  });
+
+  it('successful build writes snapshots/.last-diff-base.json matching graph.v1 counts', () => {
+    const corpus = tempDir('gsd-mnt-base-c-');
+    const store = tempDir('gsd-mnt-base-s-');
+    fs.writeFileSync(
+      path.join(corpus, 'edges.md'),
+      '# Base\n\n[[BA]] --related_to--> [[BB]]\n',
+      'utf8',
+    );
+
+    const result = mod.build({ corpus, dir: store });
+    // Default writeProjection false still omits graph.json
+    assert.equal(fs.existsSync(path.join(store, 'graph.json')), false);
+
+    const basePath = path.join(store, 'snapshots', '.last-diff-base.json');
+    assert.equal(fs.existsSync(basePath), true);
+
+    const base = JSON.parse(fs.readFileSync(basePath, 'utf8')) as {
+      schema_version: number;
+      engine: string;
+      nodes: unknown[];
+      triples: unknown[];
+      stats?: { node_count?: number; triple_count?: number };
+    };
+    assert.equal(base.schema_version, 1);
+    assert.equal(base.engine, 'gsd-graph');
+    assert.equal(base.nodes.length, result.node_count);
+    assert.equal(base.triples.length, result.triple_count);
+
+    const graph = mod.loadGraphV1(store);
+    assert.equal(base.nodes.length, graph.nodes.length);
+    assert.equal(base.triples.length, graph.triples.length);
+  });
+
+  it('default writeProjection false still writes last-diff-base', () => {
+    const corpus = tempDir('gsd-mnt-def-c-');
+    const store = tempDir('gsd-mnt-def-s-');
+    fs.writeFileSync(
+      path.join(corpus, 'edges.md'),
+      '# Def\n\n[[DA]] --related_to--> [[DB]]\n',
+      'utf8',
+    );
+    mod.build({ corpus, dir: store });
+    assert.equal(fs.existsSync(path.join(store, 'graph.json')), false);
+    assert.equal(
+      fs.existsSync(path.join(store, 'snapshots', '.last-diff-base.json')),
+      true,
+    );
   });
 });

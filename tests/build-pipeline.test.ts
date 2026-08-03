@@ -122,6 +122,17 @@ describe('build() orchestrator (D-09, EXT-03)', () => {
     // Projection not required (DEFAULT_WRITE_PROJECTION false)
     assert.equal(fs.existsSync(path.join(store, 'graph.json')), false);
     assert.equal(fs.existsSync(path.join(store, 'graph.v1.json')), true);
+    // DIFF-01 prep: last-diff-base written under lock after successful build
+    const lastDiff = path.join(store, 'snapshots', '.last-diff-base.json');
+    assert.equal(fs.existsSync(lastDiff), true);
+    const base = JSON.parse(fs.readFileSync(lastDiff, 'utf8')) as {
+      schema_version: number;
+      nodes: unknown[];
+      triples: unknown[];
+    };
+    assert.equal(base.schema_version, 1);
+    assert.equal(base.nodes.length, result.node_count);
+    assert.equal(base.triples.length, result.triple_count);
   });
 
   it('writes sources.manifest.json, review-queue.json, ontology.lock.json sidecars', () => {

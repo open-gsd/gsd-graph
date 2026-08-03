@@ -144,3 +144,7 @@ export {
   maintain,
   normPathKey,
 } from './pipeline/maintain';
+
+// Projection helper (03-02 / REP-01 prep / D-09)
+export { projectGraph } from './pipeline/project';
+export type { GraphProjection, ProjectionEdge } from './pipeline/project';

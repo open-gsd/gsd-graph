@@ -25,8 +25,13 @@ import {
 } from '../io/atomic-publish';
 import { loadGraphV1 } from '../io/load-graph';
 import { acquireBuildLock } from '../io/lock';
-import { ensureStoreRoot, resolveStoreRoot, storeFile } from '../io/paths';
-import { readJsonFile } from '../io/safe-json';
+import {
+  confineUnderRoot,
+  ensureStoreRoot,
+  resolveStoreRoot,
+  storeFile,
+} from '../io/paths';
+import { readJsonFile, writeJsonAtomicTemp } from '../io/safe-json';
 import { loadOntologyPack } from '../ontology/load-pack';
 import type { LoadedOntology } from '../ontology/types';
 import { getPackageRoot } from '../schema/validators';
@@ -45,11 +50,15 @@ import type {
 import { extractByPath } from './extract';
 import { invalidateProvenance, normPathKey } from './maintain';
 import { normalize } from './normalize';
+import { projectGraph } from './project';
 import {
   emptyReviewQueue,
   loadReviewQueue,
   mergeReviewItems,
 } from './review';
+
+/** Auto baseline for DIFF-01 under store/snapshots (OQ-3). */
+const LAST_DIFF_BASE_REL = path.join('snapshots', '.last-diff-base.json');
 
 /** Hard cap on published node count (DESIGN / T-02-12). */
 export const MAX_NODES = 100_000;
@@ -357,16 +366,23 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
 
   const ontologyLock = buildOntologyLock(ontology);
 
+  const writeProjection = opts.writeProjection ?? DEFAULT_WRITE_PROJECTION;
+  const projection = writeProjection ? projectGraph(graphV1) : null;
+
   publishGraphFiles({
     storeRoot,
     graphV1,
-    writeProjection: opts.writeProjection ?? DEFAULT_WRITE_PROJECTION,
+    writeProjection,
+    projection,
     sidecars: {
       [MANIFEST_BASENAME]: manifest,
       [QUEUE_BASENAME]: reviewQueue,
       [ONTOLOGY_LOCK_BASENAME]: ontologyLock,
     },
   });
+
+  // DIFF-01 prep: full graph.v1 copy as last-diff-base while lock still held (D-10, OQ-3).
+  writeLastDiffBase(storeRoot, graphV1);
 
   const review_pending = reviewQueue.items.filter(
     (i) => i.status === 'pending',
@@ -385,4 +401,23 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
     engine_version,
     built_at,
   };
+}
+
+/**
+ * Write snapshots/.last-diff-base.json as a full graph.v1 copy under confinement.
+ * Called while build still holds .build.lock (D-10).
+ */
+function writeLastDiffBase(storeRoot: string, graphV1: GraphV1Document): void {
+  const snapshotsDir = confineUnderRoot(storeRoot, 'snapshots');
+  fs.mkdirSync(snapshotsDir, { recursive: true });
+  const finalPath = confineUnderRoot(storeRoot, LAST_DIFF_BASE_REL);
+  const tmpPath = confineUnderRoot(
+    storeRoot,
+    path.join(
+      'snapshots',
+      `.last-diff-base.json.tmp-${process.pid}-${Date.now()}`,
+    ),
+  );
+  writeJsonAtomicTemp(tmpPath, graphV1);
+  fs.renameSync(tmpPath, finalPath);
 }
