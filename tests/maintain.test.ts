@@ -135,6 +135,88 @@ describe('invalidateProvenance pure helper (MNT-01 / D-05)', () => {
     assert.equal(t.confidence, 'EXTRACTED');
   });
 
+  it('M2: drop both provenance sources → triple gone', () => {
+    const p1 = '/corpus/one.md';
+    const p2 = '/corpus/two.md';
+    const t = triple('Concept:a', 'related_to', 'Concept:b', [
+      prov(p1, 'EXTRACTED'),
+      prov(p2, 'INFERRED'),
+    ]);
+    const drop = new Set([mod.normPathKey(p1), mod.normPathKey(p2)]);
+    const out = mod.invalidateProvenance([t], drop);
+    assert.equal(out.length, 0);
+  });
+
+  it('M3: single EXTRACTED entry; drop that path → triple gone', () => {
+    const p = '/corpus/only.md';
+    const t = triple('Concept:a', 'related_to', 'Concept:b', [
+      prov(p, 'EXTRACTED'),
+    ]);
+    const out = mod.invalidateProvenance([t], new Set([mod.normPathKey(p)]));
+    assert.equal(out.length, 0);
+  });
+
+  it('M4: two EXTRACTED different paths; drop one → remains EXTRACTED', () => {
+    const p1 = '/corpus/a.md';
+    const p2 = '/corpus/b.md';
+    const t = triple('Concept:a', 'related_to', 'Concept:b', [
+      prov(p1, 'EXTRACTED', 'sha256:1'),
+      prov(p2, 'EXTRACTED', 'sha256:2'),
+    ]);
+    const out = mod.invalidateProvenance(
+      [t],
+      new Set([mod.normPathKey(p1)]),
+    );
+    assert.equal(out.length, 1);
+    assert.equal(out[0]!.confidence, 'EXTRACTED');
+    assert.equal(out[0]!.provenance.length, 1);
+    assert.equal(
+      mod.normPathKey(out[0]!.provenance[0]!.source_path),
+      mod.normPathKey(p2),
+    );
+  });
+
+  it('M5: multiset mixed tiers → confidence EXTRACTED if any remaining entry is EXTRACTED', () => {
+    // Direct invalidate after mixed multiset entries (bestTier path, D-02).
+    const keepExtracted = '/corpus/keep-extracted.md';
+    const dropAmbiguous = '/corpus/drop-ambiguous.md';
+    const dropInferred = '/corpus/drop-inferred.md';
+    const t = triple('Concept:a', 'related_to', 'Concept:b', [
+      prov(dropAmbiguous, 'AMBIGUOUS'),
+      prov(dropInferred, 'INFERRED'),
+      prov(keepExtracted, 'EXTRACTED'),
+    ]);
+    assert.equal(t.confidence, 'EXTRACTED');
+
+    const out = mod.invalidateProvenance(
+      [t],
+      new Set([
+        mod.normPathKey(dropAmbiguous),
+        mod.normPathKey(dropInferred),
+      ]),
+    );
+    assert.equal(out.length, 1);
+    assert.equal(out[0]!.confidence, 'EXTRACTED');
+    assert.equal(out[0]!.provenance.length, 1);
+    assert.equal(
+      mod.normPathKey(out[0]!.provenance[0]!.source_path),
+      mod.normPathKey(keepExtracted),
+    );
+
+    // Also: drop EXTRACTED only → remaining bestTier is INFERRED (not AMBIGUOUS)
+    const t2 = triple('Concept:c', 'supports', 'Concept:d', [
+      prov(keepExtracted, 'EXTRACTED'),
+      prov(dropInferred, 'INFERRED'),
+      prov(dropAmbiguous, 'AMBIGUOUS'),
+    ]);
+    const out2 = mod.invalidateProvenance(
+      [t2],
+      new Set([mod.normPathKey(keepExtracted)]),
+    );
+    assert.equal(out2.length, 1);
+    assert.equal(out2[0]!.confidence, 'INFERRED');
+  });
+
   it('when pathsToDrop empty, returns cloned triples without mutating inputs', () => {
     const t = triple('Concept:a', 'related_to', 'Concept:b', [
       prov('/corpus/a.md', 'EXTRACTED'),
@@ -146,6 +228,42 @@ describe('invalidateProvenance pure helper (MNT-01 / D-05)', () => {
     assert.deepEqual(out[0]!.provenance, t.provenance);
     out[0]!.provenance[0]!.content_hash = 'sha256:mutated';
     assert.equal(t.provenance[0]!.content_hash, 'sha256:abc');
+  });
+});
+
+describe('maintain() alias of build({ full: false }) (OQ-1)', () => {
+  it('matches sources_extracted / sources_skipped_fresh and triple counts on second run', () => {
+    const corpus = tempDir('gsd-mnt-alias-c-');
+    const storeA = tempDir('gsd-mnt-alias-sa-');
+    const storeB = tempDir('gsd-mnt-alias-sb-');
+
+    const file = path.join(corpus, 'edges.md');
+    fs.writeFileSync(
+      file,
+      '# Alias\n\n[[AliasA]] --related_to--> [[AliasB]]\n',
+      'utf8',
+    );
+
+    mod.build({ corpus, dir: storeA, full: true });
+    mod.build({ corpus, dir: storeB, full: true });
+
+    const viaMaintain = mod.maintain({ corpus, dir: storeA });
+    const viaBuild = mod.build({ corpus, dir: storeB, full: false });
+
+    assert.equal(viaMaintain.sources_extracted, viaBuild.sources_extracted);
+    assert.equal(
+      viaMaintain.sources_skipped_fresh,
+      viaBuild.sources_skipped_fresh,
+    );
+    assert.ok(viaMaintain.sources_skipped_fresh >= 1);
+    assert.equal(viaMaintain.sources_extracted, 0);
+
+    const gA = mod.loadGraphV1(storeA);
+    const gB = mod.loadGraphV1(storeB);
+    assert.equal(gA.triples.length, gB.triples.length);
+    assert.equal(gA.nodes.length, gB.nodes.length);
+    assert.equal(viaMaintain.triple_count, viaBuild.triple_count);
+    assert.equal(viaMaintain.node_count, viaBuild.node_count);
   });
 });
 
