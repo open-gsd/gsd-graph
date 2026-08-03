@@ -24,8 +24,7 @@ progress:
 - **Milestone:** v0.1.0 foundation complete; optional Phase 6 planned  
 - **Phase:** 6 (optional-agents) — EXECUTING
 - **Status:** Executing Phase 6
-- **Next action:** `/gsd-execute-phase 6`  
-  Note: 06-02 includes a human-verify legitimacy checkpoint before installing MCP SDK.
+- **Next action:** Continue Phase 6 remaining plans (06-03 if incomplete)
 
 ## Progress
 
@@ -36,6 +35,7 @@ progress:
 | Phase 6 plans 06-01..06-04 | ✓ plan-check PASS |
 | Phase 6 VALIDATION | ✓ |
 | 06-01 LLM providers | ✓ complete |
+| 06-02 MCP stdio server | ✓ complete |
 | 06-04 Example packs | ✓ complete |
 
 ## Blockers
