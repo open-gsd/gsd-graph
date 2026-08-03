@@ -26,6 +26,14 @@ const lib = require(path.join(root, 'dist', 'index.js')) as {
     triple_count: number;
   };
   nodeId: (type: string, label: string) => string;
+  tripleId: (s: string, p: string, o: string) => string;
+  publishGraphFiles: (opts: {
+    storeRoot: string;
+    graphV1: unknown;
+    writeProjection?: boolean;
+  }) => void;
+  ensureStoreRoot: (storeRoot: string) => string;
+  validateGraphV1: (data: unknown) => boolean;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -488,5 +496,155 @@ describe('cli-commands pack/answer grounding (D-06, ANS-01)', () => {
     assert.equal(body.pack.triples.length, 0);
     // Must not treat abstain as operational failure (exit 2)
     assert.ok(!result.stderr.includes('"ok":false'));
+  });
+});
+
+/**
+ * Two-clique synthetic store for communities CLI smoke (COM-01, D-06, D-10).
+ * Clique A (a1–a3) + Clique B (b1–b3), EXTRACTED mutual edges.
+ */
+function publishTwoCliquesStore(): string {
+  const store = lib.ensureStoreRoot(makeTmpDir('gsd-graph-cli-communities-'));
+  const a1 = 'concept:a1';
+  const a2 = 'concept:a2';
+  const a3 = 'concept:a3';
+  const b1 = 'concept:b1';
+  const b2 = 'concept:b2';
+  const b3 = 'concept:b3';
+  const nodes = [
+    { id: a1, type: 'Concept', label: 'A1' },
+    { id: a2, type: 'Concept', label: 'A2' },
+    { id: a3, type: 'Concept', label: 'A3' },
+    { id: b1, type: 'Concept', label: 'B1' },
+    { id: b2, type: 'Concept', label: 'B2' },
+    { id: b3, type: 'Concept', label: 'B3' },
+  ];
+  const edge = (
+    s: string,
+    p: string,
+    o: string,
+  ): {
+    id: string;
+    s: string;
+    p: string;
+    o: string;
+    confidence: 'EXTRACTED';
+    provenance: Array<{
+      source_path: string;
+      extractor: string;
+      content_hash: string;
+      confidence: 'EXTRACTED';
+    }>;
+  } => ({
+    id: lib.tripleId(s, p, o),
+    s,
+    p,
+    o,
+    confidence: 'EXTRACTED',
+    provenance: [
+      {
+        source_path: 'fixture://cli-communities',
+        extractor: 'test',
+        content_hash: 'sha256:test',
+        confidence: 'EXTRACTED',
+      },
+    ],
+  });
+  const triples = [
+    edge(a1, 'related_to', a2),
+    edge(a2, 'related_to', a3),
+    edge(a3, 'related_to', a1),
+    edge(b1, 'related_to', b2),
+    edge(b2, 'related_to', b3),
+    edge(b3, 'related_to', b1),
+  ];
+  const graph = {
+    schema_version: 1 as const,
+    engine: 'gsd-graph' as const,
+    engine_version: '0.1.0',
+    ontology_pack_id: 'general',
+    ontology_version: '1.0.0',
+    built_at: '2026-08-03T00:00:00.000Z',
+    nodes,
+    triples,
+  };
+  assert.equal(lib.validateGraphV1(graph), true, 'fixture must validate');
+  lib.publishGraphFiles({
+    storeRoot: store,
+    graphV1: graph,
+    writeProjection: false,
+  });
+  return store;
+}
+
+describe('cli-commands communities detect (COM-01, D-06, D-10)', () => {
+  it('communities detect returns K22 JSON with ok, community_count, index_path', () => {
+    const dir = publishTwoCliquesStore();
+    const result = run(['--dir', dir, 'communities', 'detect']);
+    assert.equal(result.code, 0, result.stderr);
+
+    // stdout must be pure JSON (no human banner)
+    assert.doesNotThrow(() => JSON.parse(result.stdout));
+    const body = result.json as {
+      ok: boolean;
+      community_count: number;
+      iterations: number;
+      stopped_reason: string;
+      nodes_considered: number;
+      edges_considered: number;
+      dropped_small_count: number;
+      communities: Array<{
+        id: string;
+        size: number;
+        label: string;
+        stable_key: string;
+      }>;
+      index_path: string;
+      report_paths?: string[];
+    };
+
+    assert.equal(body.ok, true);
+    assert.equal(body.community_count, 2);
+    assert.ok(body.community_count >= 1);
+    assert.equal(typeof body.iterations, 'number');
+    assert.ok(
+      body.stopped_reason === 'converged' ||
+        body.stopped_reason === 'max_iterations',
+    );
+    assert.ok(body.nodes_considered >= 6);
+    assert.ok(body.edges_considered >= 6);
+    assert.equal(typeof body.dropped_small_count, 'number');
+    assert.ok(Array.isArray(body.communities));
+    assert.equal(body.communities.length, 2);
+    for (const c of body.communities) {
+      assert.match(c.id, /^c_\d{4}$/);
+      assert.ok(c.size >= 3);
+      assert.equal(typeof c.label, 'string');
+      assert.equal(typeof c.stable_key, 'string');
+      assert.ok(c.stable_key.length > 0);
+    }
+    assert.equal(typeof body.index_path, 'string');
+    assert.ok(body.index_path.includes(path.join('communities', 'index.json')));
+    assert.ok(fs.existsSync(body.index_path));
+    assert.ok(Array.isArray(body.report_paths));
+    assert.equal(body.report_paths!.length, body.community_count);
+  });
+
+  it('unknown communities nested verb exits non-zero via mapCliError/usage', () => {
+    const dir = publishTwoCliquesStore();
+    const result = run(['--dir', dir, 'communities', 'louvain']);
+    assert.notEqual(result.code, 0);
+    const err = JSON.parse(result.stderr) as { ok: false; reason: string };
+    assert.equal(err.ok, false);
+    assert.equal(err.reason, 'usage');
+  });
+
+  it('communities without subcommand exits non-zero usage', () => {
+    const dir = publishTwoCliquesStore();
+    const result = run(['--dir', dir, 'communities']);
+    assert.notEqual(result.code, 0);
+    const err = JSON.parse(result.stderr) as { ok: false; reason: string };
+    assert.equal(err.ok, false);
+    assert.equal(err.reason, 'usage');
   });
 });
