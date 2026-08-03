@@ -675,3 +675,118 @@ describe('answer deterministic (ANS-01 / D-03)', () => {
 function escapeReg(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+describe('answer abstain empty pack (ANS-02 / D-04)', () => {
+  it('stopword / no-match questions abstain with empty_subgraph and do not throw', () => {
+    const g = multiHopGraph();
+
+    const stopOnly = mod.answer({
+      graph: g,
+      question: 'why does the do?',
+    });
+    assert.equal(stopOnly.abstained, true);
+    assert.equal(stopOnly.mode, 'abstain');
+    assert.equal(stopOnly.abstain_reason, mod.GSD_GRAPH_REASON.EMPTY_SUBGRAPH);
+    assert.equal(stopOnly.abstain_reason, 'empty_subgraph');
+    assert.equal(stopOnly.pack.triples.length, 0);
+    assert.ok(stopOnly.pack !== undefined, 'pack field still present for consumers');
+
+    const noMatch = mod.answer({
+      graph: g,
+      question: 'quantum entanglement teleportation',
+    });
+    assert.equal(noMatch.abstained, true);
+    assert.equal(noMatch.mode, 'abstain');
+    assert.equal(noMatch.abstain_reason, mod.GSD_GRAPH_REASON.EMPTY_SUBGRAPH);
+    assert.equal(noMatch.pack.triples.length, 0);
+  });
+
+  it('empty pack markdown does not fabricate relationship arrows (ANS-02)', () => {
+    // Empty graph: drought/causes language in the question must not invent edges
+    const emptyGraph = {
+      schema_version: 1 as const,
+      engine: 'gsd-graph' as const,
+      engine_version: '0.1.0',
+      ontology_pack_id: 'general',
+      ontology_version: '1.0.0',
+      built_at: '2026-08-03T00:00:00.000Z',
+      nodes: [] as Array<{ id: string; type: string; label: string }>,
+      triples: [] as Array<{
+        id: string;
+        s: string;
+        p: string;
+        o: string;
+        confidence: string;
+        provenance: unknown[];
+      }>,
+    };
+
+    const emptyAns = mod.answer({
+      graph: emptyGraph,
+      question: 'why does drought cause food shortage?',
+    });
+    assert.equal(emptyAns.abstained, true);
+    assert.equal(emptyAns.mode, 'abstain');
+    assert.equal(emptyAns.abstain_reason, 'empty_subgraph');
+    // Must not invent causes chain from the question text
+    assert.doesNotMatch(emptyAns.answer_markdown, /—causes→/);
+    assert.doesNotMatch(emptyAns.answer_markdown, /-causes→/);
+    assert.doesNotMatch(
+      emptyAns.answer_markdown,
+      /drought\s+.*causes.*food/i,
+    );
+    // Empty string OR single non-relational note only
+    const md = emptyAns.answer_markdown.trim();
+    if (md.length > 0) {
+      assert.doesNotMatch(md, /## Relationships/);
+      assert.doesNotMatch(md, /—\w+→/);
+    }
+
+    // Stopword-only on multi-hop graph also abstains without causes arrows
+    const stopAns = mod.answer({
+      graph: multiHopGraph(),
+      question: 'why does the do?',
+    });
+    assert.equal(stopAns.abstained, true);
+    assert.doesNotMatch(stopAns.answer_markdown, /—causes→/);
+    assert.doesNotMatch(stopAns.answer_markdown, /-causes→/);
+  });
+
+  it('unmatched multi-hop-style question on free graph with no seeds abstains honestly', () => {
+    const g = multiHopGraph();
+    // Tokens must not be substrings of Drought / Crop Failure / Food Shortage labels
+    const ans = mod.answer({
+      graph: g,
+      question: 'quantum entanglement teleportation',
+    });
+    assert.equal(ans.abstained, true);
+    assert.equal(ans.mode, 'abstain');
+    assert.equal(ans.abstain_reason, mod.GSD_GRAPH_REASON.EMPTY_SUBGRAPH);
+    assert.equal(ans.pack.triples.length, 0);
+    assert.equal(ans.pack.paths.length, 0);
+    assert.doesNotMatch(ans.answer_markdown, /—causes→/);
+    assert.doesNotMatch(ans.answer_markdown, /Concept:drought/);
+  });
+
+  it('answer returns (no throw) for empty pack — GraphError not used for abstain', () => {
+    const g = multiHopGraph();
+    assert.doesNotThrow(() => {
+      mod.answer({ graph: g, question: 'why does the do?' });
+    });
+    assert.doesNotThrow(() => {
+      mod.answer({
+        graph: {
+          schema_version: 1,
+          engine: 'gsd-graph',
+          engine_version: '0.1.0',
+          ontology_pack_id: 'general',
+          ontology_version: '1.0.0',
+          built_at: '2026-08-03T00:00:00.000Z',
+          nodes: [],
+          triples: [],
+        },
+        question: 'why does drought cause food shortage?',
+      });
+    });
+  });
+});
