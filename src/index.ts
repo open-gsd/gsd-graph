@@ -34,3 +34,21 @@ export type {
   PolicyAction,
   PolicyDecision,
 } from './ontology/types';
+
+// Store IO (01-03)
+export {
+  DEFAULT_STORE_DIR,
+  resolveStoreRoot,
+  ensureStoreRoot,
+  confineUnderRoot,
+  storeFile,
+} from './io/paths';
+export type { ResolveStoreRootOptions, StoreBasename } from './io/paths';
+
+export {
+  DEFAULT_WRITE_PROJECTION,
+  publishGraphFiles,
+} from './io/atomic-publish';
+export type { PublishPlan } from './io/atomic-publish';
+
+export { loadGraphV1 } from './io/load-graph';
