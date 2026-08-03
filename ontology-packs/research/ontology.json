@@ -1,0 +1,56 @@
+{
+  "id": "research",
+  "version": "1",
+  "title": "Research literature",
+  "node_types": [
+    "Entity",
+    "Person",
+    "Organization",
+    "Document",
+    "Paper",
+    "Author",
+    "Method",
+    "Dataset",
+    "Claim",
+    "Concept",
+    "Topic"
+  ],
+  "predicates": [
+    { "id": "related_to", "domain": ["*"], "range": ["*"] },
+    {
+      "id": "authored",
+      "domain": ["Author", "Person", "Organization"],
+      "range": ["Paper", "Document", "Claim"]
+    },
+    {
+      "id": "cites",
+      "domain": ["Paper", "Document", "Claim"],
+      "range": ["Paper", "Document", "Claim"]
+    },
+    {
+      "id": "evaluates",
+      "domain": ["Paper", "Method"],
+      "range": ["Method", "Dataset", "Claim"]
+    },
+    {
+      "id": "uses_method",
+      "domain": ["Paper", "Claim"],
+      "range": ["Method"]
+    },
+    {
+      "id": "about",
+      "domain": ["Paper", "Document", "Claim"],
+      "range": ["Topic", "Concept", "Entity"]
+    },
+    {
+      "id": "supports",
+      "domain": ["Claim", "Document", "Paper"],
+      "range": ["Claim"]
+    },
+    { "id": "contradicts", "domain": ["Claim"], "range": ["Claim"] },
+    { "id": "same_as", "domain": ["*"], "range": ["*"] }
+  ],
+  "strict": true,
+  "unknown_predicate_policy": "review",
+  "unknown_type_policy": "review"
+}
