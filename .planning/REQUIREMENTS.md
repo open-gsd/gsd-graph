@@ -127,7 +127,7 @@
 | MCP-01 | Phase 6 | Complete |
 | RPT-01 | Phase 6 | Complete |
 | ONT-04 | Phase 6 | Complete |
-| COM-01 | Phase 7 | Pending |
+| COM-01 | Phase 7 | In Progress |
 
 ---
 *Requirements defined: 2026-08-02 after research synthesis*
