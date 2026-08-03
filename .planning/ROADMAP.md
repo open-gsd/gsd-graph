@@ -14,7 +14,7 @@ Ship `@opengsd/gsd-graph` as a standalone Graph Engineering toolkit: bootstrap a
 Critical path to **0.1.0**: Phases 1–5. Phase 6 is optional for the tag. Phase 7 is **0.2.0**.
 
 - [x] **Phase 1: Foundation & identity** - Installable package, ontology contract, crash-safe store IO
-- [ ] **Phase 2: Build pipeline** - Extract → normalize → review → publish graph.v1
+- [x] **Phase 2: Build pipeline** - Extract → normalize → review → publish graph.v1
 - [ ] **Phase 3: Query, lifecycle & maintain** - Query IR, snapshots/diff/repair, incremental M1–M5
 - [ ] **Phase 4: CLI surface** - `gsd-graph` machine contract over library ops
 - [ ] **Phase 5: Ground & prove 0.1.0** - packSubgraph, cited answers, G0–G4 goldens, release tag
