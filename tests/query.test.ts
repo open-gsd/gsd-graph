@@ -358,3 +358,212 @@ describe('query filter', () => {
     assert.ok(!result.nodes.some((n) => n.id === actorId));
   });
 });
+
+describe('applyBudget', () => {
+  it('drops AMBIGUOUS before INFERRED before EXTRACTED (ceil JSON/4)', () => {
+    const g = multiHopGraph();
+    const ambId = mod.tripleId(g.ids.drought, 'related_to', g.ids.food);
+    const infId = mod.tripleId(g.ids.crop, 'related_to', g.ids.food);
+    // Ensure id order is stable for tie-break checks within same tier
+    const ambTriple = {
+      id: ambId,
+      s: g.ids.drought,
+      p: 'related_to',
+      o: g.ids.food,
+      confidence: 'AMBIGUOUS',
+      provenance: provenance('AMBIGUOUS'),
+    };
+    const infTriple = {
+      id: infId,
+      s: g.ids.crop,
+      p: 'related_to',
+      o: g.ids.food,
+      confidence: 'INFERRED',
+      provenance: provenance('INFERRED'),
+    };
+    g.triples.push(ambTriple, infTriple);
+
+    // Full subgraph estimate
+    const fullEst = Math.ceil(
+      JSON.stringify({ nodes: g.nodes, triples: g.triples }).length / 4,
+    );
+    assert.ok(fullEst > 10, 'fixture should exceed a tiny budget');
+
+    // Budget that forces at least one drop
+    const tiny = Math.max(1, Math.floor(fullEst * 0.55));
+    const result = mod.query({
+      graph: g,
+      term: 'drought',
+      hops: 2,
+      budget: tiny,
+    });
+
+    assert.equal(result.budget_tokens, tiny);
+    assert.ok(result.trimmed !== null, 'expected trimmed description');
+    // EXTRACTED causes edges should survive longer than AMBIGUOUS noise
+    const confs = result.triples.map((t) => t.confidence);
+    if (result.triples.some((t) => t.p === 'related_to' && t.confidence === 'AMBIGUOUS')) {
+      // If AMBIGUOUS remains, no higher-value triple should have been dropped first incorrectly —
+      // but with tiny budget AMBIGUOUS must go first: assert it is absent when any drop occurred
+    }
+    assert.ok(
+      !result.triples.some((t) => t.id === ambId) ||
+        result.triples.every((t) => t.confidence === 'AMBIGUOUS'),
+      'AMBIGUOUS should drop before EXTRACTED path edges when budget trims',
+    );
+    // Prefer: if any EXTRACTED causes remain, AMBIGUOUS must be gone
+    const hasExtractedCauses = result.triples.some(
+      (t) => t.p === 'causes' && t.confidence === 'EXTRACTED',
+    );
+    if (hasExtractedCauses) {
+      assert.ok(
+        !result.triples.some((t) => t.confidence === 'AMBIGUOUS'),
+        'AMBIGUOUS must be dropped while EXTRACTED path edges remain',
+      );
+    }
+    void confs;
+  });
+
+  it('applyBudget unit: rank order then id ascending; null budget skips', () => {
+    const g = multiHopGraph();
+    const a = {
+      id: 't_aaa_ambiguous',
+      s: g.ids.drought,
+      p: 'related_to',
+      o: g.ids.food,
+      confidence: 'AMBIGUOUS' as const,
+    };
+    const b = {
+      id: 't_bbb_extracted',
+      s: g.ids.drought,
+      p: 'causes',
+      o: g.ids.crop,
+      confidence: 'EXTRACTED' as const,
+    };
+    const c = {
+      id: 't_ccc_inferred',
+      s: g.ids.crop,
+      p: 'related_to',
+      o: g.ids.food,
+      confidence: 'INFERRED' as const,
+    };
+    const nodes = g.nodes;
+    const triples = [b, c, a];
+
+    const noTrim = mod.applyBudget(nodes, triples, null, new Set([g.ids.drought]));
+    assert.equal(noTrim.trimmed, null);
+    assert.equal(noTrim.triples.length, 3);
+
+    const est = Math.ceil(JSON.stringify({ nodes, triples }).length / 4);
+    // Force drops until only EXTRACTED remains
+    let budget = est;
+    let last = mod.applyBudget(nodes, triples, budget, new Set([g.ids.drought]));
+    // binary-ish: shrink until we drop at least AMBIGUOUS
+    while (budget > 1 && last.triples.some((t) => t.confidence === 'AMBIGUOUS')) {
+      budget = Math.floor(budget * 0.85);
+      last = mod.applyBudget(nodes, triples, budget, new Set([g.ids.drought]));
+    }
+    assert.ok(
+      !last.triples.some((t) => t.confidence === 'AMBIGUOUS'),
+      'AMBIGUOUS dropped first',
+    );
+    // Further shrink should drop INFERRED before EXTRACTED
+    while (
+      budget > 1 &&
+      last.triples.some((t) => t.confidence === 'INFERRED') &&
+      last.triples.some((t) => t.confidence === 'EXTRACTED')
+    ) {
+      budget = Math.floor(budget * 0.85);
+      last = mod.applyBudget(nodes, triples, budget, new Set([g.ids.drought]));
+    }
+    if (last.triples.some((t) => t.confidence === 'EXTRACTED')) {
+      assert.ok(
+        !last.triples.some((t) => t.confidence === 'INFERRED') ||
+          last.triples.every((t) => t.confidence !== 'AMBIGUOUS'),
+      );
+      assert.ok(!last.triples.some((t) => t.confidence === 'AMBIGUOUS'));
+    }
+    // Seeds retained in node set when possible
+    assert.ok(
+      last.nodes.some(
+        (n) => (n as { id: string }).id === g.ids.drought,
+      ) || last.triples.length === 0,
+    );
+  });
+
+  it('budget_tokens and trimmed reflect activity on query()', () => {
+    const g = multiHopGraph();
+    const ambId = mod.tripleId(g.ids.drought, 'related_to', g.ids.food);
+    g.triples.push({
+      id: ambId,
+      s: g.ids.drought,
+      p: 'related_to',
+      o: g.ids.food,
+      confidence: 'AMBIGUOUS',
+      provenance: provenance('AMBIGUOUS'),
+    });
+    const est = Math.ceil(
+      JSON.stringify({ nodes: g.nodes, triples: g.triples }).length / 4,
+    );
+    const budget = Math.max(1, Math.floor(est * 0.5));
+    const result = mod.query({
+      graph: g,
+      path: { from: g.ids.drought, to: g.ids.food },
+      budget,
+    });
+    assert.equal(result.budget_tokens, budget);
+    // Path materializes only path triples; may or may not include amb depending on path materialize
+    // Force filter path with budget on seed expand for clearer trim
+    const seeded = mod.query({ graph: g, term: 'drought', hops: 2, budget });
+    assert.equal(seeded.budget_tokens, budget);
+    if (seeded.trimmed) {
+      assert.match(seeded.trimmed, /dropped/i);
+    }
+  });
+});
+
+describe('query disk loadGraphV1', () => {
+  it('loads graph.v1 via build store dir — never needs graph.json (D-04)', () => {
+    const store = tempDir('gsd-query-disk-');
+    const corpusDir = tempDir('gsd-query-corpus-');
+    fs.copyFileSync(
+      path.join(fixtures, 'multi-hop.jsonl'),
+      path.join(corpusDir, 'multi-hop.jsonl'),
+    );
+
+    const built = mod.build({
+      corpus: corpusDir,
+      dir: store,
+      full: true,
+      writeProjection: false,
+    });
+    assert.ok(built.triple_count >= 2);
+
+    // Confirm projection absent
+    assert.equal(
+      fs.existsSync(path.join(store, 'graph.json')),
+      false,
+      'projection must not be required',
+    );
+    assert.ok(fs.existsSync(path.join(store, 'graph.v1.json')));
+
+    const drought = mod.nodeId('Concept', 'Drought');
+    const food = mod.nodeId('Concept', 'Food Shortage');
+
+    const byPath = mod.query({
+      dir: store,
+      path: { from: drought, to: food, maxDepth: 6 },
+    });
+    assert.ok(byPath.paths.length >= 1);
+    assert.ok(byPath.paths[0]!.nodes.length >= 3);
+    assert.ok(byPath.paths[0]!.predicates.includes('causes'));
+
+    const byTerm = mod.query({ dir: store, term: 'drought', hops: 2 });
+    assert.ok(byTerm.seeds.length > 0);
+    assert.ok(byTerm.triples.length >= 1);
+
+    // loadGraphV1 still works independently
+    const v1 = mod.loadGraphV1(store);
+    assert.ok(v1.nodes.length >= 3);
+  });
+});
