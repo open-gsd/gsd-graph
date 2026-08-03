@@ -1,13 +1,14 @@
 {
   "name": "@opengsd/gsd-graph",
   "version": "0.1.0",
-  "description": "Graph Engineering toolkit \u2014 extract, normalize, store, query, and ground knowledge graphs from document corpora",
+  "description": "Graph Engineering toolkit — extract, normalize, store, query, and ground knowledge graphs from document corpora",
   "license": "MIT",
   "author": "Jeremy McSpadden <jeremy@fluxlabs.net>",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "gsd-graph": "./bin/gsd-graph.js"
+    "gsd-graph": "./bin/gsd-graph.js",
+    "gsd-graph-mcp": "./bin/gsd-graph-mcp.js"
   },
   "exports": {
     ".": {
@@ -36,10 +37,12 @@
     "test:coverage": "npm run build && npm run build:test && c8 --check-coverage --lines 80 node --test dist-test/**/*.test.js"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "commander": "^14.0.3",
-    "picocolors": "^1.1.1"
+    "picocolors": "^1.1.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",

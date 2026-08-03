@@ -200,3 +200,54 @@ describe('package identity bin (PKG-03, D-01, D-09)', () => {
     assert.ok(typeof body.node_types === 'number' && body.node_types > 0);
   });
 });
+
+describe('package identity MCP bin (MCP-01, D-07)', () => {
+  it('publishes bin gsd-graph-mcp → ./bin/gsd-graph-mcp.js', () => {
+    const pkg = readPackageJson();
+    const bin = pkg.bin as Record<string, string> | undefined;
+    assert.ok(bin, 'bin field required');
+    assert.equal(bin['gsd-graph-mcp'], './bin/gsd-graph-mcp.js');
+  });
+
+  it('bin/gsd-graph-mcp.js has node shebang and invokes MCP main', () => {
+    const binPath = join(root, 'bin', 'gsd-graph-mcp.js');
+    assert.equal(existsSync(binPath), true, 'bin/gsd-graph-mcp.js missing');
+    const source = readFileSync(binPath, 'utf8');
+    const firstLine = source.split(/\r?\n/)[0] ?? '';
+    assert.equal(firstLine, '#!/usr/bin/env node');
+    assert.match(source, /require\(['"]\.\.\/dist\/mcp\/server\.js['"]\)/);
+    assert.match(source, /main\(/);
+  });
+
+  it('dependencies pin @modelcontextprotocol/sdk 1.x and zod (not 2.x package names)', () => {
+    const pkg = readPackageJson();
+    const deps = pkg.dependencies as Record<string, string> | undefined;
+    assert.ok(deps, 'dependencies required');
+
+    const sdk = deps['@modelcontextprotocol/sdk'];
+    assert.equal(typeof sdk, 'string', '@modelcontextprotocol/sdk dependency required');
+    assert.match(
+      sdk as string,
+      /\^?1(\.|$)/,
+      `@modelcontextprotocol/sdk must be 1.x, got ${sdk}`,
+    );
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(deps, '@modelcontextprotocol/server'),
+      false,
+      'must not depend on @modelcontextprotocol/server 2.x package',
+    );
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(deps, '@modelcontextprotocol/client'),
+      false,
+      'must not depend on @modelcontextprotocol/client 2.x package',
+    );
+
+    const zodRange = deps.zod;
+    assert.equal(typeof zodRange, 'string', 'zod dependency required for MCP inputSchema');
+    assert.match(
+      zodRange as string,
+      /\^?[34](\.|$)/,
+      `zod must be 3.x or 4.x peer-compatible, got ${zodRange}`,
+    );
+  });
+});
