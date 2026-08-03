@@ -12,6 +12,7 @@ const root = path.join(__dirname, '..');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const mod = require(path.join(root, 'dist', 'index.js')) as {
   DEFAULT_WRITE_PROJECTION: boolean;
+  DEFAULT_STORE_DIR: string;
   publishGraphFiles: (plan: {
     storeRoot: string;
     graphV1: object;
@@ -27,6 +28,12 @@ const mod = require(path.join(root, 'dist', 'index.js')) as {
     nodes: unknown[];
   };
   ensureStoreRoot: (storeRoot: string) => string;
+  resolveStoreRoot: (opts?: object) => string;
+  confineUnderRoot: (root: string, candidate: string) => string;
+  acquireBuildLock: (
+    storeRoot: string,
+    owner: 'cli' | 'lib' | 'mcp' | 'test',
+  ) => { release(): void; lockPath: string };
   GraphError: new (reason: string, message: string, details?: unknown) => Error & {
     reason: string;
   };
@@ -239,5 +246,74 @@ describe('publishGraphFiles + loadGraphV1 (STORE-02/03)', () => {
     const loaded = mod.loadGraphV1(store);
     assert.equal(loaded.schema_version, 1);
     assert.equal(loaded.engine, 'gsd-graph');
+  });
+});
+
+describe('lock + publish contract (STORE-02/03/04 integration)', () => {
+  it('acquireBuildLock → publishGraphFiles → release; projection disposable (D-04)', () => {
+    const store = trackStore();
+    const lock = mod.acquireBuildLock(store, 'test');
+    try {
+      mod.publishGraphFiles({
+        storeRoot: store,
+        graphV1: minimalGraph(),
+        projection: { nodes: [{ id: 'x' }], edges: [] },
+        writeProjection: true,
+      });
+    } finally {
+      lock.release();
+    }
+
+    assert.ok(fs.existsSync(path.join(store, 'graph.v1.json')));
+    assert.ok(fs.existsSync(path.join(store, 'graph.json')));
+    assert.equal(fs.existsSync(path.join(store, '.build.lock')), false);
+
+    const before = mod.loadGraphV1(store);
+    assert.equal(before.engine, 'gsd-graph');
+
+    // Projection is disposable — delete it; SoT load still works
+    fs.unlinkSync(path.join(store, 'graph.json'));
+    const after = mod.loadGraphV1(store);
+    assert.equal(after.schema_version, 1);
+    assert.equal(after.nodes.length, 1);
+  });
+
+  it('nested acquireBuildLock while held throws BUILD_LOCKED', () => {
+    const store = trackStore();
+    const outer = mod.acquireBuildLock(store, 'test');
+    try {
+      assert.throws(
+        () => mod.acquireBuildLock(store, 'lib'),
+        (err: unknown) => {
+          assert.ok(err instanceof mod.GraphError);
+          assert.equal(
+            (err as InstanceType<typeof mod.GraphError>).reason,
+            mod.GSD_GRAPH_REASON.BUILD_LOCKED,
+          );
+          return true;
+        },
+      );
+
+      // publish still works under held lock
+      mod.publishGraphFiles({
+        storeRoot: store,
+        graphV1: minimalGraph(),
+        writeProjection: false,
+      });
+      assert.ok(fs.existsSync(path.join(store, 'graph.v1.json')));
+    } finally {
+      outer.release();
+    }
+  });
+
+  it('public façade exports store IO surface', () => {
+    assert.equal(typeof mod.resolveStoreRoot, 'function');
+    assert.equal(typeof mod.confineUnderRoot, 'function');
+    assert.equal(typeof mod.ensureStoreRoot, 'function');
+    assert.equal(typeof mod.acquireBuildLock, 'function');
+    assert.equal(typeof mod.publishGraphFiles, 'function');
+    assert.equal(typeof mod.loadGraphV1, 'function');
+    assert.equal(mod.DEFAULT_STORE_DIR, '.gsd-graph');
+    assert.equal(mod.DEFAULT_WRITE_PROJECTION, false);
   });
 });
