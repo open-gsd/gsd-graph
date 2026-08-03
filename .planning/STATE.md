@@ -4,15 +4,15 @@ milestone: v0.2.0
 milestone_name: milestone
 current_phase: 5
 current_phase_name: ground-prove-0-1-0
-current_plan: 4 of 4 (05-04 next)
-status: ready
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-08-03T15:35:30.000Z"
+current_plan: 4 of 4 (complete)
+status: phase_complete
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-08-03T15:39:30.000Z"
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 23
-  completed_plans: 17
+  completed_plans: 18
 ---
 
 # Project State
@@ -23,10 +23,10 @@ progress:
 ## Current position
 
 - **Milestone:** v0.1.0 foundation  
-- **Phase:** 5 (ground-prove-0-1-0) — EXECUTING
-- **Current Plan:** 4 of 4 (05-04 next)
-- **Status:** Executing Phase 5 — 05-03 complete
-- **Next action:** Execute 05-04-PLAN.md (goldens + 0.1.0 readiness)
+- **Phase:** 5 (ground-prove-0-1-0) — PLANS COMPLETE (await verify)
+- **Current Plan:** 4 of 4 (complete)
+- **Status:** Phase 5 plans 05-01..05-04 complete — 0.1.0 goldens + CHANGELOG green
+- **Next action:** Phase 5 verify-work / ship readiness (tag optional)
 
 ## Progress
 
@@ -39,6 +39,7 @@ progress:
 | 05-01 packSubgraph | ✓ Complete |
 | 05-02 answer + abstain | ✓ Complete |
 | 05-03 CLI pack/answer | ✓ Complete |
+| 05-04 goldens + 0.1.0 readiness | ✓ Complete |
 
 ## Blockers
 
@@ -51,6 +52,7 @@ None.
 | Phase 05 P01 | 12min | 2 tasks | 4 files |
 | Phase 05 P02 | 3min | 2 tasks | 4 files |
 | Phase 05 P03 | 2min | 2 tasks | 3 files |
+| Phase 05 P04 | 3min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -62,9 +64,12 @@ None.
 - [Phase 5]: Mirror query adapter shape for pack/answer CLI (question + optional --budget + withDir + writeOk)
 - [Phase 5]: Multi-hop-only isolated corpus for CLI pack/answer smoke
 - [Phase 5]: Abstain answer exits 0 at both main() and process-spawn levels (ANS-02)
+- [Phase 5]: G0 pass = abstain OR no typed multi-hop path (about edges allowed)
+- [Phase 5]: G3/G4 covered by query applyBudget + maintain M1–M5 (not reimplemented in goldens)
+- [Phase 5]: 0.1.0 releasable at green suite + CHANGELOG; no in-plan npm publish/tag
 
 ## Session
 
-**Last session:** 2026-08-03T15:35:11.449Z
-**Stopped at:** Completed 05-03-PLAN.md
+**Last session:** 2026-08-03T15:39:19.712Z
+**Stopped at:** Completed 05-04-PLAN.md
 **Resume file:** None

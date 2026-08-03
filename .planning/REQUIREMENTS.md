@@ -58,9 +58,9 @@
 
 ### Quality gates
 
-- [ ] **GOLD-01**: Golden G0 (abstain on unstructured free prose offline)
-- [ ] **GOLD-02**: Golden G1+ multi-hop on link/JSONL structured fixtures with path assertions
-- [ ] **GOLD-03**: 0.1.0 release only after goldens + M1–M5 + core CLI green
+- [x] **GOLD-01**: Golden G0 (abstain on unstructured free prose offline)
+- [x] **GOLD-02**: Golden G1+ multi-hop on link/JSONL structured fixtures with path assertions
+- [x] **GOLD-03**: 0.1.0 release only after goldens + M1–M5 + core CLI green
 
 ### Optional for 0.1 tag (non-blocking)
 
@@ -120,9 +120,9 @@
 | PACK-01 | Phase 5 | Complete |
 | ANS-01 | Phase 5 | Complete |
 | ANS-02 | Phase 5 | Complete |
-| GOLD-01 | Phase 5 | Pending |
-| GOLD-02 | Phase 5 | Pending |
-| GOLD-03 | Phase 5 | Pending |
+| GOLD-01 | Phase 5 | Complete |
+| GOLD-02 | Phase 5 | Complete |
+| GOLD-03 | Phase 5 | Complete |
 | LLM-01 | Phase 6 | Pending |
 | MCP-01 | Phase 6 | Pending |
 | RPT-01 | Phase 6 | Pending |
