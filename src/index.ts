@@ -25,6 +25,7 @@ export type {
 export {
   validateGraphV1,
   validateOntologyPack,
+  validateReviewQueue,
   formatAjvErrors,
 } from './schema/validators';
 
@@ -90,9 +91,17 @@ export type {
   DiscoverSourcesResult,
 } from './sources/discover';
 
-// Normalize (02-03)
+// Normalize + review (02-03)
 export { normalize } from './pipeline/normalize';
 export type {
   NormalizeInput,
   NormalizeOutput,
 } from './pipeline/normalize';
+
+export {
+  emptyReviewQueue,
+  loadReviewQueue,
+  mergeReviewItems,
+  reviewResolve,
+} from './pipeline/review';
+export type { ReviewResolveOptions } from './pipeline/review';

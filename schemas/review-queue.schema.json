@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opengsd.dev/schemas/review-queue.schema.json",
+  "title": "gsd-graph review-queue",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "items", "decisions"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "created_at",
+          "updated_at",
+          "payload",
+          "decision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rv_[0-9a-f]{8}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "entity_merge",
+              "predicate_unknown",
+              "type_unknown",
+              "schema_drift"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "accepted", "rejected"]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "decision": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["action", "at"],
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": ["accept", "reject"]
+                  },
+                  "at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "extend_ontology": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "action", "at"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rv_[0-9a-f]{8}$"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["accept", "reject"]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "extend_ontology": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

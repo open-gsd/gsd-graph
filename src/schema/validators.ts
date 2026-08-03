@@ -1,4 +1,4 @@
-// gsd-graph — Ajv compile-once validators for graph.v1 and ontology packs
+// gsd-graph — Ajv compile-once validators for graph.v1, ontology packs, review-queue
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { readFileSync } from 'node:fs';
@@ -26,6 +26,7 @@ addFormats(ajv);
 
 const graphV1Schema = loadSchema('graph-v1.schema.json');
 const ontologyPackSchema = loadSchema('ontology-pack.schema.json');
+const reviewQueueSchema = loadSchema('review-queue.schema.json');
 
 /** Compile once at module load (D-09) — do not recompile per call. */
 export const validateGraphV1: ValidateFunction = ajv.compile(graphV1Schema);
@@ -33,6 +34,10 @@ export const validateGraphV1: ValidateFunction = ajv.compile(graphV1Schema);
 /** Compile once at module load (D-09) — do not recompile per call. */
 export const validateOntologyPack: ValidateFunction =
   ajv.compile(ontologyPackSchema);
+
+/** Compile once at module load (D-09 / OQ-4) — review-queue.json authority. */
+export const validateReviewQueue: ValidateFunction =
+  ajv.compile(reviewQueueSchema);
 
 /** Human-readable Ajv error summary for GraphError details. */
 export function formatAjvErrors(
