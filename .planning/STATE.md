@@ -24,7 +24,7 @@ progress:
 ## Current Position
 
 Phase: 4 of 4 (cli-surface)
-Plan: 3 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: Ready to execute
 Last activity: 2026-08-03 — Completed 04-01-PLAN.md (bin + init + K22)
 
