@@ -139,7 +139,7 @@ Each task was committed atomically:
 2. **Task 2: End-to-end MCP graph_status tool + bin scaffold** - `bb156f6` (feat)
 3. **Task 3: Full read tool matrix + default-off write tools** - `6362c67` (feat)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `31097b3` (docs: complete plan); `3345601` (docs: STATE progress)
 
 ## Files Created/Modified
 
