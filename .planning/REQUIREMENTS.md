@@ -64,7 +64,7 @@
 
 ### Optional for 0.1 tag (non-blocking)
 
-- [ ] **LLM-01**: Optional LLM providers (`prompt` | `http`) for extract/normalize/answer with fail-closed schema
+- [x] **LLM-01**: Optional LLM providers (`prompt` | `http`) for extract/normalize/answer with fail-closed schema
 - [ ] **MCP-01**: Optional MCP tools for status/query/pack/answer; build/review-write off by default
 - [ ] **RPT-01**: Minimal GRAPH_REPORT.md writer
 - [x] **ONT-04**: Example research and engineering ontology packs
@@ -123,7 +123,7 @@
 | GOLD-01 | Phase 5 | Complete |
 | GOLD-02 | Phase 5 | Complete |
 | GOLD-03 | Phase 5 | Complete |
-| LLM-01 | Phase 6 | Pending |
+| LLM-01 | Phase 6 | Complete |
 | MCP-01 | Phase 6 | Pending |
 | RPT-01 | Phase 6 | Pending |
 | ONT-04 | Phase 6 | Complete |
