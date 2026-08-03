@@ -6,6 +6,12 @@ import pc from 'picocolors';
 import { GSD_GRAPH_REASON, GraphError } from './errors';
 import { resolveStoreRoot } from './io/paths';
 import { loadOntologyPack } from './ontology/load-pack';
+import { promptApply } from './llm/apply';
+import { resolveLlmMode } from './llm/provider';
+import {
+  readPromptResult,
+  requirePromptFileStage,
+} from './llm/prompt-files';
 import { answer } from './pipeline/answer';
 import { build } from './pipeline/build';
 import { diff } from './pipeline/diff';
@@ -363,20 +369,134 @@ function buildProgram(): Command {
     .description('Deterministic grounded answer with triple citations')
     .argument('<question>', 'question text')
     .option('--budget <n>', 'token budget', parseIntOpt)
-    .action((question: string, opts: { budget?: number }, cmd: Command) => {
-      const result = answer(
-        withDir(
-          {
-            question,
-            ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
-          },
-          globalDir(cmd),
-        ),
-      );
-      writeOk(result);
-    });
+    .option(
+      '--apply-prompt-result',
+      'apply store .prompt-answer-result.json (Ajv + citation gate)',
+    )
+    .option(
+      '--llm [mode]',
+      'optional LLM mode: omit/true→prompt, or prompt|http (D-01)',
+    )
+    .action(
+      (
+        question: string,
+        opts: {
+          budget?: number;
+          applyPromptResult?: boolean;
+          llm?: string | boolean;
+        },
+        cmd: Command,
+      ) => {
+        const flagMode = parseLlmFlag(opts.llm);
+        const mode = resolveLlmMode(
+          flagMode === undefined ? {} : { flagMode },
+        );
+        const result = answer(
+          withDir(
+            {
+              question,
+              ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
+              ...(opts.applyPromptResult === true
+                ? {
+                    applyPromptResult: true,
+                    promptResult: readPromptResult(
+                      withDir({ stage: 'answer' as const }, globalDir(cmd)),
+                    ),
+                  }
+                : {}),
+              ...(mode !== 'none' ? { llmMode: mode } : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        writeOk(result);
+      },
+    );
+
+  // Optional LLM prompt apply (LLM-01 / D-02 / D-03)
+  const promptCmd = program
+    .command('prompt')
+    .description('LLM prompt file-exchange helpers (opt-in; default offline)');
+
+  promptCmd
+    .command('apply')
+    .description(
+      'Apply validated prompt result for extract|normalize|answer|maintain',
+    )
+    .argument('<stage>', 'extract | normalize | answer | maintain (not query)')
+    .option(
+      '--question <text>',
+      'question for answer stage (packs subgraph for citation gate)',
+    )
+    .option('--budget <n>', 'token budget when packing for answer', parseIntOpt)
+    .action(
+      (
+        stageArg: string,
+        opts: { question?: string; budget?: number },
+        cmd: Command,
+      ) => {
+        const stage = requirePromptFileStage(stageArg);
+        const dir = globalDir(cmd);
+        const resultObj = readPromptResult(
+          withDir({ stage }, dir) as { stage: typeof stage; dir?: string },
+        );
+
+        if (stage === 'answer') {
+          if (opts.question === undefined || opts.question.length === 0) {
+            throw new GraphError(
+              GSD_GRAPH_REASON.PROMPT_RESULT_INVALID,
+              'prompt apply answer requires --question to pack subgraph',
+            );
+          }
+          const pack = packSubgraph(
+            withDir(
+              {
+                question: opts.question,
+                ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
+              },
+              dir,
+            ),
+          );
+          if (pack.triples.length === 0) {
+            writeOk({
+              stage: 'answer',
+              mode: 'abstain',
+              abstained: true,
+              reason: GSD_GRAPH_REASON.EMPTY_SUBGRAPH,
+              pack,
+            });
+            return;
+          }
+          const applied = promptApply({
+            stage: 'answer',
+            result: resultObj,
+            pack,
+          });
+          writeOk(applied);
+          return;
+        }
+
+        const applied = promptApply({ stage, result: resultObj });
+        writeOk(applied);
+      },
+    );
 
   return program;
+}
+
+/** Parse --llm [mode] from commander (true when flag alone; string when valued). */
+function parseLlmFlag(
+  raw: string | boolean | undefined,
+): import('./types').LlmMode | boolean | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === true || raw === '') return true;
+  if (raw === false) return false;
+  if (raw === 'prompt' || raw === 'http' || raw === 'none') return raw;
+  // Unknown string — treat as usage later; default resolve will ignore invalid via none
+  if (typeof raw === 'string') {
+    return raw as import('./types').LlmMode;
+  }
+  return undefined;
 }
 
 /**

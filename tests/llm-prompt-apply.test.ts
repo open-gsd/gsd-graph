@@ -308,3 +308,34 @@ describe('prompt answer apply — citation honesty (D-02)', () => {
     );
   });
 });
+
+
+describe('promptApply multi-stage extensions (D-03)', () => {
+  it('query stage throws PROMPT_RESULT_INVALID', () => {
+    assert.throws(
+      () => mod.promptApply({ stage: 'query', result: { anything: true } }),
+      (err: unknown) => {
+        assert.ok(err instanceof mod.GraphError);
+        assert.equal(
+          (err as { reason: string }).reason,
+          mod.GSD_GRAPH_REASON.PROMPT_RESULT_INVALID,
+        );
+        return true;
+      },
+    );
+  });
+
+  it('invalid extract result fails closed', () => {
+    assert.throws(
+      () => mod.promptApply({ stage: 'extract', result: { bad: true } }),
+      (err: unknown) => {
+        assert.ok(err instanceof mod.GraphError);
+        assert.equal(
+          (err as { reason: string }).reason,
+          mod.GSD_GRAPH_REASON.PROMPT_RESULT_INVALID,
+        );
+        return true;
+      },
+    );
+  });
+});

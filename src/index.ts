@@ -213,3 +213,24 @@ export type {
   PromptApplyAnswerInput,
   PromptApplyAnswerOutput,
 } from './llm/apply';
+
+export { resolveLlmMode } from './llm/provider';
+export type { ResolveLlmModeInput } from './llm/provider';
+
+export {
+  writePromptRequest,
+  readPromptResult,
+  resolvePromptResultPath,
+  promptRequestBasename,
+  promptResultBasename,
+  isPromptFileStage,
+  requirePromptFileStage,
+  assertSafePromptBasename,
+} from './llm/prompt-files';
+export type {
+  PromptFileStage,
+  PromptRequestEnvelope,
+  WritePromptRequestOptions,
+  WritePromptRequestResult,
+  ReadPromptResultOptions,
+} from './llm/prompt-files';
