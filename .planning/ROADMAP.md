@@ -140,12 +140,12 @@ Plans:
   3. Example research and engineering ontology packs load as replace-only packs with docs for domain use
   4. Minimal GRAPH_REPORT.md writer emits counts and top predicates from published v1
 
-**Plans**: 2/4 plans executed
+**Plans**: 3/4 plans executed
 
 Plans:
 
 - [x] 06-01-PLAN.md — LLM providers (none|prompt|http), prompts, Ajv apply, citation honesty (LLM-01)
-- [ ] 06-02-PLAN.md — MCP stdio server + bin; read tools on; build/review-write off by default (MCP-01)
+- [x] 06-02-PLAN.md — MCP stdio server + bin; read tools on; build/review-write off by default (MCP-01)
 - [ ] 06-03-PLAN.md — Minimal GRAPH_REPORT.md writer + CLI report (RPT-01)
 - [x] 06-04-PLAN.md — Example research + engineering ontology packs (ONT-04)
 
@@ -175,7 +175,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Query, lifecycle & maintain | 4/4 | Complete | 2026-08-03 |
 | 4. CLI surface | 3/3 | Complete | 2026-08-03 |
 | 5. Ground & prove 0.1.0 | 4/4 | In Progress|  |
-| 6. Optional agents | 2/4 | In Progress|  |
+| 6. Optional agents | 3/4 | In Progress|  |
 | 7. Global themes 0.2 | 0/TBD | Not started | - |
 
 ## Coverage

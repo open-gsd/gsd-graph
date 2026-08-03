@@ -5,13 +5,13 @@ milestone_name: milestone
 current_phase: 6
 current_phase_name: optional-agents
 status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-08-03T17:11:06.520Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-08-03T17:19:53.671Z"
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 28
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 # Project State
@@ -48,6 +48,7 @@ None.
 |------|----------|-------|-------|
 | Phase 06 P04 | 5min | 2 tasks | 5 files |
 | Phase 06 P01 | 10min | 3 tasks | 22 files |
+| Phase 06 P02 | 5min | 3 tasks | 7 files |
 
 ## Decisions
 
@@ -56,9 +57,11 @@ None.
 - [Phase ?]: Answer prompt-result fields: answer_markdown + cited_triple_ids; subset-checked against pack
 - [Phase ?]: answer() stays sync; live HTTP is answerHttp() async with same Ajv+citation gates
 - [Phase ?]: resolveLlmMode never enables from API key alone; default none
+- [Phase ?]: MCP SDK + zod are normal dependencies; write tools gated by allow flags (D-06/D-07)
+- [Phase ?]: MCP tool names use DESIGN graph_* prefix; listToolNames/handleToolCall for offline tests
 
 ## Session
 
-**Last session:** 2026-08-03T17:11:06.508Z
-**Stopped at:** Completed 06-01-PLAN.md
+**Last session:** 2026-08-03T17:19:53.646Z
+**Stopped at:** Completed 06-02-PLAN.md
 **Resume file:** None
