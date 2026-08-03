@@ -13,7 +13,7 @@ Ship `@opengsd/gsd-graph` as a standalone Graph Engineering toolkit: bootstrap a
 
 Critical path to **0.1.0**: Phases 1–5. Phase 6 is optional for the tag. Phase 7 is **0.2.0**.
 
-- [ ] **Phase 1: Foundation & identity** - Installable package, ontology contract, crash-safe store IO
+- [x] **Phase 1: Foundation & identity** - Installable package, ontology contract, crash-safe store IO
 - [ ] **Phase 2: Build pipeline** - Extract → normalize → review → publish graph.v1
 - [ ] **Phase 3: Query, lifecycle & maintain** - Query IR, snapshots/diff/repair, incremental M1–M5
 - [ ] **Phase 4: CLI surface** - `gsd-graph` machine contract over library ops
@@ -56,7 +56,7 @@ Plans:
   4. Review queue items have stable ids; accept/reject mutate graph or ontology only on accept
   5. Status reports node/triple counts, engine identity, and freshness after a successful offline build
 
-**Plans**: TBD
+**Plans**: 01-01-PLAN.md, 01-02-PLAN.md, 01-03-PLAN.md
 
 ### Phase 3: Query, lifecycle & maintain
 
