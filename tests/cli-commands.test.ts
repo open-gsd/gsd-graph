@@ -339,15 +339,136 @@ describe('cli-commands nested snapshot/review/ontology (CLI-01)', () => {
     assert.equal(body.pack_id, 'general');
   });
 
-  it('pack and answer are unregistered (exit 1, D-02)', () => {
+});
+
+/**
+ * Multi-hop-only store for pack/answer CLI smoke (D-06, D-10).
+ * Isolated corpus avoids free-prose/about noise from full fixturesCorpus.
+ */
+function prepareMultiHopStore(): { cwd: string; dir: string } {
+  const cwd = makeTmpDir('gsd-graph-cli-pack-');
+  const dir = path.join(cwd, 'store');
+  const corpus = path.join(cwd, 'corpus');
+  fs.mkdirSync(corpus, { recursive: true });
+  fs.copyFileSync(
+    path.join(fixturesCorpus, 'multi-hop.jsonl'),
+    path.join(corpus, 'multi-hop.jsonl'),
+  );
+  lib.init({ cwd, dir });
+  lib.build({ corpus, dir, full: true });
+  return { cwd, dir };
+}
+
+describe('cli-commands pack/answer grounding (D-06, ANS-01)', () => {
+  it('pack <question> exits 0 with seeds/triples/paths JSON (D-06)', () => {
+    const { dir } = prepareMultiHopStore();
+    const result = run([
+      '--dir',
+      dir,
+      'pack',
+      'why does drought cause food shortage?',
+    ]);
+    assert.equal(result.code, 0, result.stderr);
+    const body = result.json as {
+      seeds: string[];
+      triples: unknown[];
+      paths: unknown[];
+      nodes?: unknown[];
+      citations?: unknown[];
+    };
+    assert.ok(Array.isArray(body.seeds), 'pack must return seeds');
+    assert.ok(Array.isArray(body.triples), 'pack must return triples');
+    assert.ok(Array.isArray(body.paths), 'pack must return paths');
+    assert.ok(body.seeds.length > 0, 'expected non-empty seeds');
+    assert.ok(body.triples.length >= 1, 'expected multi-hop triples');
+  });
+
+  it('answer <question> exits 0 with pack, answer_markdown, mode, abstained (D-06, ANS-01)', () => {
+    const { dir } = prepareMultiHopStore();
+    const result = run([
+      '--dir',
+      dir,
+      'answer',
+      'why does drought cause food shortage?',
+    ]);
+    assert.equal(result.code, 0, result.stderr);
+    const body = result.json as {
+      pack: { seeds: string[]; triples: unknown[]; paths: unknown[] };
+      answer_markdown: string;
+      mode: string;
+      abstained: boolean;
+    };
+    assert.equal(typeof body.pack, 'object');
+    assert.ok(body.pack !== null);
+    assert.ok(Array.isArray(body.pack.seeds));
+    assert.ok(Array.isArray(body.pack.triples));
+    assert.ok(Array.isArray(body.pack.paths));
+    assert.equal(typeof body.answer_markdown, 'string');
+    assert.equal(body.mode, 'deterministic');
+    assert.equal(body.abstained, false);
+    assert.match(body.answer_markdown, /## Seeds/);
+    assert.match(body.answer_markdown, /causes/);
+  });
+
+  it('pack and answer forward optional --budget (D-06)', () => {
+    const { dir } = prepareMultiHopStore();
+    const pack = run([
+      '--dir',
+      dir,
+      'pack',
+      'drought food shortage',
+      '--budget',
+      '500',
+    ]);
+    assert.equal(pack.code, 0, pack.stderr);
+    const packBody = pack.json as { budget_tokens: number | null };
+    assert.equal(packBody.budget_tokens, 500);
+
+    const answer = run([
+      '--dir',
+      dir,
+      'answer',
+      'drought food shortage',
+      '--budget',
+      '500',
+    ]);
+    assert.equal(answer.code, 0, answer.stderr);
+    const ansBody = answer.json as {
+      pack: { budget_tokens: number | null };
+      abstained: boolean;
+    };
+    assert.equal(ansBody.pack.budget_tokens, 500);
+  });
+
+  it('pack/answer missing question argument exit 1 usage (CLI-02)', () => {
     const pack = run(['pack']);
     assert.equal(pack.code, 1);
     const packErr = JSON.parse(pack.stderr) as { ok: false; reason: string };
+    assert.equal(packErr.ok, false);
     assert.equal(packErr.reason, 'usage');
 
-    const answer = run(['answer', 'what is drought?']);
+    const answer = run(['answer']);
     assert.equal(answer.code, 1);
     const ansErr = JSON.parse(answer.stderr) as { ok: false; reason: string };
+    assert.equal(ansErr.ok, false);
     assert.equal(ansErr.reason, 'usage');
+  });
+
+  it('answer abstain still exits 0 with abstained true (D-04, ANS-02)', () => {
+    const { dir } = prepareMultiHopStore();
+    // Stopword-only / no-match question → empty pack → abstain success
+    const result = run(['--dir', dir, 'answer', 'the and or of what']);
+    assert.equal(result.code, 0, result.stderr);
+    const body = result.json as {
+      mode: string;
+      abstained: boolean;
+      answer_markdown: string;
+      pack: { triples: unknown[] };
+    };
+    assert.equal(body.mode, 'abstain');
+    assert.equal(body.abstained, true);
+    assert.equal(body.pack.triples.length, 0);
+    // Must not treat abstain as operational failure (exit 2)
+    assert.ok(!result.stderr.includes('"ok":false'));
   });
 });
