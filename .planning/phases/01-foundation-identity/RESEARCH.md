@@ -743,20 +743,24 @@ Phase 1 must implement at least: `OK`, `BUILD_LOCKED`, `SCHEMA_INVALID`, `ONTOLO
 
 **If this table is empty:** N/A — five assumptions listed for planner confirmation.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Schema draft version (2020-12 vs draft-07)**  
-   - What we know: Ajv 8 supports both; DESIGN examples don't pin `$schema`.  
-   - What's unclear: preferred draft for all four eventual schemas.  
-   - Recommendation: pick **draft-2020-12** for new schemas; document in schema `$schema` field; one draft for all packs.
+Resolved 2026-08-02 during plan-phase (plans 01-01..01-03 lock these choices).
 
-2. **Whether Phase 1 public API exports `init()` or only IO/ontology primitives**  
-   - What we know: full `init` is CLI-facing in Phase 4 (gitignore append).  
-   - Recommendation: export `resolveStoreRoot`, `loadOntologyPack`, `acquireBuildLock`, `publishGraphFiles`, `validateGraphV1`, reason codes; optional thin `ensureStoreLayout()` that creates empty dirs without full CLI init.
+1. **Schema draft version (2020-12 vs draft-07)** — **RESOLVED: draft-2020-12**  
+   - Decision: All Phase 1 checked-in schemas (`graph-v1.schema.json`, `ontology-pack.schema.json`) set `$schema` to JSON Schema draft-2020-12 and compile with Ajv 2020 constructor (`ajv/dist/2020`).  
+   - Rationale: greenfield schemas; one draft for pack + graph; matches RESEARCH recommendation and plan 01-02 Task 1.  
+   - Follow-on schemas (provenance, review-queue) should stay on the same draft.
 
-3. **Windows lock steal semantics**  
-   - What we know: DESIGN specifies PID liveness; Windows file locking differs.  
-   - Recommendation: implement POSIX-first with tests; document Windows best-effort; CI macOS/Linux green is Phase 1 gate.
+2. **Whether Phase 1 public API exports `init()` or only IO/ontology primitives** — **RESOLVED: primitives only**  
+   - Decision: Phase 1 exports library primitives only — `resolveStoreRoot`, `ensureStoreRoot` (mkdir helper), `loadOntologyPack`, `applyUnknownPolicy`, `acquireBuildLock`, `publishGraphFiles`, `loadGraphV1`, `validateGraphV1` / `validateOntologyPack`, reason codes.  
+   - No full CLI `init` (gitignore append, interactive layout) in Phase 1 — that is Phase 4 (CLI-03 / PKG-03).  
+   - Optional thin `ensureStoreLayout()` that only creates empty store dirs is allowed as a test/helper; it is not the product CLI init.
+
+3. **Windows lock steal semantics** — **RESOLVED: POSIX-first; Windows best-effort later**  
+   - Decision: Implement `.build.lock` with exclusive `wx` create, 15-minute stale age, and dead-PID steal via `process.kill(pid, 0)` semantics that match DESIGN on POSIX.  
+   - Phase 1 gate: macOS/Linux (local + GitHub Actions ubuntu) green.  
+   - Windows exclusive-create / symlink / PID-liveness edge cases are best-effort documented; deeper Windows CI matrix is deferred past Phase 1.
 
 ## Environment Availability
 
