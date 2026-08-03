@@ -221,3 +221,63 @@ export interface StatusOptions {
    */
   corpus?: string | string[];
 }
+
+// --- Query IR (QRY-01 / QRY-02 / D-01) ---
+
+/** Structured Query IR ops — no NL→IR in v0.1 (D-01, K10). */
+export type QueryIR =
+  | { op: 'seed_expand'; term: string; hops: number }
+  | { op: 'path'; from: string; to: string; maxDepth: number }
+  | { op: 'neighborhood'; id: string; hops: number }
+  | {
+      op: 'filter';
+      types?: string[];
+      predicates?: string[];
+      confidenceMin?: Confidence;
+    };
+
+/** One materialized multi-hop path with directed triple predicates. */
+export interface QueryPath {
+  nodes: string[];
+  predicates: string[];
+}
+
+/**
+ * Ergonomic query bag (maps to QueryIR). Prefer structured fields only (D-01).
+ * `graph` skips disk and never reads projection (D-04).
+ */
+export interface QueryOptions {
+  /** Store directory override (resolveStoreRoot). */
+  dir?: string;
+  /** seed_expand term (id/label/alias substring, case-folded). */
+  term?: string;
+  /** Hop count for seed_expand (default 2) or neighborhood (default 1); clamped ≤16. */
+  hops?: number;
+  /**
+   * Token budget for applyBudget: ceil(JSON.stringify({nodes,triples}).length/4).
+   * null/undefined skips trim (QRY-02).
+   */
+  budget?: number | null;
+  /** path op */
+  path?: { from: string; to: string; maxDepth?: number };
+  /** neighborhood seed node id */
+  id?: string;
+  /** filter: node types allowlist */
+  types?: string[];
+  /** filter: predicate allowlist */
+  predicates?: string[];
+  /** filter: minimum confidence tier (shared ranks with bestTier) */
+  confidenceMin?: Confidence;
+  /** In-memory graph for tests — skips loadGraphV1 (D-04). */
+  graph?: GraphV1Document;
+}
+
+/** Result of query() after optional budget trim. */
+export interface QueryResult {
+  nodes: GraphNode[];
+  triples: Triple[];
+  paths: QueryPath[];
+  seeds: string[];
+  trimmed: string | null;
+  budget_tokens: number | null;
+}

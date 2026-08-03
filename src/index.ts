@@ -26,6 +26,10 @@ export type {
   StatusOptions,
   SourcesManifest,
   SourceManifestEntry,
+  QueryIR,
+  QueryPath,
+  QueryOptions,
+  QueryResult,
 } from './types';
 
 export {
@@ -81,9 +85,27 @@ export {
   nodeId,
   tripleId,
   bestTier,
+  confidenceRank,
   stableStringify,
   reviewItemId,
 } from './pipeline/ids';
+
+// Query IR (03-01 / QRY-01 / QRY-02)
+export {
+  query,
+  buildAdjacencyMap,
+  findShortestPath,
+  matchTermSeeds,
+  expandHops,
+  seedAndExpand,
+  filterGraph,
+  applyBudget,
+  MAX_QUERY_DEPTH,
+  DEFAULT_PATH_MAX_DEPTH,
+  DEFAULT_SEED_HOPS,
+  DEFAULT_NEIGHBORHOOD_HOPS,
+} from './pipeline/query';
+export type { AdjacencyEdge, AdjacencyMap } from './pipeline/query';
 
 export { fingerprintFile } from './sources/fingerprint';
 export { extractMarkdown } from './sources/markdown';

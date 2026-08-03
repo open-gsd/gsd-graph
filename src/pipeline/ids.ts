@@ -11,6 +11,14 @@ const TIER_RANK: Record<Confidence, number> = {
 };
 
 /**
+ * Shared confidence tier rank (D-02 / QRY-02).
+ * EXTRACTED=2, INFERRED=1, AMBIGUOUS=0 — same table as bestTier.
+ */
+export function confidenceRank(c: Confidence): number {
+  return TIER_RANK[c];
+}
+
+/**
  * NFKC-lower slug: non letter/number runs → `-`, trim hyphens; empty → `unnamed`.
  */
 export function slugifyLabel(label: string): string {
