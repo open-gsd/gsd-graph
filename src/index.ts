@@ -202,6 +202,13 @@ export { packSubgraph, PACK_STOPWORDS, tokenizeQuestion, scoreSeeds } from './pi
 export { answer, answerHttp, formatDeterministicMarkdown } from './pipeline/answer';
 export type { AnswerHttpOptions } from './pipeline/answer';
 
+// Minimal GRAPH_REPORT from published v1 (06-03 / RPT-01 / D-08)
+export { writeGraphReport } from './pipeline/report';
+export type {
+  WriteGraphReportOptions,
+  WriteGraphReportResult,
+} from './pipeline/report';
+
 // Optional LLM providers (06-01 / LLM-01 / D-01..D-05)
 export {
   assertCitationsInPack,
