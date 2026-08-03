@@ -232,4 +232,36 @@ describe('G1 multi-hop causes path (GOLD-02, D-08)', () => {
   });
 });
 
-// G2 cheap + G3/G4 coverage notes land in Task 2 (GOLD-03 / D-09).
+// ---------------------------------------------------------------------------
+// G2 cheap — GOLD-02 family: path Drought → Food Shortage non-empty typed
+// G3: budget AMBIGUOUS-before-EXTRACTED covered by query.test.ts applyBudget (D-09)
+// G4: incremental edit honesty covered by maintain.test.ts M1–M5 (D-09 / GOLD-03)
+// ---------------------------------------------------------------------------
+
+describe('G2 cheap path drought→food-shortage (GOLD-02 family)', () => {
+  it('query path between Drought and Food Shortage is non-empty with causes', () => {
+    const { store } = buildIsolatedCorpus('multi-hop.jsonl', 'gsd-g2');
+    const drought = mod.nodeId('Concept', 'Drought');
+    const food = mod.nodeId('Concept', 'Food Shortage');
+
+    const byPath = mod.query({
+      dir: store,
+      path: { from: drought, to: food, maxDepth: 6 },
+    });
+    assert.ok(byPath.paths.length >= 1, 'G2: path query non-empty');
+    assert.ok(byPath.paths[0]!.nodes.length >= 3);
+    assert.ok(byPath.paths[0]!.predicates.includes('causes'));
+
+    // Pack paths also non-empty typed causes chain on same store
+    const pack = mod.packSubgraph({
+      dir: store,
+      question: MULTI_HOP_QUESTION,
+    });
+    assert.ok(
+      pack.paths.some(
+        (p) => p.nodes.length >= 3 && p.predicates.includes('causes'),
+      ),
+      'G2: pack paths non-empty typed causes chain',
+    );
+  });
+});
