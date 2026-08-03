@@ -199,12 +199,28 @@ describe('cli-commands core ops (CLI-01)', () => {
     );
   });
 
-  it('diff without baseline exits 2 with structured GraphError', () => {
+  it('diff uses last-diff-base after build and maps missing snapshot to exit 2', () => {
     const { dir } = prepareStore();
-    const result = run(['--dir', dir, 'diff']);
-    // No snapshot / last-diff-base yet → operational GraphError (exit 2)
-    assert.equal(result.code, 2, result.stderr);
-    const err = JSON.parse(result.stderr) as {
+    // Successful build writes snapshots/.last-diff-base.json → empty delta
+    const ok = run(['--dir', dir, 'diff']);
+    assert.equal(ok.code, 0, ok.stderr);
+    const body = ok.json as {
+      baseline: string;
+      counts: { nodes_added: number; triples_added: number };
+    };
+    assert.ok(typeof body.baseline === 'string');
+    assert.equal(body.counts.nodes_added, 0);
+
+    // Unknown snapshot name → GraphError → exit 2 (CLI-02, D-03)
+    const missing = run([
+      '--dir',
+      dir,
+      'diff',
+      '--snapshot',
+      'does-not-exist-snapshot',
+    ]);
+    assert.equal(missing.code, 2, missing.stderr);
+    const err = JSON.parse(missing.stderr) as {
       ok: false;
       reason: string;
       message: string;

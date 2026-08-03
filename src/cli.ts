@@ -4,7 +4,12 @@
 import { Command, CommanderError } from 'commander';
 import pc from 'picocolors';
 import { GSD_GRAPH_REASON, GraphError } from './errors';
+import { build } from './pipeline/build';
+import { diff } from './pipeline/diff';
 import { init } from './pipeline/init';
+import { query } from './pipeline/query';
+import { repair } from './pipeline/repair';
+import { status } from './pipeline/status';
 
 export interface CliErrorBody {
   ok: false;
@@ -43,6 +48,24 @@ function errorMessage(err: unknown): string {
   return String(err);
 }
 
+function parseIntOpt(value: string): number {
+  return parseInt(value, 10);
+}
+
+/** Global --dir from parent program (D-07). */
+function globalDir(cmd: Command): string | undefined {
+  const globals = cmd.optsWithGlobals() as { dir?: string };
+  return globals.dir;
+}
+
+function withDir<T extends object>(
+  base: T,
+  dir: string | undefined,
+): T & { dir?: string } {
+  if (dir === undefined) return base;
+  return { ...base, dir };
+}
+
 function buildProgram(): Command {
   const program = new Command();
   program
@@ -63,19 +86,118 @@ function buildProgram(): Command {
     .description('Create store layout and append gitignore entry when present')
     .option('--ontology <idOrPath>', 'ontology pack id or path', 'general')
     .action((opts: { ontology?: string }, cmd: Command) => {
-      const globals = cmd.optsWithGlobals() as { dir?: string; ontology?: string };
+      const dir = globalDir(cmd);
       const initOpts: {
         cwd: string;
         ontology: string;
         dir?: string;
       } = {
         cwd: process.cwd(),
-        ontology: opts.ontology ?? globals.ontology ?? 'general',
+        ontology: opts.ontology ?? 'general',
       };
-      if (globals.dir !== undefined) {
-        initOpts.dir = globals.dir;
+      if (dir !== undefined) {
+        initOpts.dir = dir;
       }
       const result = init(initOpts);
+      writeOk(result);
+    });
+
+  // Core ops — thin adapters over library (CLI-01, D-02, D-06, D-08)
+  program
+    .command('build')
+    .description('Offline extract/normalize/publish from a corpus root')
+    .requiredOption('--corpus <path>', 'corpus root directory to discover')
+    .option('--full', 're-extract all sources (ignore fresh hashes)')
+    .action((opts: { corpus: string; full?: boolean }, cmd: Command) => {
+      const result = build(
+        withDir(
+          {
+            corpus: opts.corpus,
+            ...(opts.full === true ? { full: true } : {}),
+          },
+          globalDir(cmd),
+        ),
+      );
+      writeOk(result);
+    });
+
+  program
+    .command('query')
+    .description('Seed-expand query by term (Query IR)')
+    .argument('<term>', 'seed term (id/label/alias substring)')
+    .option('--hops <n>', 'hop expansion depth', parseIntOpt)
+    .option('--budget <n>', 'token budget for result trim', parseIntOpt)
+    .action(
+      (
+        term: string,
+        opts: { hops?: number; budget?: number },
+        cmd: Command,
+      ) => {
+        const result = query(
+          withDir(
+            {
+              term,
+              ...(opts.hops !== undefined ? { hops: opts.hops } : {}),
+              ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        writeOk(result);
+      },
+    );
+
+  program
+    .command('path')
+    .description('Shortest path query between two node ids')
+    .argument('<from>', 'source node id')
+    .argument('<to>', 'target node id')
+    .option('--depth <n>', 'max path depth', parseIntOpt)
+    .action((from: string, to: string, opts: { depth?: number }, cmd: Command) => {
+      const result = query(
+        withDir(
+          {
+            path: {
+              from,
+              to,
+              ...(opts.depth !== undefined ? { maxDepth: opts.depth } : {}),
+            },
+          },
+          globalDir(cmd),
+        ),
+      );
+      writeOk(result);
+    });
+
+  program
+    .command('status')
+    .description('Read store status (never uses projection as SoT)')
+    .action((_opts: unknown, cmd: Command) => {
+      const result = status(withDir({}, globalDir(cmd)));
+      writeOk(result);
+    });
+
+  program
+    .command('diff')
+    .description('Diff current graph.v1 against a snapshot or last-diff-base')
+    .option('--snapshot <name>', 'named snapshot (logical name or fileName)')
+    .action((opts: { snapshot?: string }, cmd: Command) => {
+      const result = diff(
+        withDir(
+          {
+            ...(opts.snapshot !== undefined ? { snapshot: opts.snapshot } : {}),
+          },
+          globalDir(cmd),
+        ),
+      );
+      writeOk(result);
+    });
+
+  program
+    .command('repair')
+    .description('Regenerate disposable graph.json projection from graph.v1')
+    .action((_opts: unknown, cmd: Command) => {
+      const result = repair(withDir({}, globalDir(cmd)));
       writeOk(result);
     });
 
