@@ -5,13 +5,13 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: build-pipeline
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-08-03T03:35:35.839Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-08-03T03:43:52.216Z"
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 9
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -23,9 +23,9 @@ progress:
 
 - **Milestone:** v0.2.0  
 - **Phase:** 2 (build-pipeline) — EXECUTING  
-- **Plan:** 02-02 complete; next 02-03  
+- **Plan:** 02-03 complete; next 02-04  
 - **Status:** Executing Phase 2  
-- **Next action:** Execute `02-03-PLAN.md` (normalize / provenance / merge)
+- **Next action:** Execute `02-04-PLAN.md` (build orchestrator + status)
 
 ## Progress
 
@@ -37,10 +37,11 @@ progress:
 | Phase 2 VALIDATION | ✓ |
 | 02-01 extract + fingerprint + discover | ✓ Complete |
 | 02-02 JSONL field-map + extractByPath | ✓ Complete |
+| 02-03 normalize + review queue | ✓ Complete |
 
 ## Next
 
-Execute remaining Phase 2 plans: normalize → review → build/status.
+Execute remaining Phase 2 plan: build orchestrator + status (02-04).
 
 ## Blockers
 
@@ -52,6 +53,7 @@ None.
 |------|----------|-------|-------|
 | Phase 02-build-pipeline P01 | 7min | 3 tasks | 11 files |
 | Phase 02-build-pipeline P02 | 2min | 2 tasks | 5 files |
+| Phase 02 P03 | 6min | 3 tasks | 8 files |
 
 ## Decisions
 
@@ -61,9 +63,12 @@ None.
 - [Phase 02-02]: multi-hop fixture uses Concept--causes-->Concept chain (general-pack allowlisted)
 - [Phase 02-02]: Invalid JSONL lines → diagnostic and continue (no whole-file throw)
 - [Phase 02-02]: extractByPath fingerprints unless contentHash provided; never network/LLM
+- [Phase 02-03]: Tasks 1–2 co-committed: merge + multiset shipped together (shared normalize module)
+- [Phase 02-03]: predicate_unknown accept without extendOntology coerces p→related_to (fail-closed)
+- [Phase 02-03]: mergeReviewItems never reopens accepted/rejected when decisions[] contains id
 
 ## Session
 
-**Last session:** 2026-08-03T03:35:35.831Z
-**Stopped at:** Completed 02-02-PLAN.md
+**Last session:** 2026-08-03T03:43:52.205Z
+**Stopped at:** Completed 02-03-PLAN.md
 **Resume file:** None

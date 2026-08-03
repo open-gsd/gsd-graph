@@ -56,13 +56,13 @@ Plans:
   4. Review queue items have stable ids; accept/reject mutate graph or ontology only on accept
   5. Status reports node/triple counts, engine identity, and freshness after a successful offline build
 
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 
 - [x] 02-01-PLAN.md — Fingerprints, discover, MD/text extract, corpus fixtures (EXT-01, EXT-03)
 - [x] 02-02-PLAN.md — JSON/JSONL field-map extract + extract router (EXT-02)
-- [ ] 02-03-PLAN.md — Normalize best_tier/exact merge + review queue accept/reject (NORM-01, NORM-02, REV-01)
+- [x] 02-03-PLAN.md — Normalize best_tier/exact merge + review queue accept/reject (NORM-01, NORM-02, REV-01)
 - [ ] 02-04-PLAN.md — build() orchestrator + incremental fingerprints + status (STAT-01, EXT-03 wire)
 
 ### Phase 3: Query, lifecycle & maintain
@@ -144,7 +144,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & identity | 3/3 | Complete | 2026-08-02 |
-| 2. Build pipeline | 2/4 | In Progress|  |
+| 2. Build pipeline | 3/4 | In Progress|  |
 | 3. Query, lifecycle & maintain | 0/TBD | Not started | - |
 | 4. CLI surface | 0/TBD | Not started | - |
 | 5. Ground & prove 0.1.0 | 0/TBD | Not started | - |

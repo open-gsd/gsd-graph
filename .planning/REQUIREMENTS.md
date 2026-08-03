@@ -30,9 +30,9 @@
 - [x] **EXT-01**: Deterministic Markdown/text extract (links, headings, explicit edge lines)
 - [x] **EXT-02**: JSON/JSONL structured extract maps fields to EXTRACTED triples
 - [x] **EXT-03**: Source fingerprints support incremental rebuild
-- [ ] **NORM-01**: Multiset provenance per triple with per-entry confidence; triple confidence = best_tier(entries)
-- [ ] **NORM-02**: Auto-merge only exact same-type id/alias; `same_as` is advisory until review
-- [ ] **REV-01**: Review queue items have stable ids and accept/reject effects that mutate graph/ontology only on accept
+- [x] **NORM-01**: Multiset provenance per triple with per-entry confidence; triple confidence = best_tier(entries)
+- [x] **NORM-02**: Auto-merge only exact same-type id/alias; `same_as` is advisory until review
+- [x] **REV-01**: Review queue items have stable ids and accept/reject effects that mutate graph/ontology only on accept
 
 ### Query & ground
 
@@ -104,9 +104,9 @@
 | EXT-01 | Phase 2 | Complete |
 | EXT-02 | Phase 2 | Complete |
 | EXT-03 | Phase 2 | Complete |
-| NORM-01 | Phase 2 | Pending |
-| NORM-02 | Phase 2 | Pending |
-| REV-01 | Phase 2 | Pending |
+| NORM-01 | Phase 2 | Complete |
+| NORM-02 | Phase 2 | Complete |
+| REV-01 | Phase 2 | Complete |
 | STAT-01 | Phase 2 | Pending |
 | QRY-01 | Phase 3 | Pending |
 | QRY-02 | Phase 3 | Pending |
