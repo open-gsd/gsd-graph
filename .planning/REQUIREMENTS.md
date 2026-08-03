@@ -52,7 +52,7 @@
 
 ### CLI & agent contract
 
-- [ ] **CLI-01**: Commands: init, build, query, path, status, diff, snapshot, review, repair, ontology, pack, answer
+- [x] **CLI-01**: Commands: init, build, query, path, status, diff, snapshot, review, repair, ontology, pack, answer
 - [x] **CLI-02**: Machine contract: JSON on stdout; human diagnostics on stderr; exit 0/1/2/3
 - [x] **CLI-03**: `init` appends store dir to `.gitignore` when a gitignore exists
 
@@ -114,7 +114,7 @@
 | SNAP-01 | Phase 3 | Complete |
 | DIFF-01 | Phase 3 | Complete |
 | REP-01 | Phase 3 | Complete |
-| CLI-01 | Phase 4 | Pending |
+| CLI-01 | Phase 4 | Complete |
 | CLI-02 | Phase 4 | Complete |
 | CLI-03 | Phase 4 | Complete |
 | PACK-01 | Phase 5 | Pending |
