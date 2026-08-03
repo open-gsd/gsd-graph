@@ -1,4 +1,4 @@
-// gsd-graph — packSubgraph composition + multi-hop pack gates (PACK-01)
+// gsd-graph — packSubgraph + deterministic answer gates (PACK-01 / ANS-01 / ANS-02)
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
@@ -43,6 +43,37 @@ const mod = require(path.join(root, 'dist', 'index.js')) as {
     trimmed: string | null;
     budget_tokens: number | null;
   };
+  answer: (opts: {
+    question: string;
+    dir?: string;
+    graph?: unknown;
+    hops?: number;
+    kSeeds?: number;
+    budget?: number | null;
+  }) => {
+    pack: {
+      question: string;
+      seeds: string[];
+      nodes: Array<{ id: string }>;
+      triples: Array<{ id: string; s: string; p: string; o: string }>;
+      paths: Array<{ nodes: string[]; predicates: string[] }>;
+      citations: Array<{
+        triple_id: string;
+        s: string;
+        p: string;
+        o: string;
+        source_path?: string;
+      }>;
+      trimmed: string | null;
+      budget_tokens: number | null;
+    };
+    answer_markdown: string;
+    mode: 'deterministic' | 'prompt_pending' | 'http' | 'abstain';
+    abstained: boolean;
+    abstain_reason?: string;
+    prompt_bundle?: object;
+  };
+  GSD_GRAPH_REASON: { EMPTY_SUBGRAPH: string; [key: string]: string };
   PACK_STOPWORDS: Set<string> | ReadonlySet<string> | string[];
   tokenizeQuestion: (q: string) => string[];
   scoreSeeds: (graph: unknown, tokens: string[], kSeeds: number) => string[];
@@ -528,3 +559,119 @@ describe('packSubgraph budget and expand-by-id', () => {
     assert.equal(typeof mod.packSubgraph, 'function');
   });
 });
+
+describe('answer deterministic (ANS-01 / D-03)', () => {
+  it('exports answer for multi-hop deterministic cited markdown', () => {
+    assert.equal(typeof mod.answer, 'function');
+  });
+
+  it('multi-hop question returns mode deterministic, abstained false, causes in markdown', () => {
+    const g = multiHopGraph();
+    const ans = mod.answer({
+      graph: g,
+      question: 'why does drought cause food shortage?',
+    });
+
+    assert.equal(ans.abstained, false);
+    assert.equal(ans.mode, 'deterministic');
+    // Phase 5 never sets prompt_pending/http (D-05) — mode is deterministic only
+    assert.notEqual(ans.mode as string, 'prompt_pending');
+    assert.notEqual(ans.mode as string, 'http');
+    assert.match(ans.answer_markdown, /causes/);
+    assert.ok(ans.pack.triples.length >= 1);
+  });
+
+  it('answer_markdown includes Seeds / Relationships / Paths / Citations sections', () => {
+    const g = multiHopGraph();
+    const ans = mod.answer({
+      graph: g,
+      question: 'why does drought cause food shortage?',
+    });
+
+    const md = ans.answer_markdown;
+    const seedsIdx = md.indexOf('## Seeds');
+    const relIdx = md.indexOf('## Relationships');
+    const pathsIdx = md.indexOf('## Paths');
+    const citeIdx = md.indexOf('## Citations');
+    assert.ok(seedsIdx >= 0, 'expected ## Seeds');
+    assert.ok(relIdx > seedsIdx, '## Relationships after ## Seeds');
+    assert.ok(pathsIdx > relIdx, '## Paths after ## Relationships');
+    assert.ok(citeIdx > pathsIdx, '## Citations after ## Paths');
+  });
+
+  it('Relationships and Citations derive only from pack.triples; citation ids ⊆ triples', () => {
+    const g = multiHopGraph();
+    const ans = mod.answer({
+      graph: g,
+      question: 'why does drought cause food shortage?',
+    });
+
+    const pack = ans.pack;
+    const tripleIds = new Set(pack.triples.map((t) => t.id));
+    assert.ok(pack.citations.length > 0);
+    for (const c of pack.citations) {
+      assert.ok(
+        tripleIds.has(c.triple_id),
+        `citation ${c.triple_id} not in pack.triples`,
+      );
+    }
+
+    // Every relationship line triple id must be a pack triple
+    const relSection = ans.answer_markdown.split('## Relationships')[1]?.split('## Paths')[0] ?? '';
+    const relIds = [...relSection.matchAll(/`([^`]+)`/g)].map((m) => m[1]!);
+    for (const id of relIds) {
+      assert.ok(tripleIds.has(id), `relationship cites unknown triple ${id}`);
+    }
+
+    // Citation section backtick triple ids ⊆ pack
+    const citeSection = ans.answer_markdown.split('## Citations')[1] ?? '';
+    const citeIds = [...citeSection.matchAll(/`([^`]+)`/g)].map((m) => m[1]!);
+    for (const id of citeIds) {
+      assert.ok(tripleIds.has(id), `markdown citation ${id} not in pack.triples`);
+    }
+
+    // Relationships only use predicates present on pack triples
+    for (const t of pack.triples) {
+      if (t.p === 'causes') {
+        assert.match(
+          ans.answer_markdown,
+          new RegExp(`${escapeReg(t.s)}\\s*—${escapeReg(t.p)}→\\s*${escapeReg(t.o)}`),
+        );
+      }
+    }
+  });
+
+  it('answer.pack matches packSubgraph for the same options (D-03)', () => {
+    const g = multiHopGraph();
+    const opts = {
+      graph: g,
+      question: 'why does drought cause food shortage?',
+    };
+    const pack = mod.packSubgraph(opts);
+    const ans = mod.answer(opts);
+    assert.deepEqual(ans.pack, pack);
+  });
+
+  it('Paths section reflects pack.paths node-predicate chains', () => {
+    const g = multiHopGraph();
+    const ans = mod.answer({
+      graph: g,
+      question: 'why does drought cause food shortage?',
+    });
+    assert.ok(ans.pack.paths.length >= 1);
+    const longPath = ans.pack.paths.find((p) => p.nodes.length >= 3);
+    assert.ok(longPath, 'expected multi-hop path');
+    // Path rendering uses node -predicate→ node chains
+    for (let i = 0; i < longPath!.predicates.length; i++) {
+      const pred = longPath!.predicates[i]!;
+      assert.match(ans.answer_markdown, new RegExp(`-${escapeReg(pred)}→`));
+    }
+    for (const n of longPath!.nodes) {
+      assert.match(ans.answer_markdown, new RegExp(escapeReg(n)));
+    }
+  });
+});
+
+function escapeReg(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
