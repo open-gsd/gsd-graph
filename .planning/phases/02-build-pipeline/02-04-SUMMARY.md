@@ -154,7 +154,7 @@ Each task was committed atomically:
 
 1. **Tasks 1–3 (co-implemented): End-to-end build + incremental + status façade** - `626563e` (feat)
 
-**Plan metadata:** _(pending docs commit)_
+**Plan metadata:** `da26941` (docs: complete plan)
 
 _Note: Tracer + expansion tasks shared the same modules; shipped as one feat commit with full integration coverage._
 

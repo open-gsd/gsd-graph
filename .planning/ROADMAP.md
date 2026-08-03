@@ -144,7 +144,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & identity | 3/3 | Complete | 2026-08-02 |
-| 2. Build pipeline | 4/4 | In Progress|  |
+| 2. Build pipeline | 4/4 | Complete |  |
 | 3. Query, lifecycle & maintain | 0/TBD | Not started | - |
 | 4. CLI surface | 0/TBD | Not started | - |
 | 5. Ground & prove 0.1.0 | 0/TBD | Not started | - |

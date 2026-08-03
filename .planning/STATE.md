@@ -4,14 +4,14 @@ milestone: v0.2.0
 milestone_name: milestone
 current_phase: 2
 current_phase_name: build-pipeline
-status: executing
+status: phase_complete
 stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-08-03T03:50:53.645Z"
+last_updated: "2026-08-03T03:51:30.000Z"
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -22,10 +22,10 @@ progress:
 ## Current position
 
 - **Milestone:** v0.2.0  
-- **Phase:** 2 (build-pipeline) — EXECUTING  
-- **Plan:** 02-03 complete; next 02-04  
-- **Status:** Executing Phase 2  
-- **Next action:** Execute `02-04-PLAN.md` (build orchestrator + status)
+- **Phase:** 2 (build-pipeline) — PLANS COMPLETE  
+- **Plan:** 02-04 complete (all Phase 2 plans done)  
+- **Status:** Phase 2 implementation complete; ready for verify  
+- **Next action:** `/gsd-verify-work` or phase close for Phase 2
 
 ## Progress
 
@@ -38,10 +38,11 @@ progress:
 | 02-01 extract + fingerprint + discover | ✓ Complete |
 | 02-02 JSONL field-map + extractByPath | ✓ Complete |
 | 02-03 normalize + review queue | ✓ Complete |
+| 02-04 build orchestrator + status | ✓ Complete |
 
 ## Next
 
-Execute remaining Phase 2 plan: build orchestrator + status (02-04).
+Phase 2 plans 02-01..02-04 complete. Run verifier / close phase, then Phase 3.
 
 ## Blockers
 
@@ -67,8 +68,8 @@ None.
 - [Phase 02-03]: Tasks 1–2 co-committed: merge + multiset shipped together (shared normalize module)
 - [Phase 02-03]: predicate_unknown accept without extendOntology coerces p→related_to (fail-closed)
 - [Phase 02-03]: mergeReviewItems never reopens accepted/rejected when decisions[] contains id
-- [Phase ?]: Incremental build strips provenance for changed paths and always re-normalizes (EXT-03 Phase 2 scope)
-- [Phase ?]: status() composes STAT-01 from graph.v1 + lock + queue; never projection as SoT
+- [Phase 02-04]: Incremental build strips provenance for changed paths and always re-normalizes (EXT-03 Phase 2 scope)
+- [Phase 02-04]: status() composes STAT-01 from graph.v1 + lock + queue; never projection as SoT
 
 ## Session
 
