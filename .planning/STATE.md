@@ -4,15 +4,15 @@ milestone: v0.2.0
 milestone_name: milestone
 current_phase: 3
 current_phase_name: query-lifecycle-maintain
-current_plan: 3 of 4 (03-03 next)
+current_plan: 4 of 4 (03-04 next)
 status: executing
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-08-03T11:26:45.000Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-08-03T11:31:00.000Z"
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 14
-  completed_plans: 9
+  completed_plans: 11
 ---
 
 # Project State
@@ -24,9 +24,9 @@ progress:
 
 - **Milestone:** v0.1.0 foundation  
 - **Phase:** 3 (query-lifecycle-maintain) — EXECUTING
-- **Current Plan:** 3 of 4 (03-03 next)
-- **Status:** Plan 03-02 complete; ready for 03-03 snapshots
-- **Next action:** Execute 03-03-PLAN.md (snapshots)
+- **Current Plan:** 4 of 4 (03-04 next)
+- **Status:** Plan 03-03 complete; ready for 03-04 diff/repair
+- **Next action:** Execute 03-04-PLAN.md (diff + repair)
 
 ## Progress
 
@@ -39,10 +39,11 @@ progress:
 | Phase 3 VALIDATION | ✓ |
 | 03-01 Query IR | ✓ Complete (SUMMARY) |
 | 03-02 Maintain M1–M5 | ✓ Complete (SUMMARY) |
+| 03-03 Snapshots | ✓ Complete (SUMMARY) |
 
 ## Next
 
-Execute 03-03 snapshots, then 03-04 diff/repair.
+Execute 03-04 diff/repair.
 
 ## Blockers
 
@@ -54,6 +55,7 @@ None.
 |------|----------|-------|-------|
 | Phase 03-query-lifecycle-maintain P01 | 4min | 3 tasks | 5 files |
 | Phase 03 P02 | 6min | 3 tasks | 6 files |
+| Phase 03 P03 | 3min | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -63,9 +65,11 @@ None.
 - [Phase 3]: Normative incremental API = build({ full: false }); maintain is alias only (OQ-1)
 - [Phase 3]: Always invalidateProvenance when !full && priorGraph; pathsToDrop = changed ∪ removed
 - [Phase 3]: last-diff-base written under lock after publish; DEFAULT_WRITE_PROJECTION stays false
+- [Phase 3]: Restore rewrites projection via projectGraph from snapshot v1 only; sidecars unchanged (A2)
+- [Phase 3]: Logical snapshot name matches *-<name>.json newest; full fileName also accepted
 
 ## Session
 
-**Last session:** 2026-08-03T11:26:28.288Z
-**Stopped at:** Completed 03-02-PLAN.md
+**Last session:** 2026-08-03T11:30:51.656Z
+**Stopped at:** Completed 03-03-PLAN.md
 **Resume file:** None
