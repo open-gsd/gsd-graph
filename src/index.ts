@@ -52,3 +52,11 @@ export {
 export type { PublishPlan } from './io/atomic-publish';
 
 export { loadGraphV1 } from './io/load-graph';
+
+export { acquireBuildLock, STALE_MS } from './io/lock';
+export type {
+  BuildLockOwner,
+  BuildLockPayload,
+  LockHandle,
+  AcquireBuildLockOptions,
+} from './io/lock';
