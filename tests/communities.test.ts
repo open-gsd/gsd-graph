@@ -191,3 +191,127 @@ describe('detectCommunities two-clique (COM-01 tracer)', () => {
     assert.match(src, /gsd-graph/);
   });
 });
+
+describe('confidence filter / min-size / max-iter / determinism (COM-01 expansion)', () => {
+  it('AMBIGUOUS-only bridge does not merge the two cliques (D-03)', () => {
+    const { graph, ids } = twoCliquesGraph({ ambiguousBridge: true });
+    const result = mod.detectCommunities({ graph, write: false });
+
+    assert.equal(result.communities.length, 2);
+    // Bridge must not add an undirected community edge
+    assert.equal(result.edges_considered, 6);
+
+    const memberSets = result.communities.map((c) => new Set(c.members));
+    const aOk = memberSets.some(
+      (s) => s.has(ids.a1) && s.has(ids.a2) && s.has(ids.a3) && !s.has(ids.b1),
+    );
+    const bOk = memberSets.some(
+      (s) => s.has(ids.b1) && s.has(ids.b2) && s.has(ids.b3) && !s.has(ids.a1),
+    );
+    assert.ok(aOk, 'clique A remains separate');
+    assert.ok(bOk, 'clique B remains separate');
+  });
+
+  it('drops size-2 dyad and increments dropped_small_count (D-02)', () => {
+    const { graph } = twoCliquesGraph({ extraDyad: true });
+    const result = mod.detectCommunities({ graph, write: false });
+
+    assert.equal(result.communities.length, 2);
+    assert.ok(result.dropped_small_count >= 1);
+    for (const c of result.communities) {
+      assert.ok(!c.members.includes('concept:d1'));
+      assert.ok(!c.members.includes('concept:d2'));
+      assert.ok(c.size >= 3);
+    }
+  });
+
+  it('maxIterations 0 or 1 still returns defined stopped_reason; caps at 20', () => {
+    const { graph } = twoCliquesGraph();
+
+    const zero = mod.detectCommunities({
+      graph,
+      write: false,
+      maxIterations: 0,
+    });
+    assert.ok(
+      zero.stopped_reason === 'converged' ||
+        zero.stopped_reason === 'max_iterations',
+    );
+    assert.equal(typeof zero.iterations, 'number');
+    assert.ok(zero.iterations >= 0);
+
+    const one = mod.detectCommunities({
+      graph,
+      write: false,
+      maxIterations: 1,
+    });
+    assert.ok(
+      one.stopped_reason === 'converged' ||
+        one.stopped_reason === 'max_iterations',
+    );
+    assert.ok(one.iterations <= 1);
+
+    const huge = mod.detectCommunities({
+      graph,
+      write: false,
+      maxIterations: 999,
+    });
+    assert.ok(huge.iterations <= mod.COMMUNITY_MAX_ITERATIONS);
+
+    const neg = mod.detectCommunities({
+      graph,
+      write: false,
+      maxIterations: -5,
+    });
+    // non-finite or negative → default; still bounded
+    assert.ok(neg.iterations <= mod.COMMUNITY_MAX_ITERATIONS);
+    assert.ok(
+      neg.stopped_reason === 'converged' ||
+        neg.stopped_reason === 'max_iterations',
+    );
+  });
+
+  it('two consecutive runs deep-equal on communities (D-05, D-10)', () => {
+    const { graph } = twoCliquesGraph({ ambiguousBridge: true, extraDyad: true });
+    const a = mod.detectCommunities({ graph, write: false });
+    const b = mod.detectCommunities({ graph, write: false });
+    assert.deepEqual(a.communities, b.communities);
+    assert.equal(a.dropped_small_count, b.dropped_small_count);
+    assert.equal(a.nodes_considered, b.nodes_considered);
+    assert.equal(a.edges_considered, b.edges_considered);
+  });
+
+  it('INFERRED edges alone can form a community of size >= 3 (D-03)', () => {
+    const n1 = 'concept:i1';
+    const n2 = 'concept:i2';
+    const n3 = 'concept:i3';
+    const graph = baseDoc(
+      [
+        { id: n1, type: 'Concept', label: 'I1' },
+        { id: n2, type: 'Concept', label: 'I2' },
+        { id: n3, type: 'Concept', label: 'I3' },
+      ],
+      [
+        triple(n1, 'related_to', n2, 'INFERRED'),
+        triple(n2, 'related_to', n3, 'INFERRED'),
+        triple(n3, 'related_to', n1, 'INFERRED'),
+      ],
+    );
+    const result = mod.detectCommunities({ graph, write: false });
+    assert.equal(result.communities.length, 1);
+    assert.equal(result.communities[0]!.size, 3);
+    assert.deepEqual(
+      [...result.communities[0]!.members].sort(),
+      [n1, n2, n3].sort(),
+    );
+  });
+
+  it('does not mutate injected graph.communities field (A4)', () => {
+    const { graph } = twoCliquesGraph();
+    const doc = graph as { communities?: unknown[] };
+    doc.communities = [{ marker: 'preexisting' }];
+    const before = JSON.stringify(doc.communities);
+    mod.detectCommunities({ graph: doc, write: false });
+    assert.equal(JSON.stringify(doc.communities), before);
+  });
+});
