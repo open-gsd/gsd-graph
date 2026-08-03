@@ -23,9 +23,9 @@ progress:
 
 - **Milestone:** v0.2.0  
 - **Phase:** 2 (build-pipeline) — EXECUTING  
-- **Plan:** 02-01 complete; next 02-02  
+- **Plan:** 02-02 complete; next 02-03  
 - **Status:** Executing Phase 2  
-- **Next action:** Execute `02-02-PLAN.md` (JSONL extract / remaining pipeline)
+- **Next action:** Execute `02-03-PLAN.md` (normalize / provenance / merge)
 
 ## Progress
 
@@ -36,10 +36,11 @@ progress:
 | Phase 2 plans 02-01..02-04 | ✓ plan-check PASS |
 | Phase 2 VALIDATION | ✓ |
 | 02-01 extract + fingerprint + discover | ✓ Complete |
+| 02-02 JSONL field-map + extractByPath | ✓ Complete |
 
 ## Next
 
-Execute remaining Phase 2 plans: JSONL extract → normalize → review → build/status.
+Execute remaining Phase 2 plans: normalize → review → build/status.
 
 ## Blockers
 
@@ -57,9 +58,9 @@ None.
 - [Phase 02-01]: OQ-1 six-rule MD grammar locked in markdown.ts module header
 - [Phase 02-01]: discoverSources returns { files, diagnostics } with FILE_TOO_LARGE skips
 - [Phase 02-01]: Free prose yields no EXTRACTED typed multi-hop predicates (D-01 honesty)
-- [Phase ?]: multi-hop fixture uses Concept--causes-->Concept chain (general-pack allowlisted)
-- [Phase ?]: Invalid JSONL lines → diagnostic and continue (no whole-file throw)
-- [Phase ?]: extractByPath fingerprints unless contentHash provided; never network/LLM
+- [Phase 02-02]: multi-hop fixture uses Concept--causes-->Concept chain (general-pack allowlisted)
+- [Phase 02-02]: Invalid JSONL lines → diagnostic and continue (no whole-file throw)
+- [Phase 02-02]: extractByPath fingerprints unless contentHash provided; never network/LLM
 
 ## Session
 
