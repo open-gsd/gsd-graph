@@ -44,7 +44,7 @@
 
 ### Maintain & lifecycle
 
-- [ ] **MNT-01**: Incremental maintain invalidates provenance correctly (M1–M5 matrix)
+- [x] **MNT-01**: Incremental maintain invalidates provenance correctly (M1–M5 matrix)
 - [ ] **SNAP-01**: Snapshot save/list/restore of graph.v1
 - [ ] **DIFF-01**: Diff current graph vs snapshot / last-diff-base (± nodes & triples by id)
 - [ ] **REP-01**: Repair regenerates projection from v1 without inventing triples
@@ -110,7 +110,7 @@
 | STAT-01 | Phase 2 | Complete |
 | QRY-01 | Phase 3 | Complete |
 | QRY-02 | Phase 3 | Complete |
-| MNT-01 | Phase 3 | Pending |
+| MNT-01 | Phase 3 | Complete |
 | SNAP-01 | Phase 3 | Pending |
 | DIFF-01 | Phase 3 | Pending |
 | REP-01 | Phase 3 | Pending |
