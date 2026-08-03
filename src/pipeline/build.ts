@@ -51,6 +51,7 @@ import { extractByPath } from './extract';
 import { invalidateProvenance, normPathKey } from './maintain';
 import { normalize } from './normalize';
 import { projectGraph } from './project';
+import { writeGraphReport } from './report';
 import {
   emptyReviewQueue,
   loadReviewQueue,
@@ -384,6 +385,20 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
   // DIFF-01 prep: full graph.v1 copy as last-diff-base while lock still held (D-10, OQ-3).
   writeLastDiffBase(storeRoot, graphV1);
 
+  // Optional disposable report after successful publish (RPT-01, D-08).
+  // Default false; report errors never fail the build (T-06-13).
+  if (shouldWriteReportOnBuild(storeRoot, opts)) {
+    try {
+      writeGraphReport({ dir: storeRoot });
+    } catch (err) {
+      diagnostics.push({
+        path: 'GRAPH_REPORT.md',
+        code: 'REPORT_WRITE_FAILED',
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   const review_pending = reviewQueue.items.filter(
     (i) => i.status === 'pending',
   ).length;
@@ -401,6 +416,32 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
     engine_version,
     built_at,
   };
+}
+
+/**
+ * Resolve report.write_on_build: explicit BuildOptions wins, else config, else false.
+ */
+function shouldWriteReportOnBuild(
+  storeRoot: string,
+  opts: BuildOptions,
+): boolean {
+  if (opts.writeReportOnBuild === true) return true;
+  if (opts.writeReportOnBuild === false) return false;
+  return readReportWriteOnBuild(storeRoot);
+}
+
+/** Read config.json report.write_on_build (default false). */
+function readReportWriteOnBuild(storeRoot: string): boolean {
+  const configPath = storeFile(storeRoot, 'config.json');
+  if (!fs.existsSync(configPath)) return false;
+  try {
+    const raw = readJsonFile(configPath) as {
+      report?: { write_on_build?: unknown };
+    };
+    return raw?.report?.write_on_build === true;
+  } catch {
+    return false;
+  }
 }
 
 /**

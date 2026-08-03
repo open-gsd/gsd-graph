@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const root = path.join(__dirname, '..');
+const fixturesCorpus = path.join(root, 'tests', 'fixtures', 'corpus');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const mod = require(path.join(root, 'dist', 'index.js')) as {
@@ -32,12 +33,28 @@ const mod = require(path.join(root, 'dist', 'index.js')) as {
     ontology_version: string;
     built_at: string;
   };
+  build: (opts: {
+    corpus: string | string[];
+    dir?: string;
+    full?: boolean;
+    writeReportOnBuild?: boolean;
+  }) => {
+    store_dir: string;
+    node_count: number;
+    triple_count: number;
+    diagnostics: Array<{ code: string; message: string; path: string }>;
+  };
   GSD_GRAPH_REASON: Record<string, string>;
   GraphError: new (
     reason: string,
     message: string,
     details?: unknown,
   ) => Error & { reason: string };
+};
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const cli = require(path.join(root, 'dist', 'cli.js')) as {
+  main: (argv: string[]) => number;
 };
 
 const temps: string[] = [];
@@ -261,5 +278,130 @@ describe('writeGraphReport (RPT-01, D-08, D-10)', () => {
     const result2 = mod.writeGraphReport({ dir: store });
     const md2 = fs.readFileSync(result2.path, 'utf8');
     assert.match(md2, /review_pending:\s*1/);
+  });
+});
+
+function captureIO(fn: () => number): {
+  code: number;
+  stdout: string;
+  stderr: string;
+} {
+  const origOut = process.stdout.write.bind(process.stdout);
+  const origErr = process.stderr.write.bind(process.stderr);
+  let stdout = '';
+  let stderr = '';
+  (process.stdout as NodeJS.WriteStream).write = ((
+    chunk: string | Uint8Array,
+    ..._rest: unknown[]
+  ) => {
+    stdout += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString();
+    return true;
+  }) as typeof process.stdout.write;
+  (process.stderr as NodeJS.WriteStream).write = ((
+    chunk: string | Uint8Array,
+    ..._rest: unknown[]
+  ) => {
+    stderr += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString();
+    return true;
+  }) as typeof process.stderr.write;
+  try {
+    const code = fn();
+    return { code, stdout, stderr };
+  } finally {
+    process.stdout.write = origOut;
+    process.stderr.write = origErr;
+  }
+}
+
+describe('CLI report + write_on_build (RPT-01)', () => {
+  it('gsd-graph report exits 0 with path and counts JSON when v1 exists', () => {
+    const { store } = publishFixture();
+    const io = captureIO(() =>
+      cli.main(['node', 'gsd-graph', '--dir', store, 'report']),
+    );
+    assert.equal(io.code, 0, io.stderr);
+    const body = JSON.parse(io.stdout) as {
+      path: string;
+      node_count: number;
+      triple_count: number;
+    };
+    assert.equal(body.node_count, 4);
+    assert.equal(body.triple_count, 7);
+    assert.equal(body.path, path.join(store, 'GRAPH_REPORT.md'));
+    assert.ok(fs.existsSync(body.path));
+  });
+
+  it('gsd-graph report maps missing v1 to non-zero via mapCliError', () => {
+    const store = mod.ensureStoreRoot(tempDir('gsd-report-cli-miss-'));
+    const io = captureIO(() =>
+      cli.main(['node', 'gsd-graph', '--dir', store, 'report']),
+    );
+    assert.equal(io.code, 2);
+    const err = JSON.parse(io.stderr) as {
+      ok: false;
+      reason: string;
+      message: string;
+    };
+    assert.equal(err.ok, false);
+    assert.equal(err.reason, mod.GSD_GRAPH_REASON.SCHEMA_INVALID);
+  });
+
+  it('build does not write report when write_on_build is default false', () => {
+    const corpus = tempDir('gsd-report-build-c-');
+    const store = tempDir('gsd-report-build-s-');
+    fs.copyFileSync(
+      path.join(fixturesCorpus, 'structured-edges.md'),
+      path.join(corpus, 'structured-edges.md'),
+    );
+    const built = mod.build({ corpus, dir: store, full: true });
+    assert.ok(built.node_count > 0);
+    assert.equal(
+      fs.existsSync(path.join(store, 'GRAPH_REPORT.md')),
+      false,
+      'report.write_on_build default false',
+    );
+  });
+
+  it('build writes report when writeReportOnBuild is true', () => {
+    const corpus = tempDir('gsd-report-build-on-c-');
+    const store = tempDir('gsd-report-build-on-s-');
+    fs.copyFileSync(
+      path.join(fixturesCorpus, 'structured-edges.md'),
+      path.join(corpus, 'structured-edges.md'),
+    );
+    const built = mod.build({
+      corpus,
+      dir: store,
+      full: true,
+      writeReportOnBuild: true,
+    });
+    assert.ok(built.node_count > 0);
+    assert.ok(
+      fs.existsSync(path.join(store, 'GRAPH_REPORT.md')),
+      'report written when writeReportOnBuild true',
+    );
+    const md = fs.readFileSync(path.join(store, 'GRAPH_REPORT.md'), 'utf8');
+    assert.match(md, /Non-authoritative/i);
+    assert.match(md, new RegExp(`nodes:\\s*${built.node_count}`));
+  });
+
+  it('config report.write_on_build true enables post-publish report', () => {
+    const corpus = tempDir('gsd-report-cfg-c-');
+    const store = tempDir('gsd-report-cfg-s-');
+    fs.mkdirSync(store, { recursive: true });
+    fs.writeFileSync(
+      path.join(store, 'config.json'),
+      JSON.stringify({
+        ontology: 'general',
+        report: { write_on_build: true },
+      }),
+      'utf8',
+    );
+    fs.copyFileSync(
+      path.join(fixturesCorpus, 'structured-edges.md'),
+      path.join(corpus, 'structured-edges.md'),
+    );
+    mod.build({ corpus, dir: store, full: true });
+    assert.ok(fs.existsSync(path.join(store, 'GRAPH_REPORT.md')));
   });
 });

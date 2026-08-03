@@ -18,6 +18,7 @@ import { diff } from './pipeline/diff';
 import { init } from './pipeline/init';
 import { packSubgraph } from './pipeline/pack';
 import { query } from './pipeline/query';
+import { writeGraphReport } from './pipeline/report';
 import { repair } from './pipeline/repair';
 import { loadReviewQueue, reviewResolve } from './pipeline/review';
 import {
@@ -190,6 +191,16 @@ function buildProgram(): Command {
     .description('Read store status (never uses projection as SoT)')
     .action((_opts: unknown, cmd: Command) => {
       const result = status(withDir({}, globalDir(cmd)));
+      writeOk(result);
+    });
+
+  program
+    .command('report')
+    .description(
+      'Write disposable GRAPH_REPORT.md from published graph.v1 (never SoT)',
+    )
+    .action((_opts: unknown, cmd: Command) => {
+      const result = writeGraphReport(withDir({}, globalDir(cmd)));
       writeOk(result);
     });
 

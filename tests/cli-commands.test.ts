@@ -159,6 +159,24 @@ describe('cli-commands core ops (CLI-01)', () => {
     assert.ok((body.node_count ?? 0) > 0);
   });
 
+  it('report writes GRAPH_REPORT.md and returns path + counts JSON (RPT-01)', () => {
+    const { dir } = prepareStore();
+    const result = run(['--dir', dir, 'report']);
+    assert.equal(result.code, 0, result.stderr);
+    const body = result.json as {
+      path: string;
+      node_count: number;
+      triple_count: number;
+    };
+    assert.ok(body.node_count > 0);
+    assert.ok(body.triple_count >= 0);
+    assert.equal(body.path, path.join(dir, 'GRAPH_REPORT.md'));
+    assert.ok(fs.existsSync(body.path));
+    const md = fs.readFileSync(body.path, 'utf8');
+    assert.match(md, /Non-authoritative/i);
+    assert.match(md, /graph\.v1\.json/);
+  });
+
   it('query <term> returns seeds and nodes JSON', () => {
     const { dir } = prepareStore();
     const result = run(['--dir', dir, 'query', 'Drought', '--hops', '2']);

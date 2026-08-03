@@ -138,6 +138,12 @@ export interface BuildOptions {
   full?: boolean;
   /** Dual-write projection; default DEFAULT_WRITE_PROJECTION (false). */
   writeProjection?: boolean;
+  /**
+   * When true, write disposable GRAPH_REPORT.md after successful publish (RPT-01).
+   * Default false; when undefined, falls through to config.report.write_on_build.
+   * Report failure is diagnostic-only and never fails the build (D-08, T-06-13).
+   */
+  writeReportOnBuild?: boolean;
   /** Optional discover globs (default md/txt/markdown/json/jsonl). */
   globs?: string[];
   /**
