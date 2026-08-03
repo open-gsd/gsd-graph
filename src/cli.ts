@@ -14,7 +14,10 @@ import {
 } from './llm/prompt-files';
 import { answer } from './pipeline/answer';
 import { build } from './pipeline/build';
-import { detectCommunities } from './pipeline/communities';
+import {
+  detectCommunities,
+  writeCommunityReports,
+} from './pipeline/communities';
 import { diff } from './pipeline/diff';
 import { init } from './pipeline/init';
 import { packSubgraph } from './pipeline/pack';
@@ -402,6 +405,20 @@ function buildProgram(): Command {
         });
       },
     );
+
+  communities
+    .command('report')
+    .description(
+      'Rewrite community theme markdown from communities/index.json (no re-detect)',
+    )
+    .action((_opts: unknown, cmd: Command) => {
+      const paths = writeCommunityReports(withDir({}, globalDir(cmd)));
+      writeOk({
+        ok: true,
+        index_path: paths.index_path,
+        report_paths: paths.report_paths,
+      });
+    });
 
   // Phase 5 grounding verbs — thin K22 adapters over packSubgraph / answer (D-06)
   program
