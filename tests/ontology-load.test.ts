@@ -155,6 +155,25 @@ describe('loadOntologyPack replace-only (ONT-03)', () => {
     );
   });
 
+  it('rejects pack with extends array', () => {
+    const fixture = join(
+      root,
+      'tests',
+      'fixtures',
+      'ontology',
+      'pack-with-extends-array.json',
+    );
+    assert.throws(
+      () => mod.loadOntologyPack({ packIdOrPath: fixture }),
+      (err: unknown) => {
+        assert.ok(err instanceof mod.GraphError);
+        assert.equal(err.reason, mod.GSD_GRAPH_REASON.ONTOLOGY_INVALID);
+        assert.match(err.message, /composition|extends|replace-only|not supported/i);
+        return true;
+      },
+    );
+  });
+
   it('loads custom path pack without extends when schema-valid', () => {
     const fixture = join(root, 'tests', 'fixtures', 'ontology', 'pack-custom.json');
     const loaded = mod.loadOntologyPack({ packIdOrPath: fixture });

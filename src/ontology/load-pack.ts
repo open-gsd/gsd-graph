@@ -138,10 +138,11 @@ export function loadOntologyPack(
   }
 
   // ONT-03 / D-05: replace-only — reject pack composition before schema pass.
+  // Covers extends as string or array (or any other value); no merge API in v0.1.
   if (Object.prototype.hasOwnProperty.call(parsed, 'extends')) {
     throw new GraphError(
       GSD_GRAPH_REASON.ONTOLOGY_INVALID,
-      'ontology pack composition via extends is not supported in v0.1 (replace-only); copy the pack and load the copy',
+      'ontology pack composition via extends is not supported in v0.1 (replace-only); copy the pack and load the copy by path',
       { path: filePath, extends: parsed.extends },
     );
   }
