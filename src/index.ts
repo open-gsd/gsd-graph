@@ -171,3 +171,6 @@ export {
 
 // Diff (03-04 / DIFF-01)
 export { diff, resolveBaseline } from './pipeline/diff';
+
+// Repair (03-04 / REP-01)
+export { repair } from './pipeline/repair';
