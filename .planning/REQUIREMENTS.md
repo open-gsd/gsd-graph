@@ -9,7 +9,7 @@
 
 - [x] **PKG-01**: Installable npm package `@opengsd/gsd-graph` builds on Node ≥22 with CJS + type declarations
 - [x] **PKG-02**: README and package description present as Graph Engineering toolkit; no gsd-core runtime dependency
-- [ ] **PKG-03**: CLI binary `gsd-graph` is published and invokable after install
+- [x] **PKG-03**: CLI binary `gsd-graph` is published and invokable after install
 
 ### Ontology
 
@@ -53,8 +53,8 @@
 ### CLI & agent contract
 
 - [ ] **CLI-01**: Commands: init, build, query, path, status, diff, snapshot, review, repair, ontology, pack, answer
-- [ ] **CLI-02**: Machine contract: JSON on stdout; human diagnostics on stderr; exit 0/1/2/3
-- [ ] **CLI-03**: `init` appends store dir to `.gitignore` when a gitignore exists
+- [x] **CLI-02**: Machine contract: JSON on stdout; human diagnostics on stderr; exit 0/1/2/3
+- [x] **CLI-03**: `init` appends store dir to `.gitignore` when a gitignore exists
 
 ### Quality gates
 
@@ -92,7 +92,7 @@
 |-------------|-------|--------|
 | PKG-01 | Phase 1 | Complete |
 | PKG-02 | Phase 1 | Complete |
-| PKG-03 | Phase 4 | Pending |
+| PKG-03 | Phase 4 | Complete |
 | ONT-01 | Phase 1 | Complete |
 | ONT-02 | Phase 1 | Complete |
 | ONT-03 | Phase 1 | Complete |
@@ -115,8 +115,8 @@
 | DIFF-01 | Phase 3 | Complete |
 | REP-01 | Phase 3 | Complete |
 | CLI-01 | Phase 4 | Pending |
-| CLI-02 | Phase 4 | Pending |
-| CLI-03 | Phase 4 | Pending |
+| CLI-02 | Phase 4 | Complete |
+| CLI-03 | Phase 4 | Complete |
 | PACK-01 | Phase 5 | Pending |
 | ANS-01 | Phase 5 | Pending |
 | ANS-02 | Phase 5 | Pending |
