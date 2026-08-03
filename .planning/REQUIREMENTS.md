@@ -71,7 +71,7 @@
 
 ## v2 Requirements
 
-- **COM-01**: Community detection (label propagation) and community/theme reports
+- [x] **COM-01**: Community detection (label propagation) and community/theme reports
 - **QRY-03**: NL → Query IR
 - **EXP-01**: Optional Neo4j / Cypher export
 - **ONT-05**: Pack extends / inheritance
@@ -127,7 +127,7 @@
 | MCP-01 | Phase 6 | Complete |
 | RPT-01 | Phase 6 | Complete |
 | ONT-04 | Phase 6 | Complete |
-| COM-01 | Phase 7 | In Progress |
+| COM-01 | Phase 7 | Complete |
 
 ---
 *Requirements defined: 2026-08-02 after research synthesis*

@@ -160,13 +160,13 @@ Plans:
   2. Community/theme reports summarize clusters; LLM prose for reports is opt-in only
   3. Package version can ship as 0.2.0 with communities documented as the global-search differentiator
 
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans executed
 
 Plans:
 
 - [x] 07-01-PLAN.md — Pure-TS LPA library + synthetic two-clique tests (COM-01 core)
 - [x] 07-02-PLAN.md — loadGraphV1 + communities/ sidecars + deterministic theme reports
-- [ ] 07-03-PLAN.md — CLI communities detect|report + version 0.2.0 + CHANGELOG/README
+- [x] 07-03-PLAN.md — CLI communities detect|report + version 0.2.0 + CHANGELOG/README
 
 ## Progress
 
@@ -182,7 +182,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. CLI surface | 3/3 | Complete | 2026-08-03 |
 | 5. Ground & prove 0.1.0 | 4/4 | In Progress|  |
 | 6. Optional agents | 4/4 | In Progress|  |
-| 7. Global themes 0.2 | 2/3 | In Progress|  |
+| 7. Global themes 0.2 | 3/3 | In Progress|  |
 
 ## Coverage
 

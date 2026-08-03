@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 7
 current_phase_name: global-themes-0-2
 current_plan: 3
-status: executing
-stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-08-03T20:16:16.271Z"
+status: ready_for_verification
+stopped_at: Completed 07-03-PLAN.md
+last_updated: "2026-08-03T20:21:18.583Z"
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 32
-  completed_plans: 24
+  completed_plans: 25
 ---
 
 # Project State
@@ -22,12 +22,12 @@ progress:
 
 ## Current position
 
-- **Milestone:** 0.1.0 complete; Phase 7 (0.2.0 communities) executing  
-- **Phase:** 7 (global-themes-0-2) — EXECUTING
-- **Current Plan:** 3
+- **Milestone:** 0.1.0 complete; Phase 7 (0.2.0 communities) ready for verification  
+- **Phase:** 7 (global-themes-0-2) — READY FOR VERIFICATION
+- **Current Plan:** 3 (last plan)
 - **Total Plans in Phase:** 3
-- **Status:** Plan 07-01 complete; next 07-02
-- **Next action:** Execute 07-02-PLAN.md (community artifacts / store writes)
+- **Status:** Plans 07-01..07-03 complete; awaiting phase verification
+- **Next action:** Verify Phase 7 / close 0.2.0 milestone
 
 ## Progress
 
@@ -38,6 +38,8 @@ progress:
 | Phase 7 plans 07-01..07-03 | ✓ plan-check PASS |
 | Phase 7 VALIDATION | ✓ |
 | 07-01 pure-TS LPA library | ✓ Complete |
+| 07-02 community store artifacts | ✓ Complete |
+| 07-03 CLI + 0.2.0 ship surface | ✓ Complete |
 
 ## Blockers
 
@@ -49,6 +51,7 @@ None.
 |------|----------|-------|-------|
 | Phase 07 P01 | 4min | 2 tasks | 4 files |
 | Phase 07 P02 | 4min | 2 tasks | 4 files |
+| Phase 07 P03 | 4min | 2 tasks | 7 files |
 
 ## Decisions
 
@@ -57,9 +60,11 @@ None.
 - [Phase ?]: write defaults true only when opts.graph is omitted (production store path)
 - [Phase ?]: index.json stores full Community objects for report rewrite without re-detect
 - [Phase ?]: writeCommunityReports missing index → SCHEMA_INVALID with detect-first message (A2)
+- [Phase ?]: CLI communities detect always write:true for operator sidecars
+- [Phase ?]: CLI community JSON summaries emit id/size/label/stable_key only
 
 ## Session
 
-**Last session:** 2026-08-03T20:16:16.261Z
-**Stopped at:** Completed 07-02-PLAN.md
+**Last session:** 2026-08-03T20:21:18.568Z
+**Stopped at:** Completed 07-03-PLAN.md
 **Resume file:** None
