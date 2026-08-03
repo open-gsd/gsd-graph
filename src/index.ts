@@ -137,3 +137,10 @@ export type { ReviewResolveOptions } from './pipeline/review';
 // Build orchestrator + status (02-04)
 export { build, assertGraphCaps, MAX_NODES, MAX_TRIPLES } from './pipeline/build';
 export { status } from './pipeline/status';
+
+// Maintain invalidation (03-02 / MNT-01)
+export {
+  invalidateProvenance,
+  maintain,
+  normPathKey,
+} from './pipeline/maintain';

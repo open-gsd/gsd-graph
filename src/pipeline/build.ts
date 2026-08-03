@@ -4,12 +4,14 @@
 /**
  * Composes discover → extract → normalize → review merge → publish.
  *
- * Incremental strategy (Phase 2 / EXT-03 — not full M1–M5):
+ * Incremental strategy (MNT-01 / EXT-03):
  * - Load prior graph.v1 + sources.manifest when present.
  * - Fingerprint each discovered file; when !full and hash matches manifest,
  *   skip re-extract (sources_skipped_fresh++).
- * - Strip prior triples whose provenance references re-extracted paths, then
- *   union re-extracted candidates and always re-normalize so best_tier/merge
+ * - pathsToDrop = changed ∪ removed (manifest keys absent from discover).
+ * - Always invalidateProvenance on prior triples when !full && priorGraph,
+ *   even if zero files re-extract (deleted-source gap fix, D-06).
+ * - Union re-extracted candidates and always re-normalize so best_tier/merge
  *   stay correct.
  * - Caps: nodes > 100_000 or triples > 250_000 → LIMIT_EXCEEDED before publish.
  */
@@ -41,7 +43,7 @@ import type {
   Triple,
 } from '../types';
 import { extractByPath } from './extract';
-import { bestTier } from './ids';
+import { invalidateProvenance, normPathKey } from './maintain';
 import { normalize } from './normalize';
 import {
   emptyReviewQueue,
@@ -133,45 +135,6 @@ function extractorForPath(absPath: string): string {
   }
 }
 
-function normPathKey(p: string): string {
-  try {
-    return fs.realpathSync.native(path.resolve(p));
-  } catch {
-    return path.resolve(p);
-  }
-}
-
-/**
- * Drop provenance entries (and triples left empty) whose source_path is in
- * `changedPaths`. Recomputes confidence via bestTier.
- */
-function stripChangedSources(
-  nodes: GraphNode[],
-  triples: Triple[],
-  changedPaths: ReadonlySet<string>,
-): { nodes: GraphNode[]; triples: Triple[] } {
-  if (changedPaths.size === 0) {
-    return { nodes: nodes.map(cloneNode), triples: triples.map(cloneTriple) };
-  }
-
-  const kept: Triple[] = [];
-  for (const t of triples) {
-    const provenance = (t.provenance ?? []).filter(
-      (e) => !changedPaths.has(normPathKey(e.source_path)),
-    );
-    if (provenance.length === 0) continue;
-    kept.push({
-      ...t,
-      provenance,
-      confidence: bestTier(provenance),
-    });
-  }
-  return {
-    nodes: nodes.map(cloneNode),
-    triples: kept,
-  };
-}
-
 function cloneNode(n: GraphNode): GraphNode {
   return {
     id: n.id,
@@ -179,18 +142,6 @@ function cloneNode(n: GraphNode): GraphNode {
     label: n.label,
     ...(n.description !== undefined ? { description: n.description } : {}),
     ...(n.aliases !== undefined ? { aliases: [...n.aliases] } : {}),
-  };
-}
-
-function cloneTriple(t: Triple): Triple {
-  return {
-    id: t.id,
-    s: t.s,
-    p: t.p,
-    o: t.o,
-    confidence: t.confidence,
-    ...(t.score !== undefined ? { score: t.score } : {}),
-    provenance: t.provenance.map((e) => ({ ...e })),
   };
 }
 
@@ -255,9 +206,11 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
   const toExtract: string[] = [];
   let sources_skipped_fresh = 0;
   const changedPaths = new Set<string>();
+  const discoveredKeys = new Set<string>();
 
   for (const file of discovered.files) {
     const key = normPathKey(file);
+    discoveredKeys.add(key);
     const { content_hash } = fingerprintStat(file);
     const prior = priorManifest?.sources?.[file] ?? priorManifest?.sources?.[key];
     if (
@@ -273,17 +226,27 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
     changedPaths.add(key);
   }
 
+  // Manifest keys present previously but absent from current discover (D-06).
+  const removedPaths = new Set<string>();
+  if (!full && priorManifest) {
+    for (const srcKey of Object.keys(priorManifest.sources)) {
+      const nk = normPathKey(srcKey);
+      if (!discoveredKeys.has(nk)) {
+        removedPaths.add(nk);
+      }
+    }
+  }
+
+  const pathsToDrop = new Set<string>([...changedPaths, ...removedPaths]);
+
   let workingNodes: GraphNode[] = [];
   let workingTriples: Triple[] = [];
 
-  if (!full && priorGraph && sources_skipped_fresh > 0) {
-    const stripped = stripChangedSources(
-      priorGraph.nodes,
-      priorGraph.triples,
-      changedPaths,
-    );
-    workingNodes = stripped.nodes;
-    workingTriples = stripped.triples;
+  // Always invalidate when reusing prior graph — even if only removals and
+  // zero re-extracts (deleted-source gap / RESEARCH Pitfall 1).
+  if (!full && priorGraph) {
+    workingNodes = priorGraph.nodes.map(cloneNode);
+    workingTriples = invalidateProvenance(priorGraph.triples, pathsToDrop);
   }
 
   const sources_extracted = toExtract.length;
