@@ -85,12 +85,12 @@ function multiHopGraph() {
   const t1 = lib.tripleId(drought, 'causes', crop);
   const t2 = lib.tripleId(crop, 'causes', food);
   return {
-    schema_version: 1,
-    engine: 'gsd-graph',
+    schema_version: 1 as const,
+    engine: 'gsd-graph' as const,
     engine_version: '0.1.0',
     ontology_pack_id: 'general',
+    ontology_version: '1.0.0',
     built_at: '2026-01-01T00:00:00.000Z',
-    content_hash: 'sha256:test',
     nodes: [
       {
         id: drought,
@@ -187,5 +187,187 @@ describe('MCP package identity hooks (D-07)', () => {
     assert.equal(opts.allowBuild, true);
     assert.equal(opts.allowReviewWrite, true);
     assert.equal(opts.dir, '/tmp/store');
+  });
+});
+
+describe('MCP full read tool matrix + default-off writes (MCP-01, D-06)', () => {
+  const DEFAULT_EXACT = [
+    'graph_status',
+    'graph_query',
+    'graph_pack',
+    'graph_answer',
+    'graph_review_list',
+  ];
+
+  it('default tool list is exactly the five read tools (D-06)', () => {
+    const names = mcp.listToolNames();
+    assert.deepEqual([...names].sort(), [...DEFAULT_EXACT].sort());
+  });
+
+  it('allowBuild registers graph_build; allowReviewWrite registers graph_review_resolve', () => {
+    const withBuild = mcp.listToolNames({ allowBuild: true });
+    assert.equal(withBuild.includes('graph_build'), true);
+    assert.equal(withBuild.includes('graph_review_resolve'), false);
+
+    const withReview = mcp.listToolNames({ allowReviewWrite: true });
+    assert.equal(withReview.includes('graph_review_resolve'), true);
+    assert.equal(withReview.includes('graph_build'), false);
+
+    const both = mcp.listToolNames({
+      allowBuild: true,
+      allowReviewWrite: true,
+    });
+    assert.equal(both.includes('graph_build'), true);
+    assert.equal(both.includes('graph_review_resolve'), true);
+    for (const n of DEFAULT_EXACT) {
+      assert.equal(both.includes(n), true, `missing default ${n}`);
+    }
+  });
+
+  it('createGsdGraphMcpServer with allow flags matches listToolNames', async () => {
+    const { toolNames, server } = await mcp.createGsdGraphMcpServer({
+      allowBuild: true,
+      allowReviewWrite: true,
+    });
+    assert.equal(toolNames.includes('graph_build'), true);
+    assert.equal(toolNames.includes('graph_review_resolve'), true);
+    if (server.close) await server.close();
+  });
+
+  it('graph_build / graph_review_resolve handlers refuse when gates off', async () => {
+    const buildDenied = await mcp.handleToolCall('graph_build', {
+      corpus: '/tmp/nope',
+    });
+    assert.equal(buildDenied.isError, true);
+    assert.match(buildDenied.content[0]!.text, /not enabled|allow-build/i);
+
+    const resolveDenied = await mcp.handleToolCall('graph_review_resolve', {
+      id: 'x',
+      action: 'reject',
+    });
+    assert.equal(resolveDenied.isError, true);
+    assert.match(
+      resolveDenied.content[0]!.text,
+      /not enabled|allow-review-write/i,
+    );
+  });
+
+  it('graph_pack and graph_answer delegate to library on in-memory fixture (D-12 offline)', async () => {
+    // Integration-style via public APIs used by handlers: pack/answer shapes.
+    // Handlers load from store dir; we exercise library parity + tool JSON shape
+    // by writing a minimal store graph.v1 for the tool path.
+    const dir = tempDir('gsd-mcp-pack-');
+    const store = path.join(dir, '.gsd-graph');
+    fs.mkdirSync(store, { recursive: true });
+    const graph = multiHopGraph();
+    fs.writeFileSync(
+      path.join(store, 'graph.v1.json'),
+      JSON.stringify(graph, null, 2),
+      'utf8',
+    );
+
+    const packResult = await mcp.handleToolCall('graph_pack', {
+      question: 'How does drought cause food shortage?',
+      dir: store,
+    });
+    assert.equal(packResult.isError, undefined, packResult.content[0]?.text);
+    const pack = JSON.parse(packResult.content[0]!.text) as {
+      question: string;
+      seeds: string[];
+      triples: unknown[];
+      citations: unknown[];
+      nodes: unknown[];
+    };
+    assert.equal(typeof pack.question, 'string');
+    assert.ok(Array.isArray(pack.seeds));
+    assert.ok(Array.isArray(pack.triples));
+    assert.ok(Array.isArray(pack.citations));
+    assert.ok(pack.triples.length > 0, 'fixture multi-hop should pack triples');
+
+    const answerResult = await mcp.handleToolCall('graph_answer', {
+      question: 'How does drought cause food shortage?',
+      dir: store,
+    });
+    assert.equal(
+      answerResult.isError,
+      undefined,
+      answerResult.content[0]?.text,
+    );
+    const ans = JSON.parse(answerResult.content[0]!.text) as {
+      answer_markdown: string;
+      mode: string;
+      abstained: boolean;
+      pack: { triples: unknown[] };
+    };
+    assert.equal(typeof ans.answer_markdown, 'string');
+    assert.equal(ans.abstained, false);
+    assert.ok(ans.pack.triples.length > 0);
+    assert.match(ans.mode, /deterministic|prompt|http/);
+  });
+
+  it('graph_query term search returns nodes/triples from store (read-only)', async () => {
+    const dir = tempDir('gsd-mcp-query-');
+    const store = path.join(dir, '.gsd-graph');
+    fs.mkdirSync(store, { recursive: true });
+    fs.writeFileSync(
+      path.join(store, 'graph.v1.json'),
+      JSON.stringify(multiHopGraph(), null, 2),
+      'utf8',
+    );
+
+    const result = await mcp.handleToolCall('graph_query', {
+      term: 'Drought',
+      dir: store,
+      hops: 2,
+    });
+    assert.equal(result.isError, undefined, result.content[0]?.text);
+    const body = JSON.parse(result.content[0]!.text) as {
+      nodes: unknown[];
+      triples: unknown[];
+      seeds: string[];
+    };
+    assert.ok(body.seeds.length > 0);
+    assert.ok(body.nodes.length > 0);
+  });
+
+  it('graph_review_list returns pending items from empty queue', async () => {
+    const dir = tempDir('gsd-mcp-review-');
+    const store = path.join(dir, '.gsd-graph');
+    fs.mkdirSync(store, { recursive: true });
+    const result = await mcp.handleToolCall('graph_review_list', { dir: store });
+    assert.equal(result.isError, undefined, result.content[0]?.text);
+    const body = JSON.parse(result.content[0]!.text) as {
+      count: number;
+      items: unknown[];
+      store_dir: string;
+    };
+    assert.equal(body.count, 0);
+    assert.deepEqual(body.items, []);
+  });
+
+  it('handlers never write diagnostics to stdout (T-06-10 smoke)', async () => {
+    // Capture stdout during a status call — should remain empty.
+    let stdout = '';
+    const origWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string | Uint8Array, ...rest: unknown[]) => {
+      stdout += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString();
+      // still call through for test runner stability
+      return (origWrite as (c: string | Uint8Array, ...r: unknown[]) => boolean)(
+        chunk,
+        ...rest,
+      );
+    }) as typeof process.stdout.write;
+    try {
+      const dir = tempDir('gsd-mcp-stdout-');
+      await mcp.handleToolCall('graph_status', { dir });
+    } finally {
+      process.stdout.write = origWrite;
+    }
+    // MCP JSON-RPC integrity: tool handlers must not emit their own stdout
+    assert.equal(
+      stdout.includes('graph_status') || stdout.includes('store_dir'),
+      false,
+      `handler leaked status payload to stdout: ${stdout.slice(0, 200)}`,
+    );
   });
 });
