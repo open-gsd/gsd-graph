@@ -103,4 +103,37 @@ describe('package identity (PKG-01, PKG-02)', () => {
     assert.equal(err.reason, 'path_escape');
     assert.match(err.message, /escape/);
   });
+
+  it('README positions Graph Engineering and denies gsd-core runtime coupling', () => {
+    const readmePath = join(root, 'README.md');
+    assert.equal(existsSync(readmePath), true, 'README.md missing');
+    const text = readFileSync(readmePath, 'utf8');
+
+    assert.match(text, /Graph Engineering/, 'README must mention Graph Engineering');
+    assert.match(text, /@opengsd\/gsd-graph/, 'README must name the npm package');
+    assert.match(text, /gsd-graph/, 'README must mention CLI name gsd-graph');
+
+    // Ban affirmative runtime-coupling claims (allow explicit denials).
+    const banned = [
+      /\bdepends on gsd-core\b/i,
+      /\brequires gsd-core\b/i,
+      /\bintegrates with gsd-core (workflows|runtime)\b/i,
+      /\bgsd-core (capability|subsystem|host integration)\b/i,
+      /\bas a gsd-core plugin\b/i,
+    ];
+    for (const re of banned) {
+      assert.equal(
+        re.test(text),
+        false,
+        `README must not claim gsd-core runtime coupling (matched ${re})`,
+      );
+    }
+
+    // Positive standalone statement
+    assert.match(
+      text,
+      /no runtime dependency/i,
+      'README must explicitly state no runtime dependency on gsd-core',
+    );
+  });
 });
