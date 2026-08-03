@@ -446,6 +446,52 @@ export interface PackOptions {
   budget?: number | null;
 }
 
+// --- Optional LLM modes (LLM-01 / D-01) ---
+
+/** LLM provider mode — never ambient; default none (D-01). */
+export type LlmMode = 'none' | 'prompt' | 'http';
+
+/** Prompt pipeline stage names (D-03). query is reserved — no apply in v0.1. */
+export type PromptStage =
+  | 'extract'
+  | 'normalize'
+  | 'query'
+  | 'answer'
+  | 'maintain';
+
+/** Validated answer prompt-result shape (schemas/prompt-answer-result.schema.json). */
+export interface PromptAnswerResult {
+  answer_markdown: string;
+  cited_triple_ids: string[];
+  question?: string;
+  content_hash?: string;
+  built_at?: string;
+}
+
+/** Validated extract prompt-result shape. */
+export interface PromptExtractResult {
+  nodes: GraphNode[];
+  triples: Triple[];
+  content_hash?: string;
+  built_at?: string;
+}
+
+/** Validated normalize prompt-result shape. */
+export interface PromptNormalizeResult {
+  nodes: GraphNode[];
+  triples: Triple[];
+  suggestions?: string[];
+  content_hash?: string;
+  built_at?: string;
+}
+
+/** Validated maintain prompt-result shape (suggestions only). */
+export interface PromptMaintainResult {
+  suggestions: string[];
+  content_hash?: string;
+  built_at?: string;
+}
+
 // --- Grounded answer (ANS-01 / ANS-02 / D-03 / D-04 / D-05) ---
 
 /**
@@ -471,7 +517,34 @@ export interface GroundedAnswer {
 }
 
 /**
- * Options for answer() — extends PackOptions; no LLM flags in Phase 5 (D-05).
+ * Options for answer() — extends PackOptions with optional LLM apply flags (D-01, D-05, D-10).
+ * Default path (no apply flags) remains deterministic Phase 5 behavior.
  * Loads graph only via packSubgraph (opts.graph or loadGraphV1) (D-10).
  */
-export type AnswerOptions = PackOptions;
+export interface AnswerOptions extends PackOptions {
+  /**
+   * When true, apply a validated prompt answer result (in-memory or file) after pack.
+   * Empty pack still abstains before apply (ANS-02).
+   */
+  applyPromptResult?: boolean;
+  /**
+   * Explicit LLM mode for this call. Prefer resolveLlmMode for flag/config precedence.
+   * 'http' requires fetchImpl / config (Task 3); 'prompt' uses promptResult / file.
+   */
+  llmMode?: LlmMode;
+  /** In-memory prompt-answer-result object (tests / library; RESEARCH OQ-6). */
+  promptResult?: unknown;
+  /**
+   * Absolute path or store-relative path to `.prompt-answer-result.json`.
+   * Prefer store basename I/O via prompt-files helpers when under store root.
+   */
+  promptResultPath?: string;
+  /** Injectable fetch for http mode tests (D-05, D-12). */
+  fetchImpl?: typeof fetch;
+  /** Optional HTTP LLM config override (base URL, model, api key env name). */
+  llmHttp?: {
+    baseUrl?: string;
+    model?: string;
+    apiKeyEnv?: string;
+  };
+}

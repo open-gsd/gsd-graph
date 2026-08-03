@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opengsd.dev/schemas/prompt-answer-result.schema.json",
+  "title": "gsd-graph prompt answer result",
+  "description": "Fail-closed LLM/host answer apply payload (D-02). cited_triple_ids must be ⊆ pack.triples[].id after Ajv.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["answer_markdown", "cited_triple_ids"],
+  "properties": {
+    "answer_markdown": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Grounded answer prose; must only claim relationships backed by cited_triple_ids"
+    },
+    "cited_triple_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "description": "Triple ids from the pack used as evidence (subset-checked at apply)"
+    },
+    "question": {
+      "type": "string",
+      "description": "Optional fingerprint: question text from the request"
+    },
+    "content_hash": {
+      "type": "string",
+      "description": "Optional fingerprint: request content hash"
+    },
+    "built_at": {
+      "type": "string",
+      "description": "Optional fingerprint: graph built_at from the request"
+    }
+  }
+}

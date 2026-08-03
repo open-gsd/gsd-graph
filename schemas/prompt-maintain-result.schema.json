@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opengsd.dev/schemas/prompt-maintain-result.schema.json",
+  "title": "gsd-graph prompt maintain result",
+  "description": "Fail-closed maintain suggestions only — never rewrite graph.v1 from this payload (D-02, DESIGN).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["suggestions"],
+  "properties": {
+    "suggestions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Operator-facing maintain suggestions (no silent graph mutation)"
+    },
+    "content_hash": { "type": "string" },
+    "built_at": { "type": "string" }
+  }
+}

@@ -35,6 +35,12 @@ export type {
   PackOptions,
   GroundedAnswer,
   AnswerOptions,
+  LlmMode,
+  PromptStage,
+  PromptAnswerResult,
+  PromptExtractResult,
+  PromptNormalizeResult,
+  PromptMaintainResult,
   SnapshotSaveOptions,
   SnapshotRestoreOptions,
   SnapshotListOptions,
@@ -52,6 +58,10 @@ export {
   validateGraphV1,
   validateOntologyPack,
   validateReviewQueue,
+  validatePromptAnswerResult,
+  validatePromptExtractResult,
+  validatePromptNormalizeResult,
+  validatePromptMaintainResult,
   formatAjvErrors,
 } from './schema/validators';
 
@@ -190,3 +200,16 @@ export { packSubgraph, PACK_STOPWORDS, tokenizeQuestion, scoreSeeds } from './pi
 
 // Deterministic grounded answer (05-02 / ANS-01 / ANS-02)
 export { answer, formatDeterministicMarkdown } from './pipeline/answer';
+
+// Optional LLM providers (06-01 / LLM-01 / D-01..D-05)
+export {
+  assertCitationsInPack,
+  promptApply,
+  promptApplyAnswer,
+} from './llm/apply';
+export type {
+  PromptApplyOptions,
+  PromptApplyResult,
+  PromptApplyAnswerInput,
+  PromptApplyAnswerOutput,
+} from './llm/apply';

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opengsd.dev/schemas/prompt-normalize-result.schema.json",
+  "title": "gsd-graph prompt normalize result",
+  "description": "Fail-closed LLM normalize suggestions / candidate merges (D-02).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["nodes", "triples"],
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "label"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "type": { "type": "string", "minLength": 1 },
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "aliases": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "triples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "s", "p", "o", "confidence", "provenance"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "s": { "type": "string", "minLength": 1 },
+          "p": { "type": "string", "minLength": 1 },
+          "o": { "type": "string", "minLength": 1 },
+          "confidence": {
+            "type": "string",
+            "enum": ["EXTRACTED", "INFERRED", "AMBIGUOUS"]
+          },
+          "score": { "type": "number" },
+          "provenance": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_path",
+                "extractor",
+                "content_hash",
+                "confidence"
+              ],
+              "properties": {
+                "source_path": { "type": "string" },
+                "extractor": { "type": "string" },
+                "content_hash": { "type": "string" },
+                "confidence": {
+                  "type": "string",
+                  "enum": ["EXTRACTED", "INFERRED", "AMBIGUOUS"]
+                },
+                "score": { "type": "number" },
+                "span": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "start_line": { "type": "integer" },
+                    "end_line": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "suggestions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Human-readable merge / dedup suggestions"
+    },
+    "content_hash": { "type": "string" },
+    "built_at": { "type": "string" }
+  }
+}

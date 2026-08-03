@@ -27,6 +27,16 @@ addFormats(ajv);
 const graphV1Schema = loadSchema('graph-v1.schema.json');
 const ontologyPackSchema = loadSchema('ontology-pack.schema.json');
 const reviewQueueSchema = loadSchema('review-queue.schema.json');
+const promptAnswerResultSchema = loadSchema('prompt-answer-result.schema.json');
+const promptExtractResultSchema = loadSchema(
+  'prompt-extract-result.schema.json',
+);
+const promptNormalizeResultSchema = loadSchema(
+  'prompt-normalize-result.schema.json',
+);
+const promptMaintainResultSchema = loadSchema(
+  'prompt-maintain-result.schema.json',
+);
 
 /** Compile once at module load (D-09) — do not recompile per call. */
 export const validateGraphV1: ValidateFunction = ajv.compile(graphV1Schema);
@@ -38,6 +48,26 @@ export const validateOntologyPack: ValidateFunction =
 /** Compile once at module load (D-09 / OQ-4) — review-queue.json authority. */
 export const validateReviewQueue: ValidateFunction =
   ajv.compile(reviewQueueSchema);
+
+/** Compile once — answer prompt result (D-02 / LLM-01). */
+export const validatePromptAnswerResult: ValidateFunction = ajv.compile(
+  promptAnswerResultSchema,
+);
+
+/** Compile once — extract prompt result (D-02 / LLM-01). */
+export const validatePromptExtractResult: ValidateFunction = ajv.compile(
+  promptExtractResultSchema,
+);
+
+/** Compile once — normalize prompt result (D-02 / LLM-01). */
+export const validatePromptNormalizeResult: ValidateFunction = ajv.compile(
+  promptNormalizeResultSchema,
+);
+
+/** Compile once — maintain prompt result (D-02 / LLM-01). */
+export const validatePromptMaintainResult: ValidateFunction = ajv.compile(
+  promptMaintainResultSchema,
+);
 
 /** Human-readable Ajv error summary for GraphError details. */
 export function formatAjvErrors(
