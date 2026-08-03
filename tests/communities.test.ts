@@ -490,3 +490,92 @@ describe('detectCommunities store I/O (07-02 / D-04, D-08, COM-01)', () => {
     );
   });
 });
+
+describe('writeCommunityReports rewrite path (07-02 / D-05, A2)', () => {
+  function publishTwoCliquesStore(): { store: string; v1Path: string; v1Hash: string } {
+    const store = mod.ensureStoreRoot(tempDir('gsd-communities-report-'));
+    const { graph } = twoCliquesGraph();
+    assert.equal(mod.validateGraphV1(graph), true);
+    mod.publishGraphFiles({
+      storeRoot: store,
+      graphV1: graph,
+      writeProjection: false,
+    });
+    const v1Path = path.join(store, 'graph.v1.json');
+    return { store, v1Path, v1Hash: contentHash(v1Path) };
+  }
+
+  it('rewrites markdown from prior detect index (A2)', () => {
+    const { store, v1Path, v1Hash } = publishTwoCliquesStore();
+    const detected = mod.detectCommunities({ dir: store });
+    assert.ok(detected.index_path);
+    assert.equal(detected.report_paths!.length, 2);
+
+    // Delete markdown only; index remains
+    for (const p of detected.report_paths!) {
+      fs.unlinkSync(p);
+      assert.ok(!fs.existsSync(p));
+    }
+    assert.ok(fs.existsSync(detected.index_path!));
+
+    const rewritten = mod.writeCommunityReports({ dir: store });
+    assert.equal(rewritten.index_path, detected.index_path);
+    assert.equal(rewritten.report_paths.length, detected.communities.length);
+
+    for (const p of rewritten.report_paths) {
+      assert.ok(fs.existsSync(p), `regenerated ${p}`);
+      const md = fs.readFileSync(p, 'utf8');
+      assert.match(md, /Non-authoritative theme report/i);
+      assert.match(md, /Source of truth is graph\.v1\.json/);
+      assert.match(md, /# Community c_\d{4}/);
+    }
+
+    // SoT still untouched
+    assert.equal(contentHash(v1Path), v1Hash);
+  });
+
+  it('missing index.json throws SCHEMA_INVALID without mutating SoT', () => {
+    const { store, v1Path, v1Hash } = publishTwoCliquesStore();
+    assert.throws(
+      () => mod.writeCommunityReports({ dir: store }),
+      (err: unknown) => {
+        assert.ok(err instanceof mod.GraphError);
+        const ge = err as Error & { reason: string };
+        assert.equal(ge.reason, mod.GSD_GRAPH_REASON.SCHEMA_INVALID);
+        assert.match(ge.message, /detect/i);
+        return true;
+      },
+    );
+    assert.equal(contentHash(v1Path), v1Hash);
+    assert.ok(!fs.existsSync(path.join(store, mod.COMMUNITIES_DIR, 'index.json')));
+  });
+
+  it('writes from in-memory communities without re-running LPA', () => {
+    const { store, v1Path, v1Hash } = publishTwoCliquesStore();
+    // Pure detect (no write) then report from memory
+    const pure = mod.detectCommunities({
+      graph: twoCliquesGraph().graph,
+      write: false,
+    });
+    assert.equal(pure.communities.length, 2);
+    assert.equal(pure.index_path, undefined);
+
+    const written = mod.writeCommunityReports({
+      dir: store,
+      communities: pure.communities,
+    });
+    assert.ok(fs.existsSync(written.index_path));
+    assert.equal(written.report_paths.length, 2);
+    for (const p of written.report_paths) {
+      assert.ok(fs.existsSync(p));
+    }
+
+    const index = JSON.parse(fs.readFileSync(written.index_path, 'utf8')) as {
+      communities: Array<{ id: string }>;
+      stopped_reason: string;
+    };
+    assert.equal(index.communities.length, 2);
+    assert.equal(index.stopped_reason, 'rewrite');
+    assert.equal(contentHash(v1Path), v1Hash);
+  });
+});
