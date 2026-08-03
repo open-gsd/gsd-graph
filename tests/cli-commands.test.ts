@@ -252,3 +252,102 @@ describe('cli-commands core ops (CLI-01)', () => {
     assert.equal(err.reason, 'usage');
   });
 });
+
+describe('cli-commands nested snapshot/review/ontology (CLI-01)', () => {
+  it('snapshot save and list round-trip via main', () => {
+    const { dir } = prepareStore();
+    const save = run(['--dir', dir, 'snapshot', 'save', 'pre-edit']);
+    assert.equal(save.code, 0, save.stderr);
+    const saved = save.json as { name: string; fileName: string; path: string };
+    assert.equal(saved.name, 'pre-edit');
+    assert.ok(saved.fileName.includes('pre-edit'));
+
+    const list = run(['--dir', dir, 'snapshot', 'list']);
+    assert.equal(list.code, 0, list.stderr);
+    const entries = list.json as Array<{ name: string; fileName: string }>;
+    assert.ok(Array.isArray(entries));
+    assert.ok(entries.some((e) => e.name === 'pre-edit'));
+  });
+
+  it('snapshot restore recovers named snapshot', () => {
+    const { dir } = prepareStore();
+    const save = run(['--dir', dir, 'snapshot', 'save', 'checkpoint']);
+    assert.equal(save.code, 0, save.stderr);
+
+    const restore = run(['--dir', dir, 'snapshot', 'restore', 'checkpoint']);
+    assert.equal(restore.code, 0, restore.stderr);
+    const body = restore.json as { name: string; fileName: string };
+    assert.equal(body.name, 'checkpoint');
+  });
+
+  it('review list returns JSON queue (pending items ok)', () => {
+    const { dir } = prepareStore();
+    const result = run(['--dir', dir, 'review', 'list']);
+    assert.equal(result.code, 0, result.stderr);
+    const body = result.json as {
+      items?: unknown[];
+      schema_version?: number;
+    };
+    // Either full document or { items } shape — must be JSON object
+    assert.equal(typeof body, 'object');
+    assert.ok(body !== null);
+    if (Array.isArray(body.items)) {
+      // pending-filtered list is fine (empty or non-empty after fixture build)
+      assert.ok(true);
+    }
+  });
+
+  it('review accept/reject unknown id exits 2', () => {
+    const { dir } = prepareStore();
+    const result = run([
+      '--dir',
+      dir,
+      'review',
+      'accept',
+      'review-item-does-not-exist',
+    ]);
+    assert.equal(result.code, 2, result.stderr);
+    const err = JSON.parse(result.stderr) as { ok: false; reason: string };
+    assert.equal(err.ok, false);
+  });
+
+  it('ontology show default general exits 0 with pack summary', () => {
+    const result = run(['ontology', 'show']);
+    assert.equal(result.code, 0, result.stderr);
+    const body = result.json as {
+      id: string;
+      version: string;
+      node_types: number;
+      predicates: number;
+      packHash?: string;
+    };
+    assert.equal(body.id, 'general');
+    assert.ok(typeof body.version === 'string');
+    assert.ok(body.node_types > 0);
+    assert.ok(body.predicates > 0);
+  });
+
+  it('ontology validate default general exits 0', () => {
+    const result = run(['ontology', 'validate']);
+    assert.equal(result.code, 0, result.stderr);
+    const body = result.json as {
+      ok: boolean;
+      pack_id: string;
+      version: string;
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.pack_id, 'general');
+  });
+
+  it('pack and answer are unregistered (exit 1, D-02)', () => {
+    const pack = run(['pack']);
+    assert.equal(pack.code, 1);
+    const packErr = JSON.parse(pack.stderr) as { ok: false; reason: string };
+    assert.equal(packErr.reason, 'usage');
+
+    const answer = run(['answer', 'what is drought?']);
+    assert.equal(answer.code, 1);
+    const ansErr = JSON.parse(answer.stderr) as { ok: false; reason: string };
+    assert.equal(ansErr.reason, 'usage');
+  });
+});

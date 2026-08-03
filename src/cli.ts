@@ -4,11 +4,19 @@
 import { Command, CommanderError } from 'commander';
 import pc from 'picocolors';
 import { GSD_GRAPH_REASON, GraphError } from './errors';
+import { resolveStoreRoot } from './io/paths';
+import { loadOntologyPack } from './ontology/load-pack';
 import { build } from './pipeline/build';
 import { diff } from './pipeline/diff';
 import { init } from './pipeline/init';
 import { query } from './pipeline/query';
 import { repair } from './pipeline/repair';
+import { loadReviewQueue, reviewResolve } from './pipeline/review';
+import {
+  snapshotList,
+  snapshotRestore,
+  snapshotSave,
+} from './pipeline/snapshot';
 import { status } from './pipeline/status';
 
 export interface CliErrorBody {
@@ -200,6 +208,136 @@ function buildProgram(): Command {
       const result = repair(withDir({}, globalDir(cmd)));
       writeOk(result);
     });
+
+  // Nested lifecycle verbs — never use two-arg executable form (RESEARCH pitfall 3)
+  const snapshot = program
+    .command('snapshot')
+    .description('Save, list, or restore named graph.v1 snapshots');
+
+  snapshot
+    .command('save')
+    .description('Save current graph.v1 as a named snapshot')
+    .argument('<name>', 'logical snapshot name')
+    .action((name: string, _opts: unknown, cmd: Command) => {
+      const result = snapshotSave(withDir({ name }, globalDir(cmd)));
+      writeOk(result);
+    });
+
+  snapshot
+    .command('list')
+    .description('List named snapshots (newest first; excludes last-diff-base)')
+    .action((_opts: unknown, cmd: Command) => {
+      const result = snapshotList(withDir({}, globalDir(cmd)));
+      writeOk(result);
+    });
+
+  snapshot
+    .command('restore')
+    .description('Restore graph.v1 from a named snapshot')
+    .argument('<name>', 'logical snapshot name or fileName')
+    .action((name: string, _opts: unknown, cmd: Command) => {
+      const result = snapshotRestore(withDir({ name }, globalDir(cmd)));
+      writeOk(result);
+    });
+
+  const review = program
+    .command('review')
+    .description('List or resolve review-queue items');
+
+  review
+    .command('list')
+    .description('List pending review-queue items')
+    .action((_opts: unknown, cmd: Command) => {
+      const storeRoot = resolveStoreRoot(
+        withDir({}, globalDir(cmd)) as { dir?: string },
+      );
+      const queue = loadReviewQueue(storeRoot);
+      const pending = queue.items.filter((i) => i.status === 'pending');
+      writeOk({
+        schema_version: queue.schema_version,
+        items: pending,
+        decisions_count: queue.decisions.length,
+        pending_count: pending.length,
+      });
+    });
+
+  review
+    .command('accept')
+    .description('Accept a pending review item')
+    .argument('<id>', 'review item id')
+    .option(
+      '--extend-ontology',
+      'allow ontology.lock extend on unknown type/predicate accept',
+    )
+    .action(
+      (id: string, opts: { extendOntology?: boolean }, cmd: Command) => {
+        const storeRoot = resolveStoreRoot(
+          withDir({}, globalDir(cmd)) as { dir?: string },
+        );
+        reviewResolve({
+          storeRoot,
+          id,
+          action: 'accept',
+          ...(opts.extendOntology === true
+            ? { extendOntology: true }
+            : {}),
+        });
+        writeOk({ ok: true, id, action: 'accept' });
+      },
+    );
+
+  review
+    .command('reject')
+    .description('Reject a pending review item')
+    .argument('<id>', 'review item id')
+    .action((id: string, _opts: unknown, cmd: Command) => {
+      const storeRoot = resolveStoreRoot(
+        withDir({}, globalDir(cmd)) as { dir?: string },
+      );
+      reviewResolve({ storeRoot, id, action: 'reject' });
+      writeOk({ ok: true, id, action: 'reject' });
+    });
+
+  const ontology = program
+    .command('ontology')
+    .description('Show or validate an ontology pack');
+
+  ontology
+    .command('show')
+    .description('Load pack and print JSON-safe summary')
+    .option('--pack <idOrPath>', 'pack id or path', 'general')
+    .action((opts: { pack?: string }) => {
+      const loaded = loadOntologyPack({
+        packIdOrPath: opts.pack ?? 'general',
+      });
+      // Sets are not JSON-serializable — emit summary fields only (D-06)
+      writeOk({
+        id: loaded.pack.id,
+        version: loaded.pack.version,
+        title: loaded.pack.title,
+        node_types: loaded.pack.node_types.length,
+        predicates: loaded.pack.predicates.length,
+        strict: loaded.pack.strict,
+        packHash: loaded.packHash,
+      });
+    });
+
+  ontology
+    .command('validate')
+    .description('Load + schema-validate pack; ok on success')
+    .option('--pack <idOrPath>', 'pack id or path', 'general')
+    .action((opts: { pack?: string }) => {
+      const loaded = loadOntologyPack({
+        packIdOrPath: opts.pack ?? 'general',
+      });
+      writeOk({
+        ok: true,
+        pack_id: loaded.pack.id,
+        version: loaded.pack.version,
+      });
+    });
+
+  // pack / answer intentionally unregistered until Phase 5 (D-02)
 
   return program;
 }
