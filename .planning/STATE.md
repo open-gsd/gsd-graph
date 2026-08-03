@@ -6,26 +6,18 @@
 ## Current position
 
 - **Milestone:** v0.1.0 foundation  
-- **Phase:** 3 — Query, lifecycle & maintain — **COMPLETE** (verified PASSED)  
-- **Status:** Verified PASSED  
-- **Next action:** `/gsd-plan-phase 4` (CLI surface)
+- **Phase:** 4 — CLI surface — **PLANNED** (plan-check PASS)  
+- **Status:** Ready to execute  
+- **Next action:** `/gsd-execute-phase 4`
 
 ## Progress
 
 | Artifact | Status |
 |----------|--------|
-| Phase 1 | ✓ Complete |
-| Phase 2 | ✓ Complete |
-| Phase 3 plans 03-01..03-04 | ✓ executed |
-| Phase 3 VERIFICATION | ✓ PASSED |
-| Tests | 166/166 pass |
-
-## Completed Phase 3
-
-- Query IR (term/path/neighborhood/filter + budget)
-- Maintain M1–M5 + deleted-source fix
-- Snapshots save/list/restore
-- Diff by id + repair projection from v1
+| Phase 1–3 | ✓ Complete |
+| Phase 4 CONTEXT + RESEARCH | ✓ |
+| Phase 4 plans 04-01..04-03 | ✓ plan-check PASS |
+| Phase 4 VALIDATION | ✓ |
 
 ## Blockers
 
