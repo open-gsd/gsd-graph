@@ -1,30 +1,28 @@
 # Project State
 
 **Project:** gsd-graph  
-**Updated:** 2026-08-02  
+**Updated:** 2026-08-03  
 
 ## Current position
 
 - **Milestone:** v0.1.0 foundation  
-- **Phase:** 2 — Build pipeline — **COMPLETE** (verified PASSED)  
-- **Status:** Verified PASSED  
-- **Next action:** `/gsd-plan-phase 3` (Query, lifecycle & maintain)
+- **Phase:** 3 — Query, lifecycle & maintain — **PLANNED** (plan-check PASS)  
+- **Status:** Ready to execute  
+- **Next action:** `/gsd-execute-phase 3`
 
 ## Progress
 
 | Artifact | Status |
 |----------|--------|
 | Phase 1 | ✓ Complete |
-| Phase 2 plans 02-01..02-04 | ✓ executed |
-| Phase 2 VERIFICATION | ✓ PASSED |
-| Tests | 121/121 pass |
+| Phase 2 | ✓ Complete |
+| Phase 3 CONTEXT + RESEARCH | ✓ |
+| Phase 3 plans 03-01..03-04 | ✓ plan-check PASS |
+| Phase 3 VALIDATION | ✓ |
 
-## Completed Phase 2
+## Next
 
-- Deterministic MD/JSONL extract + fingerprints
-- Normalize multiset provenance + exact merge
-- Review queue accept/reject
-- `build()` + `status()` offline pipeline
+Execute query IR, maintain M1–M5, snapshots, diff, repair.
 
 ## Blockers
 
