@@ -1,12 +1,25 @@
-// gsd-graph — community detection tests (COM-01, D-01..D-03, D-05, D-10)
+// gsd-graph — community detection tests (COM-01, D-01..D-05, D-08, D-10)
 // Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
-import { describe, it } from 'node:test';
+import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 const root = path.join(__dirname, '..');
+
+type Community = {
+  id: string;
+  stable_key: string;
+  label: string;
+  members: string[];
+  size: number;
+  internal_triple_count: number;
+  top_predicates: Array<{ p: string; count: number }>;
+  top_nodes: Array<{ id: string; label: string; degree: number }>;
+};
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const mod = require(path.join(root, 'dist', 'index.js')) as {
@@ -17,27 +30,72 @@ const mod = require(path.join(root, 'dist', 'index.js')) as {
     minSize?: number;
     dir?: string;
   }) => {
-    communities: Array<{
-      id: string;
-      stable_key: string;
-      label: string;
-      members: string[];
-      size: number;
-      internal_triple_count: number;
-      top_predicates: Array<{ p: string; count: number }>;
-      top_nodes: Array<{ id: string; label: string; degree: number }>;
-    }>;
+    communities: Community[];
     iterations: number;
     stopped_reason: 'converged' | 'max_iterations';
     nodes_considered: number;
     edges_considered: number;
     dropped_small_count: number;
+    index_path?: string;
+    report_paths?: string[];
   };
+  writeCommunityReports: (opts?: {
+    dir?: string;
+    communities?: Community[];
+  }) => {
+    index_path: string;
+    report_paths: string[];
+  };
+  COMMUNITIES_DIR: string;
   COMMUNITY_MAX_ITERATIONS: number;
   COMMUNITY_MIN_SIZE: number;
   nodeId: (type: string, label: string) => string;
   tripleId: (s: string, p: string, o: string) => string;
+  publishGraphFiles: (opts: {
+    storeRoot: string;
+    graphV1: unknown;
+    writeProjection?: boolean;
+  }) => void;
+  ensureStoreRoot: (storeRoot: string) => string;
+  loadGraphV1: (storeRoot: string) => {
+    nodes: unknown[];
+    triples: Array<{ id: string; s: string; p: string; o: string }>;
+  };
+  validateGraphV1: (data: unknown) => boolean;
+  GSD_GRAPH_REASON: Record<string, string>;
+  GraphError: new (
+    reason: string,
+    message: string,
+    details?: unknown,
+  ) => Error & { reason: string };
 };
+
+const temps: string[] = [];
+
+afterEach(() => {
+  while (temps.length > 0) {
+    const t = temps.pop();
+    if (t) fs.rmSync(t, { recursive: true, force: true });
+  }
+});
+
+function tempDir(prefix: string): string {
+  const d = fs.realpathSync.native(
+    fs.mkdtempSync(path.join(os.tmpdir(), prefix)),
+  );
+  temps.push(d);
+  return d;
+}
+
+function tripleIdSet(graph: { triples: Array<{ id: string }> }): string {
+  return [...graph.triples.map((t) => t.id)].sort().join('\0');
+}
+
+function contentHash(filePath: string): string {
+  return createHash('sha256')
+    .update(fs.readFileSync(filePath))
+    .digest('hex');
+}
 
 function provenance(conf: string) {
   return [
@@ -313,5 +371,122 @@ describe('confidence filter / min-size / max-iter / determinism (COM-01 expansio
     const before = JSON.stringify(doc.communities);
     mod.detectCommunities({ graph: doc, write: false });
     assert.equal(JSON.stringify(doc.communities), before);
+  });
+});
+
+describe('detectCommunities store I/O (07-02 / D-04, D-08, COM-01)', () => {
+  function publishTwoCliquesStore(): {
+    store: string;
+    tripleIds: string;
+    v1Path: string;
+    v1Hash: string;
+  } {
+    const store = mod.ensureStoreRoot(tempDir('gsd-communities-'));
+    const { graph } = twoCliquesGraph();
+    assert.equal(mod.validateGraphV1(graph), true, 'fixture must validate');
+    mod.publishGraphFiles({
+      storeRoot: store,
+      graphV1: graph,
+      writeProjection: false,
+    });
+    const v1Path = path.join(store, 'graph.v1.json');
+    const loaded = mod.loadGraphV1(store);
+    return {
+      store,
+      tripleIds: tripleIdSet(loaded),
+      v1Path,
+      v1Hash: contentHash(v1Path),
+    };
+  }
+
+  it('exports COMMUNITIES_DIR as communities', () => {
+    assert.equal(mod.COMMUNITIES_DIR, 'communities');
+  });
+
+  it('loads via loadGraphV1, writes index + community-*.md, leaves SoT unchanged (D-04, D-08)', () => {
+    const { store, tripleIds, v1Path, v1Hash } = publishTwoCliquesStore();
+
+    const result = mod.detectCommunities({ dir: store });
+
+    assert.equal(result.communities.length, 2);
+    assert.ok(result.index_path);
+    assert.equal(
+      result.index_path,
+      path.join(store, mod.COMMUNITIES_DIR, 'index.json'),
+    );
+    assert.ok(Array.isArray(result.report_paths));
+    assert.equal(result.report_paths!.length, result.communities.length);
+    assert.ok(fs.existsSync(result.index_path!));
+
+    for (const c of result.communities) {
+      const mdPath = path.join(
+        store,
+        mod.COMMUNITIES_DIR,
+        `community-${c.id}.md`,
+      );
+      assert.ok(fs.existsSync(mdPath), `expected ${mdPath}`);
+      assert.ok(result.report_paths!.includes(mdPath));
+
+      const md = fs.readFileSync(mdPath, 'utf8');
+      assert.match(md, new RegExp(`# Community ${c.id}`));
+      assert.match(md, /Non-authoritative theme report/i);
+      assert.match(md, /Source of truth is graph\.v1\.json/);
+      assert.match(md, /label propagation/);
+      assert.match(md, /## Top nodes/);
+      assert.match(md, /## Top predicates/);
+      assert.match(md, /## Members/);
+      // Path safety: basenames only from c_NNNN (T-07-04)
+      assert.match(c.id, /^c_\d{4}$/);
+    }
+
+    const index = JSON.parse(
+      fs.readFileSync(result.index_path!, 'utf8'),
+    ) as {
+      communities: Array<{
+        id: string;
+        size: number;
+        label: string;
+        stable_key: string;
+      }>;
+      max_iter?: number;
+      min_size?: number;
+      iterations?: number;
+      stopped_reason?: string;
+    };
+    assert.equal(index.communities.length, 2);
+    for (const row of index.communities) {
+      assert.match(row.id, /^c_\d{4}$/);
+      assert.ok(typeof row.size === 'number' && row.size >= 3);
+      assert.ok(typeof row.label === 'string' && row.label.length > 0);
+      assert.match(row.stable_key, /^[0-9a-f]{16}$/);
+    }
+    assert.equal(index.max_iter, mod.COMMUNITY_MAX_ITERATIONS);
+    assert.equal(index.min_size, mod.COMMUNITY_MIN_SIZE);
+    assert.equal(typeof index.iterations, 'number');
+    assert.ok(
+      index.stopped_reason === 'converged' ||
+        index.stopped_reason === 'max_iterations',
+    );
+
+    // SoT triple set + file bytes unchanged (D-04, T-07-05)
+    const after = mod.loadGraphV1(store);
+    assert.equal(tripleIdSet(after), tripleIds);
+    assert.equal(contentHash(v1Path), v1Hash);
+    assert.ok(!('communities' in after) || after.communities === undefined);
+  });
+
+  it('missing graph.v1 yields SCHEMA_INVALID (D-08)', () => {
+    const store = mod.ensureStoreRoot(tempDir('gsd-communities-miss-'));
+    assert.throws(
+      () => mod.detectCommunities({ dir: store }),
+      (err: unknown) => {
+        assert.ok(err instanceof mod.GraphError);
+        assert.equal(
+          (err as Error & { reason: string }).reason,
+          mod.GSD_GRAPH_REASON.SCHEMA_INVALID,
+        );
+        return true;
+      },
+    );
   });
 });

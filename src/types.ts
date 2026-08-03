@@ -587,8 +587,8 @@ export interface DetectCommunitiesOptions {
   /** Drop communities smaller than this (default COMMUNITY_MIN_SIZE = 3). */
   minSize?: number;
   /**
-   * When true, write communities/ sidecars under the store (plan 07-02).
-   * Default false in library inject path; production CLI may set true later.
+   * When true, write disposable communities/ sidecars under the store (D-04).
+   * Default: true when loading from store (no graph); false when graph is injected.
    */
   write?: boolean;
 }
@@ -603,7 +603,25 @@ export interface DetectCommunitiesResult {
   edges_considered: number;
   /** Communities dropped for members.length < minSize. */
   dropped_small_count: number;
-  /** Present only when write artifacts are produced (later plan). */
+  /** Absolute path to communities/index.json when artifacts are written. */
   index_path?: string;
+  /** Absolute paths to community-c_NNNN.md reports when written. */
   report_paths?: string[];
+}
+
+/** Options for writeCommunityReports (D-05, A2). */
+export interface WriteCommunityReportsOptions {
+  /** Store directory override (resolveStoreRoot). */
+  dir?: string;
+  /**
+   * When provided, write index + markdown from this array without re-running LPA.
+   * When omitted, load communities/index.json (errors if missing).
+   */
+  communities?: Community[];
+}
+
+/** Result of writeCommunityReports — disposable sidecars only (D-04). */
+export interface WriteCommunityReportsResult {
+  index_path: string;
+  report_paths: string[];
 }

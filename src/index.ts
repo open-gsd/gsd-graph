@@ -55,6 +55,8 @@ export type {
   Community,
   DetectCommunitiesOptions,
   DetectCommunitiesResult,
+  WriteCommunityReportsOptions,
+  WriteCommunityReportsResult,
 } from './types';
 
 export {
@@ -212,19 +214,26 @@ export type {
   WriteGraphReportResult,
 } from './pipeline/report';
 
-// Community detection LPA (07-01 / COM-01 / D-01..D-03)
+// Community detection LPA + disposable communities/ artifacts (07 / COM-01 / D-01..D-05, D-08)
 export {
   detectCommunities,
+  writeCommunityReports,
+  writeCommunityArtifacts,
+  renderCommunityMarkdown,
+  loadCommunityIndex,
   projectCommunityEdges,
   labelPropagation,
   finalizeCommunities,
   isCommunityEdge,
   COMMUNITY_MAX_ITERATIONS,
   COMMUNITY_MIN_SIZE,
+  COMMUNITIES_DIR,
 } from './pipeline/communities';
 export type {
   CommunityProjection,
   LabelPropagationResult,
+  CommunityIndexDocument,
+  CommunityWriteMeta,
 } from './pipeline/communities';
 
 // Optional LLM providers (06-01 / LLM-01 / D-01..D-05)
