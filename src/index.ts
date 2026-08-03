@@ -30,6 +30,9 @@ export type {
   QueryPath,
   QueryOptions,
   QueryResult,
+  PackCitation,
+  SubgraphPack,
+  PackOptions,
   SnapshotSaveOptions,
   SnapshotRestoreOptions,
   SnapshotListOptions,
@@ -179,3 +182,6 @@ export { repair } from './pipeline/repair';
 
 // Init (04-01 / CLI-03)
 export { init } from './pipeline/init';
+
+// Pack / grounded subgraph (05-01 / PACK-01)
+export { packSubgraph, PACK_STOPWORDS, tokenizeQuestion, scoreSeeds } from './pipeline/pack';

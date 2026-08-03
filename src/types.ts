@@ -397,3 +397,51 @@ export interface InitResult {
   gitignore_appended: boolean;
   ontology: string;
 }
+
+// --- Pack / grounded answer (PACK-01 / D-01 / D-02) ---
+
+/** One citation projected from a remaining pack triple after budget. */
+export interface PackCitation {
+  triple_id: string;
+  s: NodeId;
+  p: string;
+  o: NodeId;
+  /** First provenance source_path when present. */
+  source_path?: string;
+}
+
+/**
+ * Result of packSubgraph — seeds, neighborhood union, paths, and citations
+ * projected only from remaining triples (D-02).
+ */
+export interface SubgraphPack {
+  question: string;
+  /** Top-k seed node ids by score (score order; score 0 dropped). */
+  seeds: string[];
+  nodes: GraphNode[];
+  triples: Triple[];
+  /** Same shape as QueryPath. */
+  paths: QueryPath[];
+  citations: PackCitation[];
+  trimmed: string | null;
+  budget_tokens: number | null;
+}
+
+/** Options for packSubgraph (PACK-01). Prefer in-memory graph for tests (D-10). */
+export interface PackOptions {
+  /** Natural-language question to tokenize and score against nodes. */
+  question: string;
+  /** Store directory override (resolveStoreRoot) when graph is absent. */
+  dir?: string;
+  /** In-memory graph — skips loadGraphV1 (D-10). */
+  graph?: GraphV1Document;
+  /** Hop expansion depth (default DEFAULT_SEED_HOPS = 2). */
+  hops?: number;
+  /** Max seed count after scoring (default 5). */
+  kSeeds?: number;
+  /**
+   * Token budget for applyBudget (ceil JSON length / 4).
+   * null/undefined skips trim (QRY-02).
+   */
+  budget?: number | null;
+}
