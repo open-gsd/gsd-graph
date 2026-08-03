@@ -14,6 +14,7 @@ import {
 } from './llm/prompt-files';
 import { answer } from './pipeline/answer';
 import { build } from './pipeline/build';
+import { detectCommunities } from './pipeline/communities';
 import { diff } from './pipeline/diff';
 import { init } from './pipeline/init';
 import { packSubgraph } from './pipeline/pack';
@@ -355,6 +356,52 @@ function buildProgram(): Command {
         version: loaded.pack.version,
       });
     });
+
+  // Phase 7 communities — nested detect|report over LPA library (COM-01, D-06)
+  const communities = program
+    .command('communities')
+    .description('Detect communities and write theme reports (non-SoT)');
+
+  communities
+    .command('detect')
+    .description(
+      'Run pure-TS label-propagation community detection; write communities/ sidecars',
+    )
+    .option('--min-size <n>', 'minimum community size (default 3)', parseIntOpt)
+    .option('--max-iter <n>', 'max LPA iterations (default 20)', parseIntOpt)
+    .action(
+      (opts: { minSize?: number; maxIter?: number }, cmd: Command) => {
+        const result = detectCommunities(
+          withDir(
+            {
+              write: true,
+              ...(opts.minSize !== undefined ? { minSize: opts.minSize } : {}),
+              ...(opts.maxIter !== undefined
+                ? { maxIterations: opts.maxIter }
+                : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        writeOk({
+          ok: true,
+          community_count: result.communities.length,
+          iterations: result.iterations,
+          stopped_reason: result.stopped_reason,
+          nodes_considered: result.nodes_considered,
+          edges_considered: result.edges_considered,
+          dropped_small_count: result.dropped_small_count,
+          communities: result.communities.map((c) => ({
+            id: c.id,
+            size: c.size,
+            label: c.label,
+            stable_key: c.stable_key,
+          })),
+          index_path: result.index_path,
+          report_paths: result.report_paths,
+        });
+      },
+    );
 
   // Phase 5 grounding verbs — thin K22 adapters over packSubgraph / answer (D-06)
   program
