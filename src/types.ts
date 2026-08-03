@@ -445,3 +445,33 @@ export interface PackOptions {
    */
   budget?: number | null;
 }
+
+// --- Grounded answer (ANS-01 / ANS-02 / D-03 / D-04 / D-05) ---
+
+/**
+ * Result of answer() — deterministic markdown over packSubgraph, or honest abstain.
+ * Phase 5 only sets mode 'deterministic' | 'abstain'; prompt_pending/http reserved (D-05).
+ */
+export interface GroundedAnswer {
+  /** Pack produced by packSubgraph for the same options (D-03, D-10). */
+  pack: SubgraphPack;
+  /** Cited markdown (Seeds / Relationships / Paths / Citations) or empty/abstain note. */
+  answer_markdown: string;
+  /**
+   * Answer production mode.
+   * Phase 5: 'deterministic' | 'abstain' only; 'prompt_pending' | 'http' for Phase 6 (D-05).
+   */
+  mode: 'deterministic' | 'prompt_pending' | 'http' | 'abstain';
+  /** True when pack has no triples — no fabricated relationships (ANS-02, D-04). */
+  abstained: boolean;
+  /** Machine-readable reason when abstained (e.g. GSD_GRAPH_REASON.EMPTY_SUBGRAPH). */
+  abstain_reason?: string;
+  /** Reserved for Phase 6 LLM prompt apply — unused in Phase 5 (D-05). */
+  prompt_bundle?: object;
+}
+
+/**
+ * Options for answer() — extends PackOptions; no LLM flags in Phase 5 (D-05).
+ * Loads graph only via packSubgraph (opts.graph or loadGraphV1) (D-10).
+ */
+export type AnswerOptions = PackOptions;

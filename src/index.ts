@@ -33,6 +33,8 @@ export type {
   PackCitation,
   SubgraphPack,
   PackOptions,
+  GroundedAnswer,
+  AnswerOptions,
   SnapshotSaveOptions,
   SnapshotRestoreOptions,
   SnapshotListOptions,
@@ -185,3 +187,6 @@ export { init } from './pipeline/init';
 
 // Pack / grounded subgraph (05-01 / PACK-01)
 export { packSubgraph, PACK_STOPWORDS, tokenizeQuestion, scoreSeeds } from './pipeline/pack';
+
+// Deterministic grounded answer (05-02 / ANS-01 / ANS-02)
+export { answer, formatDeterministicMarkdown } from './pipeline/answer';
