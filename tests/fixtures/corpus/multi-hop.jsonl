@@ -1,0 +1,3 @@
+{"type":"Concept","label":"Drought","edges":[{"p":"causes","o":{"type":"Concept","label":"Crop Failure"}}]}
+{"type":"Concept","label":"Crop Failure","edges":[{"p":"causes","o":{"type":"Concept","label":"Food Shortage"}}]}
+{"type":"Concept","label":"Food Shortage"}

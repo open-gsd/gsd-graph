@@ -75,6 +75,7 @@ export {
 
 export { fingerprintFile } from './sources/fingerprint';
 export { extractMarkdown } from './sources/markdown';
+export { extractJsonl } from './sources/jsonl';
 export { redactSecrets } from './sources/redact';
 export { discoverSources, DEFAULT_MAX_BYTES } from './sources/discover';
 export type {
