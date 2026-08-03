@@ -120,3 +120,104 @@ export interface ReviewQueueDocument {
   items: ReviewItem[];
   decisions: ReviewDecisionRecord[];
 }
+
+// --- Build orchestrator + status (STAT-01 / EXT-03) ---
+
+/** Options for the offline build() orchestrator (D-09). */
+export interface BuildOptions {
+  /** Corpus root(s) to discover under. */
+  corpus: string | string[];
+  /** Store directory override (resolveStoreRoot). */
+  dir?: string;
+  /** Ontology pack id or path (default `general`). */
+  ontology?: string;
+  /**
+   * When false (default), skip extract for sources whose content_hash still
+   * matches sources.manifest.json (D-04, EXT-03). When true, re-extract all.
+   */
+  full?: boolean;
+  /** Dual-write projection; default DEFAULT_WRITE_PROJECTION (false). */
+  writeProjection?: boolean;
+  /** Optional discover globs (default md/txt/markdown/json/jsonl). */
+  globs?: string[];
+  /**
+   * Test-only hook: mutates normalized nodes/triples before caps + publish.
+   * Used to exercise LIMIT_EXCEEDED without multi-GB fixtures.
+   * @internal
+   */
+  _afterNormalize?: (state: {
+    nodes: GraphNode[];
+    triples: Triple[];
+  }) => { nodes: GraphNode[]; triples: Triple[] };
+}
+
+/** Result of a successful build() (D-10). */
+export interface BuildResult {
+  store_dir: string;
+  node_count: number;
+  triple_count: number;
+  review_pending: number;
+  sources_total: number;
+  sources_extracted: number;
+  sources_skipped_fresh: number;
+  diagnostics: ExtractDiagnostic[];
+  engine: 'gsd-graph';
+  engine_version: string;
+  built_at: string;
+}
+
+/** Per-source fingerprint entry in sources.manifest.json (OQ-3, EXT-03). */
+export interface SourceManifestEntry {
+  content_hash: string;
+  mtime_ms: number;
+  bytes: number;
+  last_extracted_at: string;
+  extractor: string;
+}
+
+/** sources.manifest.json document (store sidecar). */
+export interface SourcesManifest {
+  schema_version: 1;
+  sources: Record<string, SourceManifestEntry>;
+}
+
+/** status() read-path result (STAT-01, D-10). Never uses graph.json as SoT. */
+export interface StatusResult {
+  exists: boolean;
+  store_dir: string;
+  engine: 'gsd-graph';
+  schema_version?: number;
+  ontology_pack_id?: string;
+  engine_version?: string;
+  node_count?: number;
+  triple_count?: number;
+  /** Alias of triple_count for STAT-01 edge_count field. */
+  edge_count?: number;
+  last_build?: string;
+  /** True when a manifest path is missing on disk or content_hash mismatches (if checked). */
+  stale?: boolean;
+  /** Hours since graph.v1 built_at (store-only freshness). */
+  age_hours?: number;
+  build_in_progress?: boolean;
+  review_queue_count?: number;
+  /** True when writeProjection was off / graph.json absent — projection is never SoT. */
+  projection_stale?: boolean;
+  last_build_status?: {
+    status?: string;
+    reason?: string;
+    finished_at?: string;
+    [key: string]: unknown;
+  } | null;
+  reason?: string | null;
+}
+
+/** Options for status() (STAT-01). */
+export interface StatusOptions {
+  /** Store directory override. */
+  dir?: string;
+  /**
+   * Optional corpus root(s). When provided, re-fingerprint manifest paths
+   * under those roots to set `stale` on hash mismatch / missing files.
+   */
+  corpus?: string | string[];
+}

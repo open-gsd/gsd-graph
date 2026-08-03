@@ -20,6 +20,12 @@ export type {
   ReviewItem,
   ReviewDecisionRecord,
   ReviewQueueDocument,
+  BuildOptions,
+  BuildResult,
+  StatusResult,
+  StatusOptions,
+  SourcesManifest,
+  SourceManifestEntry,
 } from './types';
 
 export {
@@ -105,3 +111,7 @@ export {
   reviewResolve,
 } from './pipeline/review';
 export type { ReviewResolveOptions } from './pipeline/review';
+
+// Build orchestrator + status (02-04)
+export { build, assertGraphCaps, MAX_NODES, MAX_TRIPLES } from './pipeline/build';
+export { status } from './pipeline/status';
