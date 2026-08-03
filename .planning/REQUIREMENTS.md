@@ -38,7 +38,7 @@
 
 - [x] **QRY-01**: Query IR supports term seed-expand, path, neighborhood, and filter
 - [x] **QRY-02**: Confidence budget filtering uses tier ranks consistently
-- [ ] **PACK-01**: `packSubgraph` is composition of public query ops (documented algorithm)
+- [x] **PACK-01**: `packSubgraph` is composition of public query ops (documented algorithm)
 - [ ] **ANS-01**: Deterministic answer renders markdown with triple citations from pack only
 - [ ] **ANS-02**: Empty pack produces abstain (no fabricated relationships)
 
@@ -117,7 +117,7 @@
 | CLI-01 | Phase 4 | Complete |
 | CLI-02 | Phase 4 | Complete |
 | CLI-03 | Phase 4 | Complete |
-| PACK-01 | Phase 5 | Pending |
+| PACK-01 | Phase 5 | Complete |
 | ANS-01 | Phase 5 | Pending |
 | ANS-02 | Phase 5 | Pending |
 | GOLD-01 | Phase 5 | Pending |
