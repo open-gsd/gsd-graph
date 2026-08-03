@@ -13,9 +13,9 @@
 
 ### Ontology
 
-- [ ] **ONT-01**: Load and validate the `general` ontology pack with closed type/predicate allowlists
-- [ ] **ONT-02**: Unknown type/predicate policy matrix supports `review` | `coerce` | `drop` (default `review` = no write)
-- [ ] **ONT-03**: Ontology packs are replace-only in v0.1 (no extends merge)
+- [x] **ONT-01**: Load and validate the `general` ontology pack with closed type/predicate allowlists
+- [x] **ONT-02**: Unknown type/predicate policy matrix supports `review` | `coerce` | `drop` (default `review` = no write)
+- [x] **ONT-03**: Ontology packs are replace-only in v0.1 (no extends merge)
 
 ### Store & IO
 
@@ -93,9 +93,9 @@
 | PKG-01 | Phase 1 | Complete |
 | PKG-02 | Phase 1 | Complete |
 | PKG-03 | Phase 4 | Pending |
-| ONT-01 | Phase 1 | Pending |
-| ONT-02 | Phase 1 | Pending |
-| ONT-03 | Phase 1 | Pending |
+| ONT-01 | Phase 1 | Complete |
+| ONT-02 | Phase 1 | Complete |
+| ONT-03 | Phase 1 | Complete |
 | STORE-01 | Phase 1 | Pending |
 | STORE-02 | Phase 1 | Pending |
 | STORE-03 | Phase 1 | Pending |
