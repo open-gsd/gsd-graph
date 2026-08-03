@@ -112,7 +112,7 @@ Each task was committed atomically:
 2. **Task 1 (GREEN): Register pack and answer CLI adapters** - `081ad2c` (feat)
 3. **Task 2: Flip process-level exit matrix for pack/answer** - `d989590` (test)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `b69aade` (docs: complete plan)
 
 _Note: TDD tasks may have multiple commits (test → feat → refactor)_
 

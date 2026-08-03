@@ -4,10 +4,10 @@ milestone: v0.2.0
 milestone_name: milestone
 current_phase: 5
 current_phase_name: ground-prove-0-1-0
-current_plan: 3 of 4 (05-03 next)
-status: executing
+current_plan: 4 of 4 (05-04 next)
+status: ready
 stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-08-03T15:35:11.458Z"
+last_updated: "2026-08-03T15:35:30.000Z"
 progress:
   total_phases: 5
   completed_phases: 0
@@ -24,9 +24,9 @@ progress:
 
 - **Milestone:** v0.1.0 foundation  
 - **Phase:** 5 (ground-prove-0-1-0) — EXECUTING
-- **Current Plan:** 3 of 4 (05-03 next)
-- **Status:** Executing Phase 5 — 05-02 complete
-- **Next action:** Execute 05-03-PLAN.md (CLI pack/answer)
+- **Current Plan:** 4 of 4 (05-04 next)
+- **Status:** Executing Phase 5 — 05-03 complete
+- **Next action:** Execute 05-04-PLAN.md (goldens + 0.1.0 readiness)
 
 ## Progress
 
@@ -38,6 +38,7 @@ progress:
 | Phase 5 VALIDATION | ✓ |
 | 05-01 packSubgraph | ✓ Complete |
 | 05-02 answer + abstain | ✓ Complete |
+| 05-03 CLI pack/answer | ✓ Complete |
 
 ## Blockers
 
@@ -58,9 +59,9 @@ None.
 - [Phase 5]: PACK_STOPWORDS is exact DESIGN set; empty pack returns empty shape without throw
 - [Phase 5]: Empty answer_markdown is '' for strict no-relationship honesty on abstain
 - [Phase 5]: AnswerOptions is PackOptions alias; no LLM flags in Phase 5
-- [Phase ?]: Mirror query adapter shape for pack/answer CLI (question + optional --budget + withDir + writeOk)
-- [Phase ?]: Multi-hop-only isolated corpus for CLI pack/answer smoke
-- [Phase ?]: Abstain answer exits 0 at both main() and process-spawn levels (ANS-02)
+- [Phase 5]: Mirror query adapter shape for pack/answer CLI (question + optional --budget + withDir + writeOk)
+- [Phase 5]: Multi-hop-only isolated corpus for CLI pack/answer smoke
+- [Phase 5]: Abstain answer exits 0 at both main() and process-spawn levels (ANS-02)
 
 ## Session
 
