@@ -146,7 +146,7 @@ Each task was committed atomically:
 1. **Task 1+2: normalize multiset + exact merge** - `8d0c583` (feat) — tracer + NORM-02 merge co-located in `normalize.ts`
 2. **Task 3: review queue schema + accept/reject** - `bd17ff2` (feat)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `bf04630` (docs: complete plan)
 
 _Note: Tasks 1 and 2 shared one feat commit because merge + multiset live in the same pure module and ship as one green unit._
 
