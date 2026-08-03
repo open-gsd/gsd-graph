@@ -3,6 +3,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -172,5 +173,30 @@ describe('package identity bin (PKG-03, D-01, D-09)', () => {
       false,
       `commander must not be 15.x (engines mismatch), got ${range}`,
     );
+  });
+
+  it('bin is invokable via process.execPath spawn (PKG-03 process gate)', () => {
+    // Residual process-level proof beyond static shebang/package.json checks (04-03)
+    const binPath = join(root, 'bin', 'gsd-graph.js');
+    assert.equal(existsSync(binPath), true, 'bin/gsd-graph.js missing');
+    const result = spawnSync(
+      process.execPath,
+      [binPath, 'ontology', 'show'],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, NO_COLOR: '1' },
+      },
+    );
+    assert.equal(
+      result.status,
+      0,
+      `bin spawn failed: status=${result.status} stderr=${result.stderr}`,
+    );
+    const body = JSON.parse((result.stdout ?? '').trim()) as {
+      id?: string;
+      node_types?: number;
+    };
+    assert.equal(body.id, 'general');
+    assert.ok(typeof body.node_types === 'number' && body.node_types > 0);
   });
 });
