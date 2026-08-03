@@ -30,6 +30,11 @@ export type {
   QueryPath,
   QueryOptions,
   QueryResult,
+  SnapshotSaveOptions,
+  SnapshotRestoreOptions,
+  SnapshotListOptions,
+  SnapshotResult,
+  SnapshotInfo,
 } from './types';
 
 export {
@@ -148,3 +153,13 @@ export {
 // Projection helper (03-02 / REP-01 prep / D-09)
 export { projectGraph } from './pipeline/project';
 export type { GraphProjection, ProjectionEdge } from './pipeline/project';
+
+// Snapshots (03-03 / SNAP-01)
+export {
+  snapshotSave,
+  snapshotList,
+  snapshotRestore,
+  sanitizeSnapshotName,
+  SNAP_DIR,
+  LAST_DIFF_BASE,
+} from './pipeline/snapshot';

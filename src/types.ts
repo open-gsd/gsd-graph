@@ -281,3 +281,46 @@ export interface QueryResult {
   trimmed: string | null;
   budget_tokens: number | null;
 }
+
+// --- Snapshots (SNAP-01 / D-07) ---
+
+/** Options for snapshotSave / snapshotRestore. */
+export interface SnapshotSaveOptions {
+  /** Store directory override (resolveStoreRoot). */
+  dir?: string;
+  /** Logical snapshot name — sanitized; becomes suffix of fileName. */
+  name: string;
+}
+
+/** Options for snapshotRestore (same shape as save). */
+export type SnapshotRestoreOptions = SnapshotSaveOptions;
+
+/** Options for snapshotList. */
+export interface SnapshotListOptions {
+  /** Store directory override (resolveStoreRoot). */
+  dir?: string;
+}
+
+/** Result of snapshotSave / snapshotRestore. */
+export interface SnapshotResult {
+  /** Logical sanitized name (e.g. pre-edit). */
+  name: string;
+  /** On-disk basename under snapshots/ (e.g. 2026-08-03T12-00-00.000Z-pre-edit.json). */
+  fileName: string;
+  /** Absolute path to the snapshot JSON file. */
+  path: string;
+}
+
+/** One entry from snapshotList (newest first). */
+export interface SnapshotInfo {
+  /** Logical name parsed from fileName suffix. */
+  name: string;
+  /** On-disk basename under snapshots/. */
+  fileName: string;
+  /** Absolute path to the snapshot JSON file. */
+  path: string;
+  /** File mtime in ms since epoch (for sort/debug). */
+  mtime_ms?: number;
+  /** graph.v1 built_at if readable from snapshot body. */
+  built_at?: string;
+}
