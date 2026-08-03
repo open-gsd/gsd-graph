@@ -6,24 +6,18 @@
 ## Current position
 
 - **Milestone:** v0.1.0 foundation  
-- **Phase:** 4 — CLI surface — **COMPLETE** (verified PASSED)  
-- **Status:** Verified PASSED  
-- **Next action:** `/gsd-plan-phase 5` (Ground & prove 0.1.0 — pack/answer/goldens)
+- **Phase:** 5 — Ground & prove 0.1.0 — **PLANNED** (plan-check PASS)  
+- **Status:** Ready to execute  
+- **Next action:** `/gsd-execute-phase 5`
 
 ## Progress
 
 | Artifact | Status |
 |----------|--------|
-| Phase 1–3 | ✓ Complete |
-| Phase 4 plans 04-01..04-03 | ✓ executed |
-| Phase 4 VERIFICATION | ✓ PASSED |
-| Tests | 200/200 pass |
-
-## Completed Phase 4
-
-- `gsd-graph` bin with K22 machine contract
-- Commands: init, build, query, path, status, diff, snapshot, review, repair, ontology
-- E2E process tests exit 0/1/2/3
+| Phase 1–4 | ✓ Complete |
+| Phase 5 CONTEXT + RESEARCH | ✓ |
+| Phase 5 plans 05-01..05-04 | ✓ plan-check PASS |
+| Phase 5 VALIDATION | ✓ |
 
 ## Blockers
 
