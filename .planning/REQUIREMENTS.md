@@ -19,11 +19,11 @@
 
 ### Store & IO
 
-- [ ] **STORE-01**: Default store directory is `.gsd-graph/` (overridable via `--dir` / config)
-- [ ] **STORE-02**: Canonical SoT is `graph.v1.json`; optional `graph.json` is disposable projection only
-- [ ] **STORE-03**: Publish uses dual-write protocol with atomic rename; native query never reads projection as SoT
-- [ ] **STORE-04**: Concurrent builds are serialized via `.build.lock`
-- [ ] **STORE-05**: All store paths are realpath-confined under the store root
+- [x] **STORE-01**: Default store directory is `.gsd-graph/` (overridable via `--dir` / config)
+- [x] **STORE-02**: Canonical SoT is `graph.v1.json`; optional `graph.json` is disposable projection only
+- [x] **STORE-03**: Publish uses dual-write protocol with atomic rename; native query never reads projection as SoT
+- [x] **STORE-04**: Concurrent builds are serialized via `.build.lock`
+- [x] **STORE-05**: All store paths are realpath-confined under the store root
 
 ### Extract & normalize
 
@@ -96,11 +96,11 @@
 | ONT-01 | Phase 1 | Complete |
 | ONT-02 | Phase 1 | Complete |
 | ONT-03 | Phase 1 | Complete |
-| STORE-01 | Phase 1 | Pending |
-| STORE-02 | Phase 1 | Pending |
-| STORE-03 | Phase 1 | Pending |
-| STORE-04 | Phase 1 | Pending |
-| STORE-05 | Phase 1 | Pending |
+| STORE-01 | Phase 1 | Complete |
+| STORE-02 | Phase 1 | Complete |
+| STORE-03 | Phase 1 | Complete |
+| STORE-04 | Phase 1 | Complete |
+| STORE-05 | Phase 1 | Complete |
 | EXT-01 | Phase 2 | Pending |
 | EXT-02 | Phase 2 | Pending |
 | EXT-03 | Phase 2 | Pending |

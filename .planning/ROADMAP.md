@@ -35,13 +35,13 @@ Critical path to **0.1.0**: Phases 1–5. Phase 6 is optional for the tag. Phase
   3. Store paths resolve under `.gsd-graph/` (overridable), are realpath-confined, and concurrent builds serialize via `.build.lock`
   4. Dual-write publish primitives rename `graph.v1.json` first; projection `graph.json` is never treated as SoT
 
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans executed
 
 Plans:
 
 - [x] 01-01-PLAN.md — Package bootstrap: CJS+types identity, README, CI, reason codes (PKG-01, PKG-02)
 - [x] 01-02-PLAN.md — Schemas, general ontology pack, Ajv validators, policy matrix (ONT-01..03)
-- [ ] 01-03-PLAN.md — Store paths, realpath confinement, .build.lock, dual-write publish (STORE-01..05)
+- [x] 01-03-PLAN.md — Store paths, realpath confinement, .build.lock, dual-write publish (STORE-01..05)
 
 ### Phase 2: Build pipeline
 
@@ -136,7 +136,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & identity | 2/3 | In Progress|  |
+| 1. Foundation & identity | 3/3 | In Progress|  |
 | 2. Build pipeline | 0/TBD | Not started | - |
 | 3. Query, lifecycle & maintain | 0/TBD | Not started | - |
 | 4. CLI surface | 0/TBD | Not started | - |
