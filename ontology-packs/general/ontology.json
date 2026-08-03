@@ -1,0 +1,60 @@
+{
+  "id": "general",
+  "version": "1",
+  "title": "General knowledge",
+  "node_types": [
+    "Entity",
+    "Person",
+    "Organization",
+    "Place",
+    "Concept",
+    "Document",
+    "Event",
+    "Claim",
+    "Topic",
+    "Community"
+  ],
+  "predicates": [
+    { "id": "related_to", "domain": ["*"], "range": ["*"] },
+    { "id": "mentions", "domain": ["Document", "Claim"], "range": ["*"] },
+    { "id": "part_of", "domain": ["*"], "range": ["*"] },
+    { "id": "derived_from", "domain": ["*"], "range": ["Document"] },
+    {
+      "id": "causes",
+      "domain": ["Event", "Claim", "Concept"],
+      "range": ["Event", "Claim", "Concept"]
+    },
+    {
+      "id": "supports",
+      "domain": ["Claim", "Document"],
+      "range": ["Claim"]
+    },
+    { "id": "contradicts", "domain": ["Claim"], "range": ["Claim"] },
+    {
+      "id": "located_in",
+      "domain": ["Place", "Organization", "Person"],
+      "range": ["Place"]
+    },
+    { "id": "works_for", "domain": ["Person"], "range": ["Organization"] },
+    {
+      "id": "authored",
+      "domain": ["Person", "Organization"],
+      "range": ["Document", "Claim"]
+    },
+    {
+      "id": "about",
+      "domain": ["Document", "Event", "Claim"],
+      "range": ["Topic", "Concept", "Entity"]
+    },
+    {
+      "id": "member_of",
+      "domain": ["*"],
+      "range": ["Community", "Organization"]
+    },
+    { "id": "precedes", "domain": ["Event"], "range": ["Event"] },
+    { "id": "same_as", "domain": ["*"], "range": ["*"] }
+  ],
+  "strict": true,
+  "unknown_predicate_policy": "review",
+  "unknown_type_policy": "review"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "custom",
+  "version": "1",
+  "title": "Custom replace-only pack",
+  "node_types": ["Entity", "Concept", "Document"],
+  "predicates": [
+    { "id": "related_to", "domain": ["*"], "range": ["*"] },
+    { "id": "mentions", "domain": ["Document"], "range": ["*"] }
+  ],
+  "strict": true,
+  "unknown_predicate_policy": "review",
+  "unknown_type_policy": "review"
+}

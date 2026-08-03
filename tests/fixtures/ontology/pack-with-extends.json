@@ -1,0 +1,13 @@
+{
+  "id": "extended",
+  "version": "1",
+  "title": "Invalid extends pack",
+  "node_types": ["Entity", "Concept"],
+  "predicates": [
+    { "id": "related_to", "domain": ["*"], "range": ["*"] }
+  ],
+  "strict": true,
+  "unknown_predicate_policy": "review",
+  "unknown_type_policy": "review",
+  "extends": "general"
+}

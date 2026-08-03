@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opengsd.dev/schemas/graph-v1.schema.json",
+  "title": "gsd-graph graph.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "engine",
+    "engine_version",
+    "ontology_pack_id",
+    "ontology_version",
+    "built_at",
+    "nodes",
+    "triples"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "engine": {
+      "const": "gsd-graph"
+    },
+    "engine_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ontology_pack_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ontology_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "built_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "built_at_commit": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-fA-F]{4,40}$"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "label"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "triples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "s", "p", "o", "confidence", "provenance"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^t_[0-9a-f]{16}$"
+          },
+          "s": {
+            "type": "string",
+            "minLength": 1
+          },
+          "p": {
+            "type": "string",
+            "minLength": 1
+          },
+          "o": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["EXTRACTED", "INFERRED", "AMBIGUOUS"]
+          },
+          "score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "provenance": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_path",
+                "extractor",
+                "content_hash",
+                "confidence"
+              ],
+              "properties": {
+                "source_path": {
+                  "type": "string"
+                },
+                "extractor": {
+                  "type": "string"
+                },
+                "content_hash": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "string",
+                  "enum": ["EXTRACTED", "INFERRED", "AMBIGUOUS"]
+                },
+                "score": {
+                  "type": "number"
+                },
+                "span": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "start_line": {
+                      "type": "integer"
+                    },
+                    "end_line": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "communities": {
+      "type": "array"
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "node_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "triple_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
