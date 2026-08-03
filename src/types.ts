@@ -554,3 +554,56 @@ export interface AnswerOptions extends PackOptions {
     apiKeyEnv?: string;
   };
 }
+
+// --- Community detection (COM-01 / D-01..D-03 / D-10) ---
+
+/** One community / theme cluster from label propagation. */
+export interface Community {
+  /** Stable display id after sort: c_0001, c_0002, … */
+  id: string;
+  /** First 16 hex of sha256(membersSorted.join('\\0')). */
+  stable_key: string;
+  /** Deterministic theme title (top internal-degree label or Community ${id}). */
+  label: string;
+  /** Sorted node ids in this community. */
+  members: string[];
+  size: number;
+  /** Count of EXTRACTED|INFERRED triples with both endpoints in members. */
+  internal_triple_count: number;
+  /** Internal predicate frequencies (count desc, then p asc). */
+  top_predicates: Array<{ p: string; count: number }>;
+  /** Members ranked by undirected internal degree (degree desc, id asc). */
+  top_nodes: Array<{ id: string; label: string; degree: number }>;
+}
+
+/** Options for detectCommunities (COM-01). Prefer graph injection for tests (D-10). */
+export interface DetectCommunitiesOptions {
+  /** Store directory override when graph is absent (loadGraphV1). */
+  dir?: string;
+  /** In-memory graph — skips loadGraphV1 (D-10). */
+  graph?: GraphV1Document;
+  /** Max LPA iterations (default COMMUNITY_MAX_ITERATIONS = 20; clamped). */
+  maxIterations?: number;
+  /** Drop communities smaller than this (default COMMUNITY_MIN_SIZE = 3). */
+  minSize?: number;
+  /**
+   * When true, write communities/ sidecars under the store (plan 07-02).
+   * Default false in library inject path; production CLI may set true later.
+   */
+  write?: boolean;
+}
+
+/** Result of detectCommunities — pure algorithm fields always present. */
+export interface DetectCommunitiesResult {
+  communities: Community[];
+  /** Iterations actually executed (0 when maxIterations was 0). */
+  iterations: number;
+  stopped_reason: 'converged' | 'max_iterations';
+  nodes_considered: number;
+  edges_considered: number;
+  /** Communities dropped for members.length < minSize. */
+  dropped_small_count: number;
+  /** Present only when write artifacts are produced (later plan). */
+  index_path?: string;
+  report_paths?: string[];
+}
