@@ -202,7 +202,7 @@ export function snapshotRestore(opts: SnapshotRestoreOptions): SnapshotResult {
   );
   const lock = acquireBuildLock(storeRoot, 'lib');
   try {
-    const resolved = resolveSnapshotFile(storeRoot, opts.name);
+    const resolved = resolveNamedSnapshot(storeRoot, opts.name);
     const graphV1 = readAndValidateSnapshot(resolved.path);
 
     // Rewrite projection from restored v1 only (no invented triples).
@@ -250,8 +250,9 @@ interface ResolvedSnapshot {
 
 /**
  * Resolve snapshot by exact fileName or logical name (`*-<name>.json`, newest).
+ * Exported for diff baseline resolution (DIFF-01) — keeps path confinement shared.
  */
-function resolveSnapshotFile(
+export function resolveNamedSnapshot(
   storeRoot: string,
   nameOrFile: string,
 ): ResolvedSnapshot {

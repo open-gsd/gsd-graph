@@ -324,3 +324,52 @@ export interface SnapshotInfo {
   /** graph.v1 built_at if readable from snapshot body. */
   built_at?: string;
 }
+
+// --- Diff (DIFF-01 / D-08) ---
+
+/** Options for diff() — current graph.v1 vs snapshot or last-diff-base. */
+export interface DiffOptions {
+  /** Store directory override (resolveStoreRoot). */
+  dir?: string;
+  /**
+   * Named snapshot (logical name or full fileName under snapshots/).
+   * When omitted, uses snapshots/.last-diff-base.json (NO_BASELINE if missing).
+   */
+  snapshot?: string;
+}
+
+/** Id-set arithmetic result (DESIGN DiffResult; K25). */
+export interface DiffResult {
+  /** Baseline path or snapshot name used for comparison. */
+  baseline: string;
+  nodes: { added: string[]; removed: string[]; changed: string[] };
+  triples: { added: string[]; removed: string[]; changed: string[] };
+  counts: {
+    nodes_added: number;
+    nodes_removed: number;
+    triples_added: number;
+    triples_removed: number;
+  };
+}
+
+// --- Repair (REP-01 / D-09) ---
+
+/** Options for repair() — regenerate disposable projection from v1 only. */
+export interface RepairOptions {
+  /** Store directory override (resolveStoreRoot). */
+  dir?: string;
+  /**
+   * Always materializes graph.json when true (default true for repair).
+   * Explicit false is ignored — repair's job is to write the projection.
+   */
+  writeProjection?: boolean;
+}
+
+/** Result of repair() after projecting graph.v1 → graph.json. */
+export interface RepairResult {
+  store_dir: string;
+  node_count: number;
+  triple_count: number;
+  projection_written: true;
+  reason: string;
+}

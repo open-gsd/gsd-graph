@@ -35,6 +35,10 @@ export type {
   SnapshotListOptions,
   SnapshotResult,
   SnapshotInfo,
+  DiffOptions,
+  DiffResult,
+  RepairOptions,
+  RepairResult,
 } from './types';
 
 export {
@@ -160,6 +164,10 @@ export {
   snapshotList,
   snapshotRestore,
   sanitizeSnapshotName,
+  resolveNamedSnapshot,
   SNAP_DIR,
   LAST_DIFF_BASE,
 } from './pipeline/snapshot';
+
+// Diff (03-04 / DIFF-01)
+export { diff, resolveBaseline } from './pipeline/diff';
