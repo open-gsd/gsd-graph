@@ -4,15 +4,15 @@ milestone: v0.2.0
 milestone_name: milestone
 current_phase: 3
 current_phase_name: query-lifecycle-maintain
-current_plan: 4 of 4 (03-04 next)
-status: executing
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-08-03T11:31:00.000Z"
+current_plan: 4 of 4 (complete)
+status: phase_complete
+stopped_at: Completed 03-04-PLAN.md
+last_updated: "2026-08-03T11:37:50.000Z"
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 14
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -23,10 +23,10 @@ progress:
 ## Current position
 
 - **Milestone:** v0.1.0 foundation  
-- **Phase:** 3 (query-lifecycle-maintain) — EXECUTING
-- **Current Plan:** 4 of 4 (03-04 next)
-- **Status:** Plan 03-03 complete; ready for 03-04 diff/repair
-- **Next action:** Execute 03-04-PLAN.md (diff + repair)
+- **Phase:** 3 (query-lifecycle-maintain) — COMPLETE
+- **Current Plan:** 4 of 4 (complete)
+- **Status:** Plan 03-04 complete; Phase 3 library surface done
+- **Next action:** Phase 3 verify / advance to Phase 4 CLI
 
 ## Progress
 
@@ -40,10 +40,11 @@ progress:
 | 03-01 Query IR | ✓ Complete (SUMMARY) |
 | 03-02 Maintain M1–M5 | ✓ Complete (SUMMARY) |
 | 03-03 Snapshots | ✓ Complete (SUMMARY) |
+| 03-04 Diff + Repair | ✓ Complete (SUMMARY) |
 
 ## Next
 
-Execute 03-04 diff/repair.
+Phase 3 plans complete — run phase verify or plan Phase 4 CLI.
 
 ## Blockers
 
@@ -56,6 +57,7 @@ None.
 | Phase 03-query-lifecycle-maintain P01 | 4min | 3 tasks | 5 files |
 | Phase 03 P02 | 6min | 3 tasks | 6 files |
 | Phase 03 P03 | 3min | 2 tasks | 4 files |
+| Phase 03 P04 | 4min | 2 tasks | 7 files |
 
 ## Decisions
 
@@ -67,9 +69,12 @@ None.
 - [Phase 3]: last-diff-base written under lock after publish; DEFAULT_WRITE_PROJECTION stays false
 - [Phase 3]: Restore rewrites projection via projectGraph from snapshot v1 only; sidecars unchanged (A2)
 - [Phase 3]: Logical snapshot name matches *-<name>.json newest; full fileName also accepted
+- [Phase 3]: Export resolveNamedSnapshot so diff reuses snapshot path confinement
+- [Phase 3]: resolveBaseline before loadGraphV1 so empty store yields NO_BASELINE
+- [Phase 3]: repair always materializes graph.json under build lock from v1 only
 
 ## Session
 
-**Last session:** 2026-08-03T11:30:51.656Z
-**Stopped at:** Completed 03-03-PLAN.md
+**Last session:** 2026-08-03T11:37:21.740Z
+**Stopped at:** Completed 03-04-PLAN.md
 **Resume file:** None

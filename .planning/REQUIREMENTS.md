@@ -46,8 +46,8 @@
 
 - [x] **MNT-01**: Incremental maintain invalidates provenance correctly (M1–M5 matrix)
 - [x] **SNAP-01**: Snapshot save/list/restore of graph.v1
-- [ ] **DIFF-01**: Diff current graph vs snapshot / last-diff-base (± nodes & triples by id)
-- [ ] **REP-01**: Repair regenerates projection from v1 without inventing triples
+- [x] **DIFF-01**: Diff current graph vs snapshot / last-diff-base (± nodes & triples by id)
+- [x] **REP-01**: Repair regenerates projection from v1 without inventing triples
 - [x] **STAT-01**: Status reports node/triple counts, engine identity, freshness signals
 
 ### CLI & agent contract
@@ -112,8 +112,8 @@
 | QRY-02 | Phase 3 | Complete |
 | MNT-01 | Phase 3 | Complete |
 | SNAP-01 | Phase 3 | Complete |
-| DIFF-01 | Phase 3 | Pending |
-| REP-01 | Phase 3 | Pending |
+| DIFF-01 | Phase 3 | Complete |
+| REP-01 | Phase 3 | Complete |
 | CLI-01 | Phase 4 | Pending |
 | CLI-02 | Phase 4 | Pending |
 | CLI-03 | Phase 4 | Pending |

@@ -15,7 +15,7 @@ Critical path to **0.1.0**: Phases 1–5. Phase 6 is optional for the tag. Phase
 
 - [x] **Phase 1: Foundation & identity** - Installable package, ontology contract, crash-safe store IO
 - [x] **Phase 2: Build pipeline** - Extract → normalize → review → publish graph.v1
-- [ ] **Phase 3: Query, lifecycle & maintain** - Query IR, snapshots/diff/repair, incremental M1–M5
+- [x] **Phase 3: Query, lifecycle & maintain** - Query IR, snapshots/diff/repair, incremental M1–M5
 - [ ] **Phase 4: CLI surface** - `gsd-graph` machine contract over library ops
 - [ ] **Phase 5: Ground & prove 0.1.0** - packSubgraph, cited answers, G0–G4 goldens, release tag
 - [ ] **Phase 6: Optional agents** - LLM providers, MCP read tools, example packs, minimal report
@@ -77,14 +77,14 @@ Plans:
   3. Snapshot save/list/restore round-trips `graph.v1`; diff reports ± nodes and triples by id vs snapshot or last-diff-base
   4. Repair regenerates projection from v1 only and invents no triples
 
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans executed
 
 Plans:
 
 - [x] 03-01-PLAN.md — Query IR (term/path/neighborhood/filter) + budget ranks (QRY-01, QRY-02)
 - [x] 03-02-PLAN.md — Maintain invalidateProvenance + M1–M5 + build({full:false}) fix (MNT-01)
 - [x] 03-03-PLAN.md — Snapshot save/list/restore under snapshots/ (SNAP-01)
-- [ ] 03-04-PLAN.md — Diff ± by id + repair projection from v1 (DIFF-01, REP-01)
+- [x] 03-04-PLAN.md — Diff ± by id + repair projection from v1 (DIFF-01, REP-01)
 
 ### Phase 4: CLI surface
 
@@ -152,7 +152,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Foundation & identity | 3/3 | Complete | 2026-08-02 |
 | 2. Build pipeline | 4/4 | Complete |  |
-| 3. Query, lifecycle & maintain | 3/4 | In Progress|  |
+| 3. Query, lifecycle & maintain | 4/4 | Complete | 2026-08-03 |
 | 4. CLI surface | 0/TBD | Not started | - |
 | 5. Ground & prove 0.1.0 | 0/TBD | Not started | - |
 | 6. Optional agents | 0/TBD | Not started | - |
