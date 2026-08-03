@@ -119,12 +119,12 @@ Plans:
   4. Golden G1+ multi-hop path assertions pass on link/JSONL structured fixtures
   5. Version 0.1.0 is releasable only when goldens, M1–M5, and core CLI are green
 
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 
 Plans:
 
 - [x] 05-01-PLAN.md — packSubgraph public-query composition + types + pack tests (PACK-01)
-- [ ] 05-02-PLAN.md — deterministic answer() + empty abstain (ANS-01, ANS-02)
+- [x] 05-02-PLAN.md — deterministic answer() + empty abstain (ANS-01, ANS-02)
 - [ ] 05-03-PLAN.md — CLI pack/answer + flip Phase 4 unregistered tests (D-06)
 - [ ] 05-04-PLAN.md — Golden G0/G1(+G2) + CHANGELOG 0.1.0 release gate (GOLD-01..03)
 
@@ -167,7 +167,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Build pipeline | 4/4 | Complete |  |
 | 3. Query, lifecycle & maintain | 4/4 | Complete | 2026-08-03 |
 | 4. CLI surface | 3/3 | Complete | 2026-08-03 |
-| 5. Ground & prove 0.1.0 | 1/4 | In Progress|  |
+| 5. Ground & prove 0.1.0 | 2/4 | In Progress|  |
 | 6. Optional agents | 0/TBD | Not started | - |
 | 7. Global themes 0.2 | 0/TBD | Not started | - |
 
