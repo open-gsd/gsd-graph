@@ -13,6 +13,8 @@ export type {
   Triple,
   GraphStats,
   GraphV1Document,
+  ExtractDiagnostic,
+  ExtractResult,
 } from './types';
 
 export {
@@ -60,3 +62,17 @@ export type {
   LockHandle,
   AcquireBuildLockOptions,
 } from './io/lock';
+
+// Pipeline ids + sources (02-01)
+export {
+  slugifyLabel,
+  nodeId,
+  tripleId,
+  bestTier,
+  stableStringify,
+  reviewItemId,
+} from './pipeline/ids';
+
+export { fingerprintFile } from './sources/fingerprint';
+export { extractMarkdown } from './sources/markdown';
+export { redactSecrets } from './sources/redact';

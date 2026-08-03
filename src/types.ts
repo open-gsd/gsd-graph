@@ -50,6 +50,20 @@ export interface GraphStats {
   triple_count?: number;
 }
 
+/** Diagnostic from extract / discover stages (EXT-01/03). */
+export interface ExtractDiagnostic {
+  path: string;
+  code: string;
+  message: string;
+}
+
+/** Candidate nodes/triples from a single source extract (Phase 2). */
+export interface ExtractResult {
+  nodes: GraphNode[];
+  triples: Triple[];
+  diagnostics: ExtractDiagnostic[];
+}
+
 /** graph.v1 document — SoT shape for future store publish (01-03). */
 export interface GraphV1Document {
   schema_version: 1;
