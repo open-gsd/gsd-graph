@@ -1,0 +1,53 @@
+{
+  "name": "@opengsd/gsd-graph",
+  "version": "0.1.0",
+  "description": "Graph Engineering toolkit — extract, normalize, store, query, and ground knowledge graphs from document corpora",
+  "license": "MIT",
+  "author": "Jeremy McSpadden <jeremy@fluxlabs.net>",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "schemas",
+    "ontology-packs",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:test": "tsc -p tsconfig.test.json",
+    "test": "npm run build && npm run build:test && node --test dist-test/**/*.test.js",
+    "test:coverage": "npm run build && npm run build:test && c8 --check-coverage --lines 80 node --test dist-test/**/*.test.js"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "c8": "^12.0.0",
+    "typescript": "^6.0.3"
+  },
+  "keywords": [
+    "graph-engineering",
+    "knowledge-graph",
+    "graph-rag",
+    "triples",
+    "ontology"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-gsd/gsd-graph.git"
+  }
+}

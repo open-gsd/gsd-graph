@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-test/
+coverage/
+.gsd-graph/
+*.log
+.DS_Store
+*.tsbuildinfo
+.npm/
+.nyc_output/
