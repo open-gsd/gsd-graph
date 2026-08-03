@@ -172,14 +172,14 @@ describe('cli happy path (D-12, CLI-02, CLI-03)', () => {
 });
 
 describe('cli exit matrix (CLI-01, CLI-02, D-02, D-03, D-04)', () => {
-  it('unknown command and unregistered pack/answer exit 1', () => {
+  it('unknown command exit 1', () => {
     const cwd = makeTmpDir('gsd-graph-cli-exit1-');
     fs.writeFileSync(path.join(cwd, '.gitignore'), 'node_modules\n', 'utf8');
 
+    // True unknown verbs only — pack/answer are registered Phase 5 (D-06, pitfall 5)
     for (const args of [
       ['totally-unknown-verb'],
-      ['pack'],
-      ['answer', 'what is drought?'],
+      ['not-a-real-command'],
     ] as string[][]) {
       const result = run(args, cwd);
       assert.equal(
@@ -197,6 +197,97 @@ describe('cli exit matrix (CLI-01, CLI-02, D-02, D-03, D-04)', () => {
       assert.equal(typeof err.reason, 'string');
       assert.equal(typeof err.message, 'string');
     }
+  });
+
+  it('pack and answer registered success exit 0 (D-06)', () => {
+    const cwd = makeTmpDir('gsd-graph-cli-pack-e2e-');
+    fs.writeFileSync(path.join(cwd, '.gitignore'), 'node_modules\n', 'utf8');
+
+    // Isolated multi-hop corpus (same fixture strategy as cli-commands)
+    const corpus = path.join(cwd, 'corpus');
+    fs.mkdirSync(corpus, { recursive: true });
+    fs.copyFileSync(
+      path.join(fixturesCorpus, 'multi-hop.jsonl'),
+      path.join(corpus, 'multi-hop.jsonl'),
+    );
+
+    const initResult = run(['init'], cwd);
+    assert.equal(initResult.status, 0, initResult.stderr);
+
+    const buildResult = run(
+      ['build', '--corpus', corpus, '--full'],
+      cwd,
+    );
+    assert.equal(buildResult.status, 0, buildResult.stderr);
+
+    const packResult = run(
+      ['pack', 'why does drought cause food shortage?'],
+      cwd,
+    );
+    assert.equal(
+      packResult.status,
+      0,
+      `pack expected exit 0: ${packResult.stderr}`,
+    );
+    const packBody = assertJsonOnlyStdout(packResult.stdout) as {
+      seeds: string[];
+      triples: unknown[];
+      paths: unknown[];
+    };
+    assert.ok(Array.isArray(packBody.seeds));
+    assert.ok(Array.isArray(packBody.triples));
+    assert.ok(Array.isArray(packBody.paths));
+    assert.ok(packBody.seeds.length > 0);
+
+    const answerResult = run(
+      ['answer', 'why does drought cause food shortage?'],
+      cwd,
+    );
+    assert.equal(
+      answerResult.status,
+      0,
+      `answer expected exit 0: ${answerResult.stderr}`,
+    );
+    const answerBody = assertJsonOnlyStdout(answerResult.stdout) as {
+      pack: { triples: unknown[] };
+      answer_markdown: string;
+      mode: string;
+      abstained: boolean;
+    };
+    assert.equal(answerBody.mode, 'deterministic');
+    assert.equal(answerBody.abstained, false);
+    assert.ok(answerBody.pack.triples.length >= 1);
+    assert.match(answerBody.answer_markdown, /causes/);
+  });
+
+  it('answer abstain exits 0 not 2 (ANS-02)', () => {
+    const cwd = makeTmpDir('gsd-graph-cli-abstain-');
+    fs.writeFileSync(path.join(cwd, '.gitignore'), 'node_modules\n', 'utf8');
+
+    const corpus = path.join(cwd, 'corpus');
+    fs.mkdirSync(corpus, { recursive: true });
+    fs.copyFileSync(
+      path.join(fixturesCorpus, 'multi-hop.jsonl'),
+      path.join(corpus, 'multi-hop.jsonl'),
+    );
+
+    assert.equal(run(['init'], cwd).status, 0);
+    assert.equal(run(['build', '--corpus', corpus, '--full'], cwd).status, 0);
+
+    const result = run(['answer', 'the and or of what'], cwd);
+    assert.equal(
+      result.status,
+      0,
+      `abstain must exit 0 not 2: ${result.stderr}`,
+    );
+    const body = assertJsonOnlyStdout(result.stdout) as {
+      mode: string;
+      abstained: boolean;
+      pack: { triples: unknown[] };
+    };
+    assert.equal(body.mode, 'abstain');
+    assert.equal(body.abstained, true);
+    assert.equal(body.pack.triples.length, 0);
   });
 
   it('build without --corpus exits 1 (usage)', () => {
