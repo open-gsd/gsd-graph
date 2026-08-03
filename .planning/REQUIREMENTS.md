@@ -7,8 +7,8 @@
 
 ### Package & identity
 
-- [ ] **PKG-01**: Installable npm package `@opengsd/gsd-graph` builds on Node ≥22 with CJS + type declarations
-- [ ] **PKG-02**: README and package description present as Graph Engineering toolkit; no gsd-core runtime dependency
+- [x] **PKG-01**: Installable npm package `@opengsd/gsd-graph` builds on Node ≥22 with CJS + type declarations
+- [x] **PKG-02**: README and package description present as Graph Engineering toolkit; no gsd-core runtime dependency
 - [ ] **PKG-03**: CLI binary `gsd-graph` is published and invokable after install
 
 ### Ontology
@@ -90,8 +90,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PKG-01 | Phase 1 | Pending |
-| PKG-02 | Phase 1 | Pending |
+| PKG-01 | Phase 1 | Complete |
+| PKG-02 | Phase 1 | Complete |
 | PKG-03 | Phase 4 | Pending |
 | ONT-01 | Phase 1 | Pending |
 | ONT-02 | Phase 1 | Pending |
