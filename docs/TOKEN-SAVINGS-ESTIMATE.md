@@ -1,7 +1,9 @@
 # Token Savings Benchmark Estimate
 
-**Status:** preliminary estimate, not a production benchmark  
-**Measured:** 2026-08-04  
+**Status:** preliminary estimate, not a production benchmark
+
+**Measured:** 2026-08-04
+
 **Scope:** retrieval input context for `gsd-graph pack`; output-generation tokens are excluded
 
 ## Executive estimate
