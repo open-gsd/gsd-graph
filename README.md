@@ -2,16 +2,15 @@
 
 **Graph Engineering toolkit** — build a local knowledge graph of **relationships** (subject–predicate–object triples with provenance), then answer multi-hop questions with **citations**.
 
+| | |
+|--|--|
+| **CLI** | `gsd-graph` |
+| **MCP** | `gsd-graph-mcp` |
+| **Store** | `.gsd-graph/graph.v1.json` (source of truth) |
+| **Runtime** | Node.js ≥ 22 · offline by default |
+| **npm** | [`@opengsd/gsd-graph`](https://www.npmjs.com/package/@opengsd/gsd-graph) |
 
-|             |                                              |
-| ----------- | -------------------------------------------- |
-| **CLI**     | `gsd-graph`                                  |
-| **MCP**     | `gsd-graph-mcp`                              |
-| **Store**   | `.gsd-graph/graph.v1.json` (source of truth) |
-| **Runtime** | Node.js ≥ 22 · offline by default            |
-
-
-
+OpenGSD is the **publisher namespace only**. This package has no runtime dependency on gsd-core, GSD workflows, or Python graphify.
 
 ---
 
@@ -27,6 +26,8 @@ extract → normalize → store → query → ground → maintain
 
 ## Quick start
 
+### Install then use (recommended)
+
 ```bash
 npm install @opengsd/gsd-graph
 
@@ -37,31 +38,43 @@ npx gsd-graph enable
 npx gsd-graph ask "why is phase 4 blocked by phase 3?"
 ```
 
+### Zero-install via npx (scoped package)
 
-| Command                  | When                                       |
-| ------------------------ | ------------------------------------------ |
-| `gsd-graph enable`       | First time in a repo                       |
-| `gsd-graph sync`         | After docs / planning change (incremental) |
-| `gsd-graph ask "…"`      | Grounded multi-hop answer                  |
-| `gsd-graph status`       | Counts / freshness                         |
-| `gsd-graph query <term>` | Seed-expand search                         |
+Because the package is scoped (`@opengsd/…`), use the package name (or `-p`) so npx resolves the bin:
 
+```bash
+# run the gsd-graph binary from the published package
+npx -y @opengsd/gsd-graph enable
+npx -y @opengsd/gsd-graph ask "why is X blocked by Y?"
+npx -y @opengsd/gsd-graph status
 
-Agent skill (installed by `enable`): `**/skill:gsd-graph**`
+# equivalent explicit form
+npx -y -p @opengsd/gsd-graph gsd-graph enable
+```
+
+After a local `npm install`, plain `npx gsd-graph …` works via `node_modules/.bin`.
+
+| Command | When |
+|---------|------|
+| `gsd-graph enable` | First time in a repo |
+| `gsd-graph sync` | After docs / planning change (incremental) |
+| `gsd-graph ask "…"` | Grounded multi-hop answer |
+| `gsd-graph status` | Counts / freshness |
+| `gsd-graph query <term>` | Seed-expand search |
+
+Agent skill (installed by `enable`): **`/skill:gsd-graph`**
 
 ---
 
 ## Documentation
 
-
-| Guide                                    | Audience                                                             |
-| ---------------------------------------- | -------------------------------------------------------------------- |
-| [**Quick Guide**](./docs/QUICK-GUIDE.md) | Install, 3 commands, continuous update, AI in 5 minutes              |
-| [**Full Guide**](./docs/FULL-GUIDE.md)   | Corpus, maintain, MCP, ontology, LLM, CLI reference, troubleshooting |
-| [**Design**](./docs/DESIGN.md)           | Architecture, store contracts, pipeline decisions                    |
-| [**Changelog**](./CHANGELOG.md)          | Release history                                                      |
-| [**Skill**](./skills/gsd-graph/SKILL.md) | Agent skill source                                                   |
-
+| Guide | Audience |
+|-------|----------|
+| **[Quick Guide](./docs/QUICK-GUIDE.md)** | Install, 3 commands, continuous update, AI in 5 minutes |
+| **[Full Guide](./docs/FULL-GUIDE.md)** | Corpus, maintain, MCP, ontology, LLM, CLI reference, troubleshooting |
+| **[Design](./docs/DESIGN.md)** | Architecture, store contracts, pipeline decisions |
+| **[Changelog](./CHANGELOG.md)** | Release history |
+| **[Skill](./skills/gsd-graph/SKILL.md)** | Agent skill source |
 
 ---
 
@@ -89,15 +102,17 @@ Does **not** scan all of `src/` by default.
 
 ```bash
 npx gsd-graph sync --corpus ./specs --full
+# or zero-install:
+npx -y @opengsd/gsd-graph sync --corpus ./specs --full
 ```
 
 ---
 
 ## How AI uses the graph
 
-1. **Sync** keeps triples current from corpus files
-2. **Pack** retrieves a small subgraph for the question (seeds → hops → paths → budget)
-3. **Ask / MCP `graph_answer`** grounds the reply on that pack only — or **abstains** if empty
+1. **Sync** keeps triples current from corpus files  
+2. **Pack** retrieves a small subgraph for the question (seeds → hops → paths → budget)  
+3. **Ask / MCP `graph_answer`** grounds the reply on that pack only — or **abstains** if empty  
 
 Default answer path is **deterministic** (no API key). Optional `--llm` must still cite pack triple ids only.
 
@@ -107,14 +122,12 @@ Default answer path is **deterministic** (no API key). Optional `--llm` must sti
 
 ## Store (source of truth)
 
-
-| Path                         | Role                     |
-| ---------------------------- | ------------------------ |
-| `.gsd-graph/graph.v1.json`   | **Canonical** SoT        |
-| `.gsd-graph/graph.json`      | Disposable projection    |
-| `.gsd-graph/communities/`    | Disposable theme reports |
-| `.gsd-graph/GRAPH_REPORT.md` | Human summary            |
-
+| Path | Role |
+|------|------|
+| `.gsd-graph/graph.v1.json` | **Canonical** SoT |
+| `.gsd-graph/graph.json` | Disposable projection |
+| `.gsd-graph/communities/` | Disposable theme reports |
+| `.gsd-graph/GRAPH_REPORT.md` | Human summary |
 
 Native query/answer APIs **never** treat projections as authority.
 
@@ -130,7 +143,8 @@ gsd-graph path Concept:a Concept:b
 gsd-graph communities detect
 gsd-graph review list
 gsd-graph snapshot save pre-refactor
-gsd-graph-mcp                    # optional MCP stdio server
+npx -y @opengsd/gsd-graph-mcp   # if linked as bin; or:
+npx -y -p @opengsd/gsd-graph gsd-graph-mcp
 ```
 
 Machine contract: **JSON on stdout** (K22). Library: `require('@opengsd/gsd-graph')`.
@@ -145,6 +159,7 @@ Ontology packs: `general` (default), `engineering`, `research`.
 npm install
 npm run build
 npm test
+npm publish --access public   # maintainers; requires npm login to @opengsd
 ```
 
 ---

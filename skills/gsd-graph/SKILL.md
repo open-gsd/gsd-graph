@@ -18,15 +18,17 @@ GSD > GRAPH
 
 1. `command -v gsd-graph`
 2. `./node_modules/.bin/gsd-graph`
-3. `npx gsd-graph`
-4. Dev checkout: `node bin/gsd-graph.js`
+3. `npx gsd-graph` (after local `npm install @opengsd/gsd-graph`)
+4. `npx -y @opengsd/gsd-graph` (zero-install scoped package)
+5. Dev checkout: `node bin/gsd-graph.js`
 
 If missing: `npm install @opengsd/gsd-graph`.
 
 ## Happy path (prefer this)
 
 ```bash
-npx gsd-graph enable          # skill + hooks + config + full sync
+npx gsd-graph enable          # after local install
+# or: npx -y @opengsd/gsd-graph enable
 npx gsd-graph ask "…"         # multi-hop answer with citations
 npx gsd-graph sync            # incremental after doc changes
 npx gsd-graph status

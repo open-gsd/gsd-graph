@@ -87,6 +87,20 @@ npx gsd-graph ask "why is X blocked by Y?"
 npx gsd-graph status
 ```
 
+### Zero-install via npx
+
+Scoped packages are not found as bare `npx gsd-graph` until installed. Use:
+
+```bash
+npx -y @opengsd/gsd-graph enable
+npx -y @opengsd/gsd-graph ask "why is X blocked by Y?"
+npx -y @opengsd/gsd-graph status
+
+# explicit binary name
+npx -y -p @opengsd/gsd-graph gsd-graph enable
+npx -y -p @opengsd/gsd-graph gsd-graph-mcp
+```
+
 `enable` does:
 
 1. Installs skill to `~/.agents/skills/gsd-graph` and `~/.claude/skills/gsd-graph`  

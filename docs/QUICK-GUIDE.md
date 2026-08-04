@@ -29,13 +29,21 @@ npx gsd-graph enable
 npx gsd-graph ask "why is phase 4 blocked by phase 3?"
 ```
 
-| When | Command |
-|------|---------|
-| First time in a repo | `npx gsd-graph enable` |
-| After big doc / planning edits | `npx gsd-graph sync` |
-| Ask a relationship question | `npx gsd-graph ask "…"` |
-| Check counts / freshness | `npx gsd-graph status` |
-| Search by term | `npx gsd-graph query <term>` |
+**Zero-install** (scoped package — use the package name so npx finds the bin):
+
+```bash
+npx -y @opengsd/gsd-graph enable
+npx -y @opengsd/gsd-graph ask "why is phase 4 blocked by phase 3?"
+# same as: npx -y -p @opengsd/gsd-graph gsd-graph enable
+```
+
+| When | After `npm install` | Zero-install |
+|------|---------------------|--------------|
+| First time | `npx gsd-graph enable` | `npx -y @opengsd/gsd-graph enable` |
+| After doc edits | `npx gsd-graph sync` | `npx -y @opengsd/gsd-graph sync` |
+| Question | `npx gsd-graph ask "…"` | `npx -y @opengsd/gsd-graph ask "…"` |
+| Status | `npx gsd-graph status` | `npx -y @opengsd/gsd-graph status` |
+| Search | `npx gsd-graph query <term>` | `npx -y @opengsd/gsd-graph query <term>` |
 
 Agent skill (installed by `enable`): **`/skill:gsd-graph`**
 

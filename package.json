@@ -65,5 +65,13 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/open-gsd/gsd-graph.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "homepage": "https://github.com/open-gsd/gsd-graph#readme",
+  "bugs": {
+    "url": "https://github.com/open-gsd/gsd-graph/issues"
   }
 }
