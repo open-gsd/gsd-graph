@@ -197,7 +197,6 @@ Note: current `files` omits `bin` [VERIFIED: package.json:17-22]. Current packag
 ```js
 #!/usr/bin/env node
 // gsd-graph — npm bin entry (PKG-03)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 'use strict';
 require('../dist/cli.js');
 ```
@@ -412,7 +411,6 @@ Recommended library `init(opts: { dir?: string; ontology?: string; cwd?: string 
 ```js
 #!/usr/bin/env node
 // gsd-graph — CLI bin entry
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 'use strict';
 require('../dist/cli.js');
 ```
@@ -421,7 +419,6 @@ require('../dist/cli.js');
 
 ```ts
 // gsd-graph — CLI entry (K22 machine contract)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 import { Command } from 'commander';
 import {
   GraphError,

@@ -1,5 +1,4 @@
 // gsd-graph — load graph.v1.json as sole source of truth
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import fs from 'node:fs';
 import { GSD_GRAPH_REASON, GraphError } from '../errors';

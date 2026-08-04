@@ -1,5 +1,4 @@
 // gsd-graph — init store layout + gitignore append (CLI-03)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import fs from 'node:fs';
 import path from 'node:path';

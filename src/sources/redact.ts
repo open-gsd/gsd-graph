@@ -1,5 +1,4 @@
 // gsd-graph — secret-pattern redaction for extract labels (discretion)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Replace common secret-like tokens with `[REDACTED]` before labels/descriptions

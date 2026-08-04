@@ -1,5 +1,4 @@
 // gsd-graph — unknown type/predicate policy matrix tests (ONT-02)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';

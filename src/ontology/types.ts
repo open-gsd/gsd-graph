@@ -1,5 +1,4 @@
 // gsd-graph — ontology pack TypeScript types (mirror schema; schema is authority)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /** Unknown type/predicate policy (D-05 / ONT-02). */
 export type UnknownPolicy = 'review' | 'coerce' | 'drop';

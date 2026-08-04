@@ -1,7 +1,6 @@
 # Domain Pitfalls
 
 // gsd-graph — Domain pitfalls research for Graph Engineering systems
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 **Domain:** Graph Engineering / GraphRAG-style knowledge graphs (local-first file store)
 **Project:** `@opengsd/gsd-graph`

@@ -1,5 +1,4 @@
 // gsd-graph — typed reason codes and GraphError
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Machine-readable reason codes for CLI/library failures (DESIGN § Reason codes).

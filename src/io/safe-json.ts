@@ -1,5 +1,4 @@
 // gsd-graph — safe JSON read / atomic temp write helpers
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import fs from 'node:fs';
 

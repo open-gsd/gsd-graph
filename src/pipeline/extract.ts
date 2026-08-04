@@ -1,5 +1,4 @@
 // gsd-graph — per-file extract orchestrator by extension (EXT-01/02)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Routes a corpus file to the correct offline extractor (D-01, D-03, D-12).

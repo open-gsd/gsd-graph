@@ -1,5 +1,4 @@
 // gsd-graph — dual-write publish + loadGraphV1 tests (STORE-02/03)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

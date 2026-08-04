@@ -1,5 +1,4 @@
 // gsd-graph — dual-write ordered publish (v1 rename first)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import fs from 'node:fs';
 import { GSD_GRAPH_REASON, GraphError } from '../errors';

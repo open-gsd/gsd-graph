@@ -731,7 +731,6 @@ Step 2.6 external tools: no Postgres/Redis/Docker required.
 - Read before edit; keep changes minimal  
 - Copyright header on all new source:  
   `// gsd-graph — <purpose>`  
-  `// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>`  
 - Build and test after major changes; fix errors before commit  
 - No gsd-core runtime coupling  
 - Memtrace preferred for symbol discovery when indexed (index empty for packSubgraph this session — filesystem verified)

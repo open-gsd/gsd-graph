@@ -1,5 +1,4 @@
 // gsd-graph — offline build orchestrator under lock (D-09, EXT-03, STAT-01)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Composes discover → extract → normalize → review merge → publish.

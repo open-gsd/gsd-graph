@@ -1,5 +1,4 @@
 // gsd-graph — repair projection from graph.v1 only (REP-01, D-09, D-10)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

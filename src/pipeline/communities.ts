@@ -1,5 +1,4 @@
 // gsd-graph — pure-TS label-propagation community detection (COM-01)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Deterministic asynchronous label propagation over an undirected projection of

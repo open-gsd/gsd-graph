@@ -8,3 +8,12 @@ coverage/
 *.tsbuildinfo
 .npm/
 .nyc_output/
+
+# Accidental tsc emit next to sources
+src/**/*.js
+src/**/*.js.map
+
+# Local tool state
+.memdb/
+.memtrace/
+.planning/research/.cache/

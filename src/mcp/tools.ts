@@ -1,5 +1,4 @@
 // gsd-graph — MCP tool handlers mapping to public library APIs (MCP-01 / D-06 / D-10)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { z } from 'zod';
 import {

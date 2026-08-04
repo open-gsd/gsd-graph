@@ -1,5 +1,4 @@
 // gsd-graph — MCP stdio server create/start with default-off write gates (MCP-01 / D-06)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

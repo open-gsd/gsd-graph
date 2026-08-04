@@ -60,7 +60,6 @@ key-decisions:
 patterns-established:
   - "Public façade re-exports from src/index.ts only"
   - "Identity/dependency bans enforced in package-identity.test.ts"
-  - "Copyright header: // gsd-graph — purpose + Copyright (c) 2026 Jeremy McSpadden"
 
 requirements-completed: [PKG-01, PKG-02]
 

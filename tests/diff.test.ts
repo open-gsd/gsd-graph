@@ -1,5 +1,4 @@
 // gsd-graph — diff vs last-diff-base / named snapshot tests (DIFF-01, D-08)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

@@ -397,7 +397,6 @@ Projection shape [VERIFIED: docs/DESIGN.md:490-498]:
 
 ```typescript
 // gsd-graph — query seed_expand sketch (Phase 3)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 // Ranks: EXTRACTED=2, INFERRED=1, AMBIGUOUS=0 [VERIFIED: src/pipeline/ids.ts:7-11]
 // Budget: ceil(JSON.stringify(sub).length/4); drop worst first [VERIFIED: docs/DESIGN.md:593]
 
@@ -528,7 +527,6 @@ export function applyBudget(
 
 ```typescript
 // gsd-graph — pure invalidation (MNT-01)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /** Drop provenance entries for paths; recompute bestTier; drop empty. */
 export function invalidateProvenance(

@@ -1,5 +1,4 @@
 // gsd-graph — unknown type/predicate policy matrix (ONT-02, D-05)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import type {
   LoadedOntology,

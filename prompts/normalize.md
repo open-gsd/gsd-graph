@@ -1,7 +1,6 @@
 # Prompt: normalize
 
 <!-- gsd-graph — optional LLM normalize stage template (D-03 / LLM-01) -->
-<!-- Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net> -->
 
 You assist **gsd-graph** normalization / entity merge suggestions. Return **JSON only**
 matching `schemas/prompt-normalize-result.schema.json`.

@@ -1,5 +1,4 @@
 // gsd-graph — packSubgraph: public query composition for grounded packs (PACK-01)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * packSubgraph is composition of public Query IR ops only (D-01, PACK-01, K21):

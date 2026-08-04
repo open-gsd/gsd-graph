@@ -1,5 +1,4 @@
 // gsd-graph — status read path over graph.v1 + lock + queue (STAT-01, D-10)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Composes honest store status without treating graph.json as SoT (D-09, D-10).

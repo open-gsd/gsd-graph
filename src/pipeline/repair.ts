@@ -1,5 +1,4 @@
 // gsd-graph — repair: regenerate disposable projection from graph.v1 only (REP-01)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * repair regenerates graph.json from loadGraphV1 + projectGraph only (REP-01, D-09).

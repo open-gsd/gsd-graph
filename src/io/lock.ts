@@ -1,5 +1,4 @@
 // gsd-graph — exclusive .build.lock acquire / release / stale steal
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import fs from 'node:fs';
 import { GSD_GRAPH_REASON, GraphError } from '../errors';

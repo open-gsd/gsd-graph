@@ -1,5 +1,4 @@
 // gsd-graph — CLI adapter (commander) + K22 exit mapping
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { Command, CommanderError } from 'commander';
 import pc from 'picocolors';
@@ -20,6 +19,8 @@ import {
 } from './pipeline/communities';
 import { diff } from './pipeline/diff';
 import { init } from './pipeline/init';
+import { enable } from './pipeline/enable';
+import { projectSync } from './pipeline/project-sync';
 import { packSubgraph } from './pipeline/pack';
 import { query } from './pipeline/query';
 import { writeGraphReport } from './pipeline/report';
@@ -102,6 +103,39 @@ function buildProgram(): Command {
     })
     .option('--dir <path>', 'store directory override');
 
+  // One-shot enable — skill + hooks + config + full brownfield sync
+  program
+    .command('enable')
+    .description(
+      'One-shot setup: install skill/hooks, write config, full project graph sync',
+    )
+    .option('--no-auto-update', 'disable continuous post-commit sync flags')
+    .option('--no-report', 'skip GRAPH_REPORT.md on first sync')
+    .option('--communities', 'run communities detect after first sync')
+    .option('--skip-sync', 'install skill/hooks/config only (no corpus build)')
+    .action(
+      (
+        opts: {
+          autoUpdate?: boolean;
+          report?: boolean;
+          communities?: boolean;
+          skipSync?: boolean;
+        },
+        cmd: Command,
+      ) => {
+        const dir = globalDir(cmd);
+        const result = enable({
+          cwd: process.cwd(),
+          ...(dir !== undefined ? { dir } : {}),
+          ...(opts.autoUpdate === false ? { autoUpdate: false } : {}),
+          ...(opts.report === false ? { report: false } : {}),
+          ...(opts.communities === true ? { communities: true } : {}),
+          ...(opts.skipSync === true ? { skipSync: true } : {}),
+        });
+        writeOk(result);
+      },
+    );
+
   program
     .command('init')
     .description('Create store layout and append gitignore entry when present')
@@ -122,6 +156,49 @@ function buildProgram(): Command {
       const result = init(initOpts);
       writeOk(result);
     });
+
+  // Project sync — brownfield auto corpus + continuous incremental update
+  program
+    .command('sync')
+    .description(
+      'Init (if needed) and build project corpus (docs, README, .planning, …); incremental by default',
+    )
+    .option('--full', 'full re-extract (ignore fresh content hashes)')
+    .option(
+      '--corpus <path>',
+      'extra corpus root (repeatable)',
+      (val: string, prev: string[]) => {
+        prev.push(val);
+        return prev;
+      },
+      [] as string[],
+    )
+    .option('--communities', 'run communities detect after build')
+    .option('--report', 'write GRAPH_REPORT.md after build')
+    .action(
+      (
+        opts: {
+          full?: boolean;
+          corpus?: string[];
+          communities?: boolean;
+          report?: boolean;
+        },
+        cmd: Command,
+      ) => {
+        const dir = globalDir(cmd);
+        const result = projectSync({
+          cwd: process.cwd(),
+          ...(dir !== undefined ? { dir } : {}),
+          ...(opts.full === true ? { full: true } : {}),
+          ...(opts.corpus && opts.corpus.length > 0
+            ? { extraCorpus: opts.corpus }
+            : {}),
+          ...(opts.communities === true ? { communities: true } : {}),
+          ...(opts.report === true ? { report: true } : {}),
+        });
+        writeOk(result);
+      },
+    );
 
   // Core ops — thin adapters over library (CLI-01, D-02, D-06, D-08)
   program
@@ -439,6 +516,38 @@ function buildProgram(): Command {
       writeOk(result);
     });
 
+  const answerAction = (
+    question: string,
+    opts: {
+      budget?: number;
+      applyPromptResult?: boolean;
+      llm?: string | boolean;
+    },
+    cmd: Command,
+  ) => {
+    const flagMode = parseLlmFlag(opts.llm);
+    const mode = resolveLlmMode(flagMode === undefined ? {} : { flagMode });
+    const result = answer(
+      withDir(
+        {
+          question,
+          ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
+          ...(opts.applyPromptResult === true
+            ? {
+                applyPromptResult: true,
+                promptResult: readPromptResult(
+                  withDir({ stage: 'answer' as const }, globalDir(cmd)),
+                ),
+              }
+            : {}),
+          ...(mode !== 'none' ? { llmMode: mode } : {}),
+        },
+        globalDir(cmd),
+      ),
+    );
+    writeOk(result);
+  };
+
   program
     .command('answer')
     .description('Deterministic grounded answer with triple citations')
@@ -452,41 +561,23 @@ function buildProgram(): Command {
       '--llm [mode]',
       'optional LLM mode: omit/true→prompt, or prompt|http (D-01)',
     )
-    .action(
-      (
-        question: string,
-        opts: {
-          budget?: number;
-          applyPromptResult?: boolean;
-          llm?: string | boolean;
-        },
-        cmd: Command,
-      ) => {
-        const flagMode = parseLlmFlag(opts.llm);
-        const mode = resolveLlmMode(
-          flagMode === undefined ? {} : { flagMode },
-        );
-        const result = answer(
-          withDir(
-            {
-              question,
-              ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
-              ...(opts.applyPromptResult === true
-                ? {
-                    applyPromptResult: true,
-                    promptResult: readPromptResult(
-                      withDir({ stage: 'answer' as const }, globalDir(cmd)),
-                    ),
-                  }
-                : {}),
-              ...(mode !== 'none' ? { llmMode: mode } : {}),
-            },
-            globalDir(cmd),
-          ),
-        );
-        writeOk(result);
-      },
-    );
+    .action(answerAction);
+
+  // Friendlier alias for answer
+  program
+    .command('ask')
+    .description('Alias for answer — grounded multi-hop Q&A with citations')
+    .argument('<question>', 'question text')
+    .option('--budget <n>', 'token budget', parseIntOpt)
+    .option(
+      '--apply-prompt-result',
+      'apply store .prompt-answer-result.json (Ajv + citation gate)',
+    )
+    .option(
+      '--llm [mode]',
+      'optional LLM mode: omit/true→prompt, or prompt|http (D-01)',
+    )
+    .action(answerAction);
 
   // Optional LLM prompt apply (LLM-01 / D-02 / D-03)
   const promptCmd = program

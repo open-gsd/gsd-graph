@@ -1,5 +1,4 @@
 // gsd-graph — ontology pack load + replace-only composition tests
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

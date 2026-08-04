@@ -1,5 +1,4 @@
 // gsd-graph — store path resolve + realpath confinement tests (STORE-01/05)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

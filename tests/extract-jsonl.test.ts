@@ -1,5 +1,4 @@
 // gsd-graph — JSON/JSONL field-map extract tests (EXT-02 / D-03)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

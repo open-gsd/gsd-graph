@@ -1,5 +1,4 @@
 // gsd-graph — offline build orchestrator integration tests (D-09, EXT-03)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,5 +1,4 @@
 // gsd-graph — review queue load/save + accept/reject resolve (REV-01, D-08)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import fs from 'node:fs';
 import { GSD_GRAPH_REASON, GraphError } from '../errors';

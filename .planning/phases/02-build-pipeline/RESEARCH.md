@@ -871,7 +871,6 @@ Step 2.6: external tools OK for this phase (pure library + existing test stack).
 
 ```ts
 // gsd-graph — <purpose>
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 ```
 
 [VERIFIED: existing src headers, e.g. src/index.ts:1-2]

@@ -1,5 +1,4 @@
 // gsd-graph — resolveLlmMode matrix + prompt file confinement (LLM-01 / D-01 / D-04)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,5 +1,4 @@
 // gsd-graph — deterministic Markdown extract tests (EXT-01 / D-01)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,5 +1,4 @@
 // gsd-graph — public library façade
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 export { GSD_GRAPH_REASON, GraphError } from './errors';
 export type { GraphReasonCode } from './errors';
@@ -52,6 +51,8 @@ export type {
   RepairResult,
   InitOptions,
   InitResult,
+  ProjectSyncOptions,
+  ProjectSyncResult,
   Community,
   DetectCommunitiesOptions,
   DetectCommunitiesResult,
@@ -168,6 +169,26 @@ export type { ReviewResolveOptions } from './pipeline/review';
 // Build orchestrator + status (02-04)
 export { build, assertGraphCaps, MAX_NODES, MAX_TRIPLES } from './pipeline/build';
 export { status } from './pipeline/status';
+
+// Project sync — brownfield + continuous update
+export {
+  projectSync,
+  resolveProjectCorpus,
+  readPlanningGraphConfig,
+  readGraphProjectConfig,
+  DEFAULT_PROJECT_CORPUS_DIRS,
+  DEFAULT_PROJECT_CORPUS_FILES,
+} from './pipeline/project-sync';
+export type { GraphProjectConfig } from './pipeline/project-sync';
+
+// One-shot enable
+export {
+  enable,
+  installSkill,
+  installHooks,
+  writeEnableConfig,
+  resolvePackageRoot,
+} from './pipeline/enable';
 
 // Maintain invalidation (03-02 / MNT-01)
 export {

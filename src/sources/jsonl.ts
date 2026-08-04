@@ -1,5 +1,4 @@
 // gsd-graph — JSON/JSONL structured field-map extract (EXT-02)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * JSONL / JSON field map (preferred multi-hop fixtures, D-03 / EXT-02):

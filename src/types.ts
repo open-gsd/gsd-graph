@@ -1,5 +1,4 @@
 // gsd-graph — shared public types mirroring graph.v1 schema (schema is authority)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * TypeScript mirrors of schemas/graph-v1.schema.json.
@@ -402,6 +401,72 @@ export interface InitResult {
   created: boolean;
   gitignore_appended: boolean;
   ontology: string;
+}
+
+// --- Project sync (brownfield + continuous update) ---
+
+/** Options for projectSync() — init + build project corpus roots. */
+export interface ProjectSyncOptions {
+  /** Working directory (default process.cwd()). */
+  cwd?: string;
+  /** Store directory override. */
+  dir?: string;
+  /** Force full re-extract (default false = incremental). */
+  full?: boolean;
+  /** Explicit corpus roots; when omitted uses auto brownfield resolve. */
+  corpus?: string[];
+  /** Extra roots merged into auto resolve. */
+  extraCorpus?: string[];
+  /** Run communities detect after build (default: config gsd_graph.communities_on_sync). */
+  communities?: boolean;
+  /** Write GRAPH_REPORT after build (default: config gsd_graph.report_on_sync). */
+  report?: boolean;
+}
+
+/** Result of projectSync() — JSON-serializable for CLI/hooks. */
+export interface ProjectSyncResult {
+  store_dir: string;
+  corpus: string[];
+  init: InitResult;
+  build: BuildResult;
+  communities_written: boolean;
+  report_written: boolean;
+  full: boolean;
+}
+
+// --- Enable (one-shot install + full brownfield sync) ---
+
+/** Options for enable() — skill, hooks, config, full sync. */
+export interface EnableOptions {
+  cwd?: string;
+  dir?: string;
+  /** Default true — write auto_update flags. */
+  autoUpdate?: boolean;
+  /** Default true — write GRAPH_REPORT on first sync. */
+  report?: boolean;
+  /** Default false — also run communities detect. */
+  communities?: boolean;
+  /** Skip corpus sync (install-only). */
+  skipSync?: boolean;
+  /** Override package root (skills/hooks source); auto-detected when omitted. */
+  packageRoot?: string;
+}
+
+/** Result of enable() — JSON-serializable for CLI. */
+export interface EnableResult {
+  store_dir: string;
+  skills_installed: string[];
+  hooks_dir: string;
+  store_config: string;
+  planning_config: string | null;
+  auto_update: boolean;
+  sync: ProjectSyncResult | null;
+  next: {
+    ask: string;
+    sync: string;
+    status: string;
+    hook: string;
+  };
 }
 
 // --- Pack / grounded answer (PACK-01 / D-01 / D-02) ---

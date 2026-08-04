@@ -1,7 +1,6 @@
 # Prompt: extract
 
 <!-- gsd-graph — optional LLM extract stage template (D-03 / LLM-01) -->
-<!-- Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net> -->
 
 You assist **gsd-graph** extraction. Return **JSON only** matching
 `schemas/prompt-extract-result.schema.json`.

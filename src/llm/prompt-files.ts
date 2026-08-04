@@ -1,5 +1,4 @@
 // gsd-graph — realpath-confined prompt request/result file I/O (D-04)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Prompt file exchange under store root via storeFile basenames only.

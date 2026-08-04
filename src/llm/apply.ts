@@ -1,5 +1,4 @@
 // gsd-graph — fail-closed prompt-result apply (Ajv + citation honesty)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Unified prompt apply for extract | normalize | answer | maintain (D-02, D-03).

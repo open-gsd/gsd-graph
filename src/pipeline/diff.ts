@@ -1,5 +1,4 @@
 // gsd-graph — diff current graph.v1 vs snapshot / last-diff-base by id (DIFF-01)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Diff current graph.v1 against a baseline (DIFF-01, D-08, D-04, K25).

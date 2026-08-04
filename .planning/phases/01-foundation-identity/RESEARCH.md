@@ -320,7 +320,6 @@ gsd-graph/
 
 ```ts
 // gsd-graph — <file purpose>
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 ```
 
 ## Code Examples
@@ -385,7 +384,6 @@ gsd-graph/
 
 ```ts
 // gsd-graph — ontology pack load API sketch
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 // Source shape: docs/DESIGN.md ontology model [VERIFIED: docs/DESIGN.md:337-363]
 
 export type UnknownPolicy = 'review' | 'coerce' | 'drop';
@@ -451,7 +449,6 @@ Quote (policy defaults):
 
 ```ts
 // gsd-graph — lock + dual-write sketches
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 // Protocol: docs/DESIGN.md [VERIFIED: docs/DESIGN.md:302-327]
 // Pattern precedent: gsd-core openSync wx + tmp-${pid}-N rename [CITED]
 
@@ -657,7 +654,6 @@ export const validateOntologyPack = ajv.compile(ontologyPackSchema);
 
 ```ts
 // gsd-graph — path confinement
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import fs from 'node:fs';
 import path from 'node:path';

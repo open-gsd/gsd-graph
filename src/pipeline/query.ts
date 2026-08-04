@@ -1,5 +1,4 @@
 // gsd-graph — pure-TS Query IR (path, seed_expand, neighborhood, filter, budget)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Dispatch order (exclusive):

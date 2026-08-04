@@ -1,5 +1,4 @@
 // gsd-graph — HTTP LLM client mock fetch + answerHttp gates (LLM-01 / D-05 / D-12)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

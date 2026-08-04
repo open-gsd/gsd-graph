@@ -1,5 +1,4 @@
 // gsd-graph — deterministic Markdown/text extract (EXT-01)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * OQ-1 MD edge grammar (locked):

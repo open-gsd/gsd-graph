@@ -1,5 +1,4 @@
 // gsd-graph — snapshot save/list/restore tests (SNAP-01, D-07, D-10)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,5 +1,4 @@
 // gsd-graph — Ajv compile-once validators for graph.v1, ontology packs, review-queue
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

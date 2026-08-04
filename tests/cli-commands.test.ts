@@ -1,5 +1,4 @@
 // gsd-graph — CLI command surface smoke tests (CLI-01, D-02, D-06)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

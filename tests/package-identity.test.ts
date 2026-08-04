@@ -1,5 +1,4 @@
 // gsd-graph — package identity and standalone dependency gates
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

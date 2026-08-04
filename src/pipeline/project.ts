@@ -1,5 +1,4 @@
 // gsd-graph — disposable graph.json projection from graph.v1 (REP-01 prep, D-09)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * projectGraph maps graph.v1 triples → edges only. Never invents triples.

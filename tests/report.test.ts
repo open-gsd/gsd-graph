@@ -1,5 +1,4 @@
 // gsd-graph — writeGraphReport from published graph.v1 only (RPT-01, D-08, D-10)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

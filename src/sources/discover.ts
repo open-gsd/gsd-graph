@@ -1,5 +1,4 @@
 // gsd-graph — corpus discovery with realpath confinement (EXT-03)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -73,6 +72,21 @@ export function discoverSources(
     }
 
     const st = fs.statSync(rootReal);
+    // Allow single-file corpus roots (README.md, AGENTS.md) for project sync.
+    if (st.isFile()) {
+      if (extensionFilter(rootReal)) {
+        if (st.size > maxBytes) {
+          diagnostics.push({
+            path: rootReal,
+            code: 'FILE_TOO_LARGE',
+            message: `file exceeds maxBytes (${maxBytes}): ${rootReal}`,
+          });
+        } else {
+          files.push(rootReal);
+        }
+      }
+      continue;
+    }
     if (!st.isDirectory()) {
       throw new GraphError(
         GSD_GRAPH_REASON.CORPUS_NOT_FOUND,

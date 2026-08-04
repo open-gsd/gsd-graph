@@ -1,5 +1,4 @@
 // gsd-graph — deterministic answer() over packSubgraph (ANS-01 / ANS-02)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Pure formatter over packSubgraph (D-03, D-04, D-05, D-10, D-11, D-12).

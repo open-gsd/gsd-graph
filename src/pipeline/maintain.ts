@@ -1,5 +1,4 @@
 // gsd-graph — pure multiset provenance invalidation + maintain alias (MNT-01)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * M1–M5 multiset provenance invalidation (D-05, D-06).

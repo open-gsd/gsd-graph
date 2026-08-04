@@ -1,5 +1,4 @@
 // gsd-graph — offline golden scenarios G0/G1/G2 (GOLD-01, GOLD-02, GOLD-03)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

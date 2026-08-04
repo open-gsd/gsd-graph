@@ -1,5 +1,4 @@
 // gsd-graph — process-spawn CLI E2E (happy path + exit matrix, D-12, CLI-02)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

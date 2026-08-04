@@ -65,5 +65,13 @@
   },
   "resolve_model_ids": "omit",
   "mode": "yolo",
-  "granularity": "standard"
+  "granularity": "standard",
+  "gsd_graph": {
+    "enabled": true,
+    "auto_update": true,
+    "store_dir": ".gsd-graph",
+    "report_on_sync": true,
+    "full_on_enable": true,
+    "communities_on_sync": false
+  }
 }

@@ -1,5 +1,4 @@
 // gsd-graph — normalize multiset provenance + exact merge + policy tests (NORM-01/02)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';

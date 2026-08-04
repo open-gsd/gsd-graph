@@ -1,5 +1,4 @@
 // gsd-graph — minimal GRAPH_REPORT.md writer from published graph.v1 (RPT-01, D-08)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Disposable human/agent summary of the published graph.

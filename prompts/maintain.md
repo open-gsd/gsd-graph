@@ -1,7 +1,6 @@
 # Prompt: maintain
 
 <!-- gsd-graph — optional LLM maintain suggestions template (D-03 / LLM-01) -->
-<!-- Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net> -->
 
 You suggest maintenance actions for a **gsd-graph** store. Return **JSON only** matching
 `schemas/prompt-maintain-result.schema.json`.

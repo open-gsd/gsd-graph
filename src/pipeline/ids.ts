@@ -1,5 +1,4 @@
 // gsd-graph — stable id helpers (slug, node, triple, review)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { createHash } from 'node:crypto';
 import type { Confidence, ProvenanceEntry } from '../types';

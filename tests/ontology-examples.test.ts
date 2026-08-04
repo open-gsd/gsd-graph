@@ -1,5 +1,4 @@
 // gsd-graph — example research + engineering ontology pack load tests (ONT-04)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

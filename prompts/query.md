@@ -1,7 +1,6 @@
 # Prompt: query (reserved)
 
 <!-- gsd-graph — reserved NL→Query IR template; NOT applied in v0.1 (D-03) -->
-<!-- Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net> -->
 
 ## Status
 

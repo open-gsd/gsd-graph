@@ -1,5 +1,4 @@
 // gsd-graph — normalize: multiset provenance, best_tier, exact merge, policy gate
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { applyUnknownPolicy } from '../ontology/policy';
 import type { LoadedOntology } from '../ontology/types';

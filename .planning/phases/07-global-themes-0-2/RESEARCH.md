@@ -601,7 +601,6 @@ Step 2.6 note: Phase is code/algorithm + file IO only; no external services.
 No project-root `CLAUDE.md` found in gsd-graph. Apply org working rules from user context:
 
 - Copyright header on all new source:  
-  `// gsd-graph — <purpose>` + `// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>` (D-09)  
 - Prefer simple, minimal changes; read before edit  
 - Tests via existing `npm test` pipeline  
 - No gsd-core runtime dependency (already enforced)

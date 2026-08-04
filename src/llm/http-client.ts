@@ -1,5 +1,4 @@
 // gsd-graph — OpenAI-compatible chat completions via injectable fetch (D-05)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Thin HTTP LLM client — no openai SDK. Only used when resolveLlmMode is http.

@@ -1,5 +1,4 @@
 // gsd-graph — review queue schema + stable rv_ + accept/reject tests (REV-01)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

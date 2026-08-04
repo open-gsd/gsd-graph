@@ -1,5 +1,4 @@
 // gsd-graph — LLM mode resolution (none | prompt | http); never ambient (D-01)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Central resolveLlmMode: explicit flag wins; config only when flag absent; else none.

@@ -1,5 +1,4 @@
 // gsd-graph — community detection tests (COM-01, D-01..D-05, D-08, D-10)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -240,13 +239,13 @@ describe('detectCommunities two-clique (COM-01 tracer)', () => {
     }
   });
 
-  it('includes copyright header on communities.ts source', () => {
+  it('includes purpose header on communities.ts source', () => {
     const src = fs.readFileSync(
       path.join(root, 'src', 'pipeline', 'communities.ts'),
       'utf8',
     );
-    assert.match(src, /Copyright \(c\) 2026 Jeremy McSpadden/);
     assert.match(src, /gsd-graph/);
+    assert.doesNotMatch(src, /Copyright \(c\) 2026 Jeremy McSpadden/);
   });
 });
 

@@ -4,12 +4,12 @@
 |-------|-------|
 | **Document** | System design for `@opengsd/gsd-graph` |
 | **Author** | Jeremy McSpadden \<jeremy@fluxlabs.net\> (OpenGSD org namespace) |
-| **Copyright** | Copyright (c) 2026 Jeremy McSpadden \<jeremy@fluxlabs.net\>. Design for `open-gsd/gsd-graph`. |
 | **Status** | Draft — standalone product pivot (review pass applied) |
 | **Date** | 2026-08-02 |
 | **Repo** | `/Users/jeremy/github/open-gsd/gsd-graph` (greenfield) |
 | **Conceptual base** | Graph Engineering (GraphRAG-style pipelines: extract → normalize → query → ground → maintain) |
 | **Audience** | Engineers implementing a general-purpose Graph Engineering toolkit |
+| **User docs** | [QUICK-GUIDE.md](./QUICK-GUIDE.md) · [FULL-GUIDE.md](./FULL-GUIDE.md) · [../README.md](../README.md) |
 
 ---
 
@@ -258,11 +258,10 @@ gsd-graph/
     └── DESIGN.md              # this document
 ```
 
-**Copyright header** on every source file:
+**Purpose header** on every source file:
 
 ```ts
 // gsd-graph — <file purpose>
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 ```
 
 ### Storage layout (file-first)
@@ -1091,7 +1090,7 @@ All PRs are **this repo only**. Sizes: **S** small, **M** medium, **L** large.
 - **Title:** `chore: bootstrap @opengsd/gsd-graph package`
 - **Files:** package.json, tsconfigs, LICENSE, README, src/index.ts, CI  
 - **Deps:** none  
-- **Description:** Package metadata, build, copyright headers, Node ≥22.
+- **Description:** Package metadata, build, purpose headers, Node ≥22.
 
 ### PR-02 — Schemas & ontology pack loader — **M**
 

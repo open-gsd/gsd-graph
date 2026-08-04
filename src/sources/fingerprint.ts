@@ -1,5 +1,4 @@
 // gsd-graph — sha256 source content fingerprints (EXT-03)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';

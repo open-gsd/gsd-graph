@@ -1,5 +1,4 @@
 // gsd-graph — snapshot save/list/restore of full graph.v1 under store/snapshots (SNAP-01)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Snapshot lifecycle for graph.v1 (SNAP-01, D-07, D-10, D-12).

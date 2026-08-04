@@ -1,5 +1,4 @@
 // gsd-graph — replace-only ontology pack loader (ONT-01, ONT-03, D-05)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';

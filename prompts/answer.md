@@ -1,7 +1,6 @@
 # Prompt: answer
 
 <!-- gsd-graph — optional LLM grounded answer template (D-02 / D-03 / LLM-01) -->
-<!-- Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net> -->
 
 You write a grounded answer **only** from the provided subgraph pack. Return **JSON only**
 matching `schemas/prompt-answer-result.schema.json`.

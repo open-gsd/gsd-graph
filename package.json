@@ -23,18 +23,24 @@
     "schemas",
     "prompts",
     "ontology-packs",
+    "skills",
+    "hooks",
+    "scripts",
+    "docs",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
-  "engines": {
-    "node": ">=22.0.0",
-    "npm": ">=10.0.0"
-  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "build:test": "tsc -p tsconfig.test.json",
     "test": "npm run build && npm run build:test && node --test dist-test/**/*.test.js",
-    "test:coverage": "npm run build && npm run build:test && c8 --check-coverage --lines 80 node --test dist-test/**/*.test.js"
+    "test:coverage": "npm run build && npm run build:test && c8 --check-coverage --lines 80 node --test dist-test/**/*.test.js",
+    "install-gsd": "node scripts/install-gsd-integration.js"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

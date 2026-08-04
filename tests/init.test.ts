@@ -1,5 +1,4 @@
 // gsd-graph — init library + CLI K22 exit mapping tests (CLI-02/03, PKG-03)
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
