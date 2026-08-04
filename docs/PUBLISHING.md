@@ -38,7 +38,7 @@ Official reference: [npm Trusted Publishing](https://docs.npmjs.com/trusted-publ
 The workflow has two entry points:
 
 - `workflow_dispatch`: installs, tests, and runs `npm pack --dry-run`; it never
-  publishes. Use this before every release.
+  publishes and has no OIDC permission. Use this before every release.
 - GitHub Release `published`: repeats validation and publishes to npm.
 
 Release safety gates:
@@ -50,7 +50,8 @@ Release safety gates:
 - `npm pack --dry-run` must succeed before publication.
 - Stable releases publish under npm dist-tag `latest`.
 - GitHub prereleases publish under npm dist-tag `next`.
-- Concurrent runs for the same Git ref do not cancel or overlap publication.
+- Package-wide concurrency prevents different releases from publishing at the
+  same time.
 
 The npm registry is immutable by package name and version. Rerunning a workflow
 after a successful publish will fail rather than overwrite the release.

@@ -8,15 +8,14 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
-  group: npm-publish-${{ github.ref }}
+  group: npm-publish
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: validate and publish
+  validate:
+    name: validate package
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -40,8 +39,10 @@ jobs:
         run: |
           NPM_VERSION="$(npm --version)"
           node -e '
-            const [major, minor] = process.argv[1].split(".").map(Number);
-            if (major < 11 || (major === 11 && minor < 5)) {
+            const [major, minor, patch] = process.argv[1].split(".").map(Number);
+            const supported = major > 11 ||
+              (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+            if (!supported) {
               throw new Error(`npm ${process.argv[1]} is too old; trusted publishing requires npm >=11.5.1`);
             }
           ' "$NPM_VERSION"
@@ -67,9 +68,31 @@ jobs:
       - name: Inspect package contents
         run: npm pack --dry-run
 
+  publish:
+    name: publish package
+    if: github.event_name == 'release'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+
       - name: Select npm dist-tag
         id: dist-tag
-        if: github.event_name == 'release'
         env:
           IS_PRERELEASE: ${{ github.event.release.prerelease }}
         shell: bash
@@ -81,5 +104,4 @@ jobs:
           fi
 
       - name: Publish to npm
-        if: github.event_name == 'release'
         run: npm publish --access public --tag "${{ steps.dist-tag.outputs.name }}"

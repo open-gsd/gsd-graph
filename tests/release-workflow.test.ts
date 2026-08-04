@@ -24,10 +24,18 @@ describe('npm publish workflow', () => {
     assert.match(workflow, /release:\s*\n\s*types:\s*\[published\]/);
     assert.match(workflow, /workflow_dispatch:/);
     assert.match(workflow, /contents:\s*read/);
-    assert.match(workflow, /id-token:\s*write/);
     assert.doesNotMatch(workflow, /NPM_TOKEN|NODE_AUTH_TOKEN/);
-    assert.match(workflow, /if:\s*github\.event_name == 'release'/);
     assert.match(workflow, /npm publish --access public --tag/);
+
+    const validateStart = workflow.indexOf('  validate:');
+    const publishStart = workflow.indexOf('  publish:');
+    assert.ok(validateStart >= 0 && publishStart > validateStart);
+    const validateJob = workflow.slice(validateStart, publishStart);
+    const publishJob = workflow.slice(publishStart);
+    assert.doesNotMatch(validateJob, /id-token:\s*write/);
+    assert.match(publishJob, /if:\s*github\.event_name == 'release'/);
+    assert.match(publishJob, /id-token:\s*write/);
+    assert.match(publishJob, /needs:\s*validate/);
   });
 
   it('validates, tests, and packs the exact release before publishing', () => {
@@ -42,17 +50,21 @@ describe('npm publish workflow', () => {
     assert.match(workflow, /npm pack --dry-run/);
     assert.match(workflow, /RELEASE_TAG/);
     assert.match(workflow, /v\$\{PACKAGE_VERSION\}/);
+    assert.match(workflow, /patch >= 1/);
     assert.match(workflow, /IS_PRERELEASE/);
     assert.match(workflow, /name=next/);
     assert.match(workflow, /name=latest/);
+    assert.match(workflow, /group:\s*npm-publish\s*$/m);
   });
 
-  it('keeps CI actions current and package metadata pack-safe', () => {
+  it('keeps CI actions current', () => {
     const ci = read('.github/workflows/ci.yml');
     assert.match(ci, /actions\/checkout@v7/);
     assert.match(ci, /actions\/setup-node@v7/);
     assert.match(ci, /permissions:\s*\n\s*contents:\s*read/);
+  });
 
+  it('keeps package metadata pack-safe', () => {
     const pkg = readJson('package.json');
     const scripts = pkg.scripts as Record<string, string> | undefined;
     assert.equal(scripts?.prepack, 'npm run build');
