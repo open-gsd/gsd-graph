@@ -41,9 +41,9 @@ describe('package identity (PKG-01, PKG-02)', () => {
     assert.match(nodeEngine as string, />=\s*22/);
   });
 
-  it('package version is 0.2.0 (global themes milestone, D-07)', () => {
+  it('package version is 0.2.1 (enable/docs release)', () => {
     const pkg = readPackageJson();
-    assert.equal(pkg.version, '0.2.0');
+    assert.equal(pkg.version, '0.2.1');
   });
 
   it('description positions Graph Engineering toolkit', () => {
@@ -144,11 +144,11 @@ describe('package identity (PKG-01, PKG-02)', () => {
 });
 
 describe('package identity bin (PKG-03, D-01, D-09)', () => {
-  it('publishes bin gsd-graph → ./bin/gsd-graph.js and files includes bin', () => {
+  it('publishes bin gsd-graph → bin/gsd-graph.js and files includes bin', () => {
     const pkg = readPackageJson();
     const bin = pkg.bin as Record<string, string> | undefined;
     assert.ok(bin, 'bin field required');
-    assert.equal(bin['gsd-graph'], './bin/gsd-graph.js');
+    assert.equal(bin['gsd-graph'], 'bin/gsd-graph.js');
 
     const files = pkg.files as string[] | undefined;
     assert.ok(Array.isArray(files), 'files array required');
@@ -206,11 +206,11 @@ describe('package identity bin (PKG-03, D-01, D-09)', () => {
 });
 
 describe('package identity MCP bin (MCP-01, D-07)', () => {
-  it('publishes bin gsd-graph-mcp → ./bin/gsd-graph-mcp.js', () => {
+  it('publishes bin gsd-graph-mcp → bin/gsd-graph-mcp.js', () => {
     const pkg = readPackageJson();
     const bin = pkg.bin as Record<string, string> | undefined;
     assert.ok(bin, 'bin field required');
-    assert.equal(bin['gsd-graph-mcp'], './bin/gsd-graph-mcp.js');
+    assert.equal(bin['gsd-graph-mcp'], 'bin/gsd-graph-mcp.js');
   });
 
   it('bin/gsd-graph-mcp.js has node shebang and invokes MCP main', () => {
