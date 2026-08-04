@@ -5,6 +5,7 @@ Complete guide to installing, updating, querying, and operating **@opengsd/gsd-g
 | Doc | Purpose |
 |-----|---------|
 | [QUICK-GUIDE.md](./QUICK-GUIDE.md) | 3-command start |
+| [DAY-IN-THE-LIFE.md](./DAY-IN-THE-LIFE.md) | Agent workflow: ask vs query vs Memtrace |
 | **This guide** | Full reference |
 | [DESIGN.md](./DESIGN.md) | Architecture, contracts, decisions |
 | [../README.md](../README.md) | Package landing |

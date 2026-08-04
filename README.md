@@ -71,6 +71,7 @@ Agent skill (installed by `enable`): **`/skill:gsd-graph`**
 | Guide | Audience |
 |-------|----------|
 | **[Quick Guide](./docs/QUICK-GUIDE.md)** | Install, 3 commands, continuous update, AI in 5 minutes |
+| **[Day in the life](./docs/DAY-IN-THE-LIFE.md)** | Agent workflow: enable → hooks → ask vs query vs Memtrace |
 | **[Full Guide](./docs/FULL-GUIDE.md)** | Corpus, maintain, MCP, ontology, LLM, CLI reference, troubleshooting |
 | **[Design](./docs/DESIGN.md)** | Architecture, store contracts, pipeline decisions |
 | **[Changelog](./CHANGELOG.md)** | Release history |

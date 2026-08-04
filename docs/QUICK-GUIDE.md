@@ -1,6 +1,6 @@
 # gsd-graph — Quick Guide
 
-Get a local knowledge graph running in minutes. For depth (MCP, ontology, maintain, LLM), see [FULL-GUIDE.md](./FULL-GUIDE.md).
+Get a local knowledge graph running in minutes. For depth (MCP, ontology, maintain, LLM), see [FULL-GUIDE.md](./FULL-GUIDE.md). For day-to-day agent use (when to `ask` vs `query` vs a code graph like Memtrace), see [DAY-IN-THE-LIFE.md](./DAY-IN-THE-LIFE.md).
 
 ---
 
