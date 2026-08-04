@@ -34,6 +34,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "build:test": "tsc -p tsconfig.test.json",
+    "prepack": "npm run build",
     "test": "npm run build && npm run build:test && node --test dist-test/**/*.test.js",
     "test:coverage": "npm run build && npm run build:test && c8 --check-coverage --lines 80 node --test dist-test/**/*.test.js",
     "install-gsd": "node scripts/install-gsd-integration.js"

@@ -1,0 +1,85 @@
+# gsd-graph — validate and publish GitHub Releases to npm with OIDC
+name: publish npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: validate and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Show toolchain
+        run: |
+          node --version
+          npm --version
+
+      - name: Verify npm supports trusted publishing
+        shell: bash
+        run: |
+          NPM_VERSION="$(npm --version)"
+          node -e '
+            const [major, minor] = process.argv[1].split(".").map(Number);
+            if (major < 11 || (major === 11 && minor < 5)) {
+              throw new Error(`npm ${process.argv[1]} is too old; trusted publishing requires npm >=11.5.1`);
+            }
+          ' "$NPM_VERSION"
+
+      - name: Verify release tag matches package version
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$RELEASE_TAG" != "v${PACKAGE_VERSION}" ]]; then
+            echo "Release tag $RELEASE_TAG must equal v${PACKAGE_VERSION}" >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test package
+        run: npm test
+
+      - name: Inspect package contents
+        run: npm pack --dry-run
+
+      - name: Select npm dist-tag
+        id: dist-tag
+        if: github.event_name == 'release'
+        env:
+          IS_PRERELEASE: ${{ github.event.release.prerelease }}
+        shell: bash
+        run: |
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            echo "name=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        if: github.event_name == 'release'
+        run: npm publish --access public --tag "${{ steps.dist-tag.outputs.name }}"
