@@ -103,6 +103,14 @@ export type { PublishPlan } from './io/atomic-publish';
 
 export { loadGraphV1 } from './io/load-graph';
 
+export {
+  CURRENT_GRAPH_SCHEMA_VERSION,
+  registerGraphMigration,
+  listGraphMigrations,
+  migrateGraphDocument,
+} from './io/migrations';
+export type { GraphMigration, MigrateGraphResult } from './io/migrations';
+
 export { acquireBuildLock, STALE_MS } from './io/lock';
 export type {
   BuildLockOwner,

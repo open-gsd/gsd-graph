@@ -212,7 +212,7 @@ describe('writeGraphReport (RPT-01, D-08, D-10)', () => {
     assert.deepEqual(lines, ['- about: 3', '- related_to: 2']);
   });
 
-  it('throws SCHEMA_INVALID when graph.v1 is missing (never uses projection)', () => {
+  it('throws STORE_NOT_FOUND when graph.v1 is missing (never uses projection)', () => {
     const store = mod.ensureStoreRoot(tempDir('gsd-report-empty-'));
     fs.writeFileSync(
       path.join(store, 'graph.json'),
@@ -225,7 +225,7 @@ describe('writeGraphReport (RPT-01, D-08, D-10)', () => {
         assert.ok(err instanceof mod.GraphError);
         assert.equal(
           (err as { reason: string }).reason,
-          mod.GSD_GRAPH_REASON.SCHEMA_INVALID,
+          mod.GSD_GRAPH_REASON.STORE_NOT_FOUND,
         );
         return true;
       },
@@ -342,7 +342,7 @@ describe('CLI report + write_on_build (RPT-01)', () => {
       message: string;
     };
     assert.equal(err.ok, false);
-    assert.equal(err.reason, mod.GSD_GRAPH_REASON.SCHEMA_INVALID);
+    assert.equal(err.reason, mod.GSD_GRAPH_REASON.STORE_NOT_FOUND);
   });
 
   it('build does not write report when write_on_build is default false', () => {

@@ -153,7 +153,7 @@ describe('publishGraphFiles + loadGraphV1 (STORE-02/03)', () => {
     assert.equal(proj.nodes.length, 1);
   });
 
-  it('loadGraphV1 fails SCHEMA_INVALID when only projection exists (D-04)', () => {
+  it('loadGraphV1 fails STORE_NOT_FOUND when only projection exists (D-04)', () => {
     const store = trackStore();
     fs.writeFileSync(
       path.join(store, 'graph.json'),
@@ -168,7 +168,7 @@ describe('publishGraphFiles + loadGraphV1 (STORE-02/03)', () => {
         assert.ok(err instanceof mod.GraphError);
         assert.equal(
           (err as InstanceType<typeof mod.GraphError>).reason,
-          mod.GSD_GRAPH_REASON.SCHEMA_INVALID,
+          mod.GSD_GRAPH_REASON.STORE_NOT_FOUND,
         );
         return true;
       },

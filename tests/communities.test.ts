@@ -474,7 +474,7 @@ describe('detectCommunities store I/O (07-02 / D-04, D-08, COM-01)', () => {
     assert.ok(!('communities' in after) || after.communities === undefined);
   });
 
-  it('missing graph.v1 yields SCHEMA_INVALID (D-08)', () => {
+  it('missing graph.v1 yields STORE_NOT_FOUND (D-08)', () => {
     const store = mod.ensureStoreRoot(tempDir('gsd-communities-miss-'));
     assert.throws(
       () => mod.detectCommunities({ dir: store }),
@@ -482,7 +482,7 @@ describe('detectCommunities store I/O (07-02 / D-04, D-08, COM-01)', () => {
         assert.ok(err instanceof mod.GraphError);
         assert.equal(
           (err as Error & { reason: string }).reason,
-          mod.GSD_GRAPH_REASON.SCHEMA_INVALID,
+          mod.GSD_GRAPH_REASON.STORE_NOT_FOUND,
         );
         return true;
       },

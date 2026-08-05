@@ -6,6 +6,7 @@
  */
 export const GSD_GRAPH_REASON = Object.freeze({
   OK: 'ok',
+  STORE_NOT_FOUND: 'store_not_found',
   BUILD_LOCKED: 'build_locked',
   BUILD_FAILED: 'build_failed',
   SCHEMA_INVALID: 'schema_invalid',

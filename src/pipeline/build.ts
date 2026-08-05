@@ -91,6 +91,26 @@ export function assertGraphCaps(
   }
 }
 
+/**
+ * Current git HEAD commit for build provenance (built_at_commit).
+ * Null outside a git work tree or when git is unavailable — never fails a build.
+ */
+export function readGitHeadCommit(cwd?: string): string | null {
+  try {
+    const { execFileSync } = require('node:child_process') as
+      typeof import('node:child_process');
+    const out = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: cwd ?? process.cwd(),
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 2000,
+      encoding: 'utf8',
+    }).trim();
+    return /^[0-9a-fA-F]{4,40}$/.test(out) ? out : null;
+  } catch {
+    return null;
+  }
+}
+
 function readEngineVersion(): string {
   try {
     const pkgPath = path.join(getPackageRoot(), 'package.json');
@@ -364,6 +384,7 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
     ontology_pack_id: ontology.pack.id,
     ontology_version: ontology.pack.version,
     built_at,
+    built_at_commit: readGitHeadCommit(),
     nodes: normalized.nodes,
     triples: normalized.triples,
     stats: {
@@ -572,6 +593,7 @@ export function mergeCandidates(
       ontology_pack_id: ontology.pack.id,
       ontology_version: ontology.pack.version,
       built_at,
+      built_at_commit: readGitHeadCommit(),
       nodes: normalized.nodes,
       triples: normalized.triples,
       stats: {
