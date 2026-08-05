@@ -68,6 +68,7 @@ import {
 import { supersede } from './pipeline/supersede';
 import { assertFact, retractFact } from './pipeline/assert';
 import { runEval } from './pipeline/eval';
+import { topNodes } from './pipeline/top';
 import { status } from './pipeline/status';
 
 export interface CliErrorBody {
@@ -916,19 +917,60 @@ function buildProgram(): Command {
     .argument('<from>', 'source term (label, alias, or node id)')
     .argument('<to>', 'target term (label, alias, or node id)')
     .option('--depth <n>', 'max path depth', parseIntOpt)
+    .option('--k <n>', 'total routes (k-1 alternatives shown)', parseIntOpt)
     .action(
-      (from: string, to: string, opts: { depth?: number }, cmd: Command) => {
+      (
+        from: string,
+        to: string,
+        opts: { depth?: number; k?: number },
+        cmd: Command,
+      ) => {
         const result = why(
           withDir(
             {
               from,
               to,
               ...(opts.depth !== undefined ? { maxDepth: opts.depth } : {}),
+              ...(opts.k !== undefined ? { k: opts.k } : {}),
             },
             globalDir(cmd),
           ),
         );
         writeHumanReadable(result, () => renderWhyHuman(result));
+      },
+    );
+
+  program
+    .command('top')
+    .description('Most central nodes by PageRank or degree (pure TS)')
+    .option('--k <n>', 'rows (default 20)', parseIntOpt)
+    .option('--metric <m>', 'pagerank | degree (default pagerank)')
+    .action(
+      (opts: { k?: number; metric?: string }, cmd: Command) => {
+        const metric: 'degree' | 'pagerank' | undefined =
+          opts.metric === 'degree'
+            ? 'degree'
+            : opts.metric === 'pagerank'
+              ? 'pagerank'
+              : undefined;
+        const result = topNodes(
+          withDir(
+            {
+              ...(opts.k !== undefined ? { k: opts.k } : {}),
+              ...(metric !== undefined ? { metric } : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        writeHumanReadable(result, () =>
+          [
+            `${pc.bold('top nodes')} (${result.metric}) · ${result.node_count} nodes · ${result.triple_count} triples`,
+            ...result.nodes.map(
+              (n2, i) =>
+                `  ${String(i + 1).padStart(2)}. ${n2.label || n2.id} ${pc.dim(`(${n2.id})`)} — degree ${n2.degree} · pr ${n2.pagerank.toFixed(4)}`,
+            ),
+          ].join('\n'),
+        );
       },
     );
 

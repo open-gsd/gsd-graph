@@ -82,6 +82,25 @@ export function writeGraphReport(
       lines.push(`- ${p}: ${n}`);
     }
   }
+
+  // Central nodes by PageRank — the "what matters here" ranking.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { topNodes } = require('./top') as typeof import('./top');
+    const central = topNodes({ graph, k: topN });
+    lines.push('', '## Central nodes (PageRank)');
+    if (central.nodes.length === 0) {
+      lines.push('- (none)');
+    } else {
+      for (const n of central.nodes) {
+        lines.push(
+          `- ${n.label || n.id} (\`${n.id}\`) — degree ${n.degree}, pr ${n.pagerank.toFixed(4)}`,
+        );
+      }
+    }
+  } catch {
+    // analytics failure never blocks the report
+  }
   lines.push('');
 
   const out = storeFile(root, 'GRAPH_REPORT.md');

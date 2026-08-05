@@ -349,6 +349,20 @@ export type {
 } from './pipeline/export';
 
 export { why, resolveNodeTerm } from './pipeline/why';
+
+// Centrality analytics (pure TS)
+export {
+  topNodes,
+  pagerank,
+  degreeCounts,
+  PAGERANK_DAMPING,
+  PAGERANK_MAX_ITERATIONS,
+} from './pipeline/top';
+export type {
+  TopNodesOptions,
+  TopNodesResult,
+  TopNodeEntry,
+} from './pipeline/top';
 export type { WhyOptions, WhyResult, WhyCitation } from './pipeline/why';
 
 // Init (04-01 / CLI-03)

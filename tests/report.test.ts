@@ -182,7 +182,7 @@ describe('writeGraphReport (RPT-01, D-08, D-10)', () => {
     assert.match(md, /triples:\s*7/);
 
     // Top predicates: about 3, related_to 2, same_as 1, supports 1 (id asc on ties)
-    const predSection = md.split('## Top predicates')[1] ?? '';
+    const predSection = (md.split('## Top predicates')[1] ?? '').split('## Central nodes')[0] ?? '';
     const lines = predSection
       .split('\n')
       .map((l) => l.trim())
@@ -204,7 +204,7 @@ describe('writeGraphReport (RPT-01, D-08, D-10)', () => {
     const { store } = publishFixture();
     const result = mod.writeGraphReport({ dir: store, topN: 2 });
     const md = fs.readFileSync(result.path, 'utf8');
-    const predSection = md.split('## Top predicates')[1] ?? '';
+    const predSection = (md.split('## Top predicates')[1] ?? '').split('## Central nodes')[0] ?? '';
     const lines = predSection
       .split('\n')
       .map((l) => l.trim())
