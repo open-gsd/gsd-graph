@@ -26,17 +26,20 @@ extract → normalize → store → query → ground → maintain
 
 ## Quick start
 
-### Install then use (recommended)
+### Global CLI (recommended)
 
 ```bash
-npm install @opengsd/gsd-graph
+npm install -g @opengsd/gsd-graph
 
 # one shot: skill + hooks + config + full brownfield graph
-npx gsd-graph enable
+gsd-graph enable
 
 # multi-hop Q&A with citations
-npx gsd-graph ask "why is phase 4 blocked by phase 3?"
+gsd-graph ask "why is phase 4 blocked by phase 3?"
 ```
+
+The global install keeps this CLI separate from a project's dependency tree. To
+upgrade later, rerun the install command with `@latest`.
 
 ### Zero-install via npx (scoped package)
 
@@ -52,7 +55,18 @@ npx -y @opengsd/gsd-graph status
 npx -y -p @opengsd/gsd-graph gsd-graph enable
 ```
 
-After a local `npm install`, plain `npx gsd-graph …` works via `node_modules/.bin`.
+For reproducible automation, replace the unversioned package with an exact release,
+for example `@opengsd/gsd-graph@0.2.2`.
+
+### Local library dependency
+
+Install locally only when application code imports the Node.js API:
+
+```bash
+npm install @opengsd/gsd-graph
+```
+
+After a local install, `npx gsd-graph …` also works via `node_modules/.bin`.
 
 | Command | When |
 |---------|------|
@@ -103,7 +117,7 @@ Details: [Full Guide → Continuous update](./docs/FULL-GUIDE.md#6-continuous-up
 Does **not** scan all of `src/` by default.
 
 ```bash
-npx gsd-graph sync --corpus ./specs --full
+gsd-graph sync --corpus ./specs --full
 # or zero-install:
 npx -y @opengsd/gsd-graph sync --corpus ./specs --full
 ```
@@ -145,8 +159,7 @@ gsd-graph path Concept:a Concept:b
 gsd-graph communities detect
 gsd-graph review list
 gsd-graph snapshot save pre-refactor
-npx -y @opengsd/gsd-graph-mcp   # if linked as bin; or:
-npx -y -p @opengsd/gsd-graph gsd-graph-mcp
+npx -y -p @opengsd/gsd-graph@0.2.2 gsd-graph-mcp
 ```
 
 Machine contract: **JSON on stdout** (K22). Library: `require('@opengsd/gsd-graph')`.

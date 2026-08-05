@@ -47,13 +47,14 @@ extract → normalize → store → query → ground → maintain
 
 ---
 
-## 0. Setup (once per clone)
+## 0. Install once, enable per clone
 
 ```bash
-npm install
-# or: npm install @opengsd/gsd-graph
+# once per machine
+npm install -g @opengsd/gsd-graph
 
-npx gsd-graph enable
+# once in each project clone
+gsd-graph enable
 # install-only: enable --skip-sync
 ```
 
@@ -87,7 +88,7 @@ Agent skill (installed by `enable`): **`/skill:gsd-graph`**
 ## 1. Morning: is the graph alive?
 
 ```bash
-npx gsd-graph status
+gsd-graph status
 # optional: cat .gsd-graph/.last-sync-status.json
 ```
 
@@ -156,8 +157,8 @@ What am I trying to know?
 **Use when:** the question is multi-hop and you want a grounded answer + citations.
 
 ```bash
-npx gsd-graph ask "why is phase 4 blocked by phase 3?"
-npx gsd-graph ask "what requirements depend on Phase 5?"
+gsd-graph ask "why is phase 4 blocked by phase 3?"
+gsd-graph ask "what requirements depend on Phase 5?"
 ```
 
 - Packs seeds → hops → budgeted triples → deterministic answer (optional `--llm`)  
@@ -169,8 +170,8 @@ npx gsd-graph ask "what requirements depend on Phase 5?"
 **Use when:** you have a **term**, not a full question — browsing the graph.
 
 ```bash
-npx gsd-graph query blocked --hops 2
-npx gsd-graph query packSubgraph --hops 1 --budget 500
+gsd-graph query blocked --hops 2
+gsd-graph query packSubgraph --hops 1 --budget 500
 ```
 
 - Substring match on labels/ids → expand neighborhood  
@@ -184,7 +185,7 @@ Also via query IR: neighborhood by id, path, type/predicate filters.
 **Use when:** the agent will write its own answer but must stay grounded.
 
 ```bash
-npx gsd-graph pack "how are graph answers grounded with citations?"
+gsd-graph pack "how are graph answers grounded with citations?"
 ```
 
 Returns seeds, nodes, triples, paths, citations, trim info.  
@@ -193,7 +194,7 @@ Returns seeds, nodes, triples, paths, citations, trim info.
 ### `path` — known endpoints
 
 ```bash
-npx gsd-graph path Concept:a Concept:b
+gsd-graph path Concept:a Concept:b
 ```
 
 Only when you already have node ids (from status/query).

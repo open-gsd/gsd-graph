@@ -75,17 +75,24 @@ OpenGSD is the **publisher namespace only**. No runtime dependency on gsd-core. 
 
 ## 2. Install & enable
 
-### Happy path (recommended)
+### Global CLI (recommended)
 
 ```bash
-npm install @opengsd/gsd-graph
+npm install -g @opengsd/gsd-graph
 
 # One shot: agent skill + hooks + config + full brownfield sync
-npx gsd-graph enable
+gsd-graph enable
 
 # Use it
-npx gsd-graph ask "why is X blocked by Y?"
-npx gsd-graph status
+gsd-graph ask "why is X blocked by Y?"
+gsd-graph status
+```
+
+The global install keeps the CLI independent of the current project's dependency
+tree. Upgrade it with:
+
+```bash
+npm install -g @opengsd/gsd-graph@latest
 ```
 
 ### Zero-install via npx
@@ -101,6 +108,40 @@ npx -y @opengsd/gsd-graph status
 npx -y -p @opengsd/gsd-graph gsd-graph enable
 npx -y -p @opengsd/gsd-graph gsd-graph-mcp
 ```
+
+Pin an exact release in CI and other reproducible automation:
+
+```bash
+npx -y @opengsd/gsd-graph@0.2.2 status
+npx -y -p @opengsd/gsd-graph@0.2.2 gsd-graph-mcp
+```
+
+### Local library dependency
+
+Install the package locally when application code imports its Node.js API:
+
+```bash
+npm install @opengsd/gsd-graph
+```
+
+This also exposes the binaries through `npx gsd-graph` and
+`npx gsd-graph-mcp`. A global installation is not resolved by Node.js imports.
+
+### npm `Link.matches` installation error
+
+If npm reports `Cannot read properties of null (reading 'matches')`, its Arborist
+installer has encountered stale or mixed link state in the dependency tree. This
+often happens after switching package managers, but can also involve npm workspace
+or linked-package state. For CLI use, prefer the global installation above.
+Otherwise, continue with the package manager that created `node_modules`, or move
+the existing tree aside before rebuilding it with npm:
+
+```bash
+mv node_modules node_modules.pre-npm
+npm install
+```
+
+Clearing the npm download cache does not repair this link state.
 
 `enable` does:
 
@@ -482,9 +523,11 @@ Snapshots store full `graph.v1` copies under `snapshots/`. Restore recovers grap
 Durable agent access without re-pasting the graph.
 
 ```bash
-npx gsd-graph-mcp
-# or
-node node_modules/@opengsd/gsd-graph/bin/gsd-graph-mcp.js --dir .gsd-graph
+# global CLI installation
+gsd-graph-mcp
+
+# zero-install (pin an exact version for production)
+npx -y -p @opengsd/gsd-graph@0.2.2 gsd-graph-mcp
 ```
 
 ### Tools (default read)
@@ -511,7 +554,7 @@ Example MCP client config (shape varies by host):
   "mcpServers": {
     "gsd-graph": {
       "command": "npx",
-      "args": ["-y", "gsd-graph-mcp"],
+      "args": ["-y", "-p", "@opengsd/gsd-graph@0.2.2", "gsd-graph-mcp"],
       "env": { "GSD_GRAPH_DIR": ".gsd-graph" }
     }
   }

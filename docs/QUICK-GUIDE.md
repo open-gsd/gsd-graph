@@ -20,13 +20,13 @@ Get a local knowledge graph running in minutes. For depth (MCP, ontology, mainta
 ## 3 commands
 
 ```bash
-npm install @opengsd/gsd-graph
+npm install -g @opengsd/gsd-graph
 
 # skill + hooks + config + full brownfield graph
-npx gsd-graph enable
+gsd-graph enable
 
 # multi-hop Q&A with citations
-npx gsd-graph ask "why is phase 4 blocked by phase 3?"
+gsd-graph ask "why is phase 4 blocked by phase 3?"
 ```
 
 **Zero-install** (scoped package — use the package name so npx finds the bin):
@@ -37,13 +37,13 @@ npx -y @opengsd/gsd-graph ask "why is phase 4 blocked by phase 3?"
 # same as: npx -y -p @opengsd/gsd-graph gsd-graph enable
 ```
 
-| When | After `npm install` | Zero-install |
-|------|---------------------|--------------|
-| First time | `npx gsd-graph enable` | `npx -y @opengsd/gsd-graph enable` |
-| After doc edits | `npx gsd-graph sync` | `npx -y @opengsd/gsd-graph sync` |
-| Question | `npx gsd-graph ask "…"` | `npx -y @opengsd/gsd-graph ask "…"` |
-| Status | `npx gsd-graph status` | `npx -y @opengsd/gsd-graph status` |
-| Search | `npx gsd-graph query <term>` | `npx -y @opengsd/gsd-graph query <term>` |
+| When | Global CLI | Zero-install |
+|------|------------|--------------|
+| First time | `gsd-graph enable` | `npx -y @opengsd/gsd-graph enable` |
+| After doc edits | `gsd-graph sync` | `npx -y @opengsd/gsd-graph sync` |
+| Question | `gsd-graph ask "…"` | `npx -y @opengsd/gsd-graph ask "…"` |
+| Status | `gsd-graph status` | `npx -y @opengsd/gsd-graph status` |
+| Search | `gsd-graph query <term>` | `npx -y @opengsd/gsd-graph query <term>` |
 
 Agent skill (installed by `enable`): **`/skill:gsd-graph`**
 
@@ -60,7 +60,7 @@ Does **not** scan all of `src/` by default.
 
 ```bash
 # add more roots
-npx gsd-graph sync --corpus ./specs --full
+gsd-graph sync --corpus ./specs --full
 ```
 
 Write structured links when you care about multi-hop offline quality, e.g.:
@@ -103,8 +103,8 @@ Or just run `sync` yourself after docs change.
 4. **Answer** only from that pack (or abstain if empty)
 
 ```bash
-npx gsd-graph pack "how does A connect to B?"   # raw pack JSON
-npx gsd-graph ask  "how does A connect to B?"   # cited markdown
+gsd-graph pack "how does A connect to B?"   # raw pack JSON
+gsd-graph ask  "how does A connect to B?"   # cited markdown
 ```
 
 ---
