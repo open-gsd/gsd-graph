@@ -158,6 +158,129 @@ function writeOkHumanCommand(payload: unknown): void {
   writeOk(payload);
 }
 
+/**
+ * Read commands with a human-first payload (ask/why/status/query): render
+ * markdown/text on an interactive TTY, JSON when piped / --json / CI —
+ * the same precedent enable/sync set in v0.2.10.
+ */
+function writeHumanReadable(payload: unknown, render: () => string): void {
+  if (shouldEmitJsonForHumanCommand()) {
+    writeOk(payload);
+    return;
+  }
+  process.stdout.write(`${render()}\n`);
+}
+
+function renderAnswerHuman(result: {
+  abstained: boolean;
+  abstain_reason?: string;
+  suggestions?: string[];
+  answer_markdown: string;
+  mode: string;
+}): string {
+  if (result.abstained) {
+    const lines = [
+      pc.yellow(`No grounded answer (${result.abstain_reason ?? 'empty'}).`),
+    ];
+    if (result.suggestions !== undefined && result.suggestions.length > 0) {
+      lines.push('', 'Did you mean:');
+      for (const s of result.suggestions) lines.push(`  - ${s}`);
+    } else {
+      lines.push(
+        pc.dim('Try: gsd-graph query <term> · gsd-graph sync (refresh graph)'),
+      );
+    }
+    return lines.join('\n');
+  }
+  return result.answer_markdown;
+}
+
+function renderWhyHuman(result: {
+  found: boolean;
+  reason: string | null;
+  explanation_markdown: string;
+}): string {
+  if (!result.found) {
+    return pc.yellow(`No path: ${result.reason ?? 'unknown'}`);
+  }
+  return result.explanation_markdown;
+}
+
+function renderStatusHuman(result: import('./types').StatusResult): string {
+  if (!result.exists) {
+    return pc.yellow(
+      'No graph store found — run `gsd-graph enable` to build one.',
+    );
+  }
+  const lines = [
+    `${pc.bold('gsd-graph store')} ${result.store_dir}`,
+    `  nodes ${result.node_count ?? 0} · triples ${result.triple_count ?? 0} · ontology ${result.ontology_pack_id ?? '?'}`,
+    `  last build ${result.last_build ?? '?'}${result.age_hours !== undefined ? ` (${result.age_hours.toFixed(1)}h ago)` : ''}`,
+  ];
+  const hints: string[] = [];
+  if (result.stale === true) {
+    hints.push('sources changed → gsd-graph sync');
+  }
+  if ((result.review_queue_count ?? 0) > 0) {
+    hints.push(
+      `${result.review_queue_count} review item(s) → gsd-graph review summary`,
+    );
+  }
+  if (result.build_in_progress === true) {
+    hints.push('build in progress (lock held)');
+  }
+  if (hints.length > 0) {
+    lines.push('', pc.bold('  Next'));
+    for (const h of hints) lines.push(`    ${pc.cyan(h)}`);
+  } else {
+    lines.push(`  ${pc.green('healthy — no action needed')}`);
+  }
+  return lines.join('\n');
+}
+
+function renderQueryHuman(result: {
+  seeds: string[];
+  nodes: Array<{ id: string; label: string }>;
+  triples: Array<{ s: string; p: string; o: string }>;
+  trimmed: string | null;
+}): string {
+  const lines = [
+    `${pc.bold('seeds')} ${result.seeds.join(', ') || '(none)'}`,
+    `${pc.bold('nodes')} ${result.nodes.length} · ${pc.bold('triples')} ${result.triples.length}`,
+  ];
+  const cap = 30;
+  for (const t of result.triples.slice(0, cap)) {
+    lines.push(`  ${t.s} —${t.p}→ ${t.o}`);
+  }
+  if (result.triples.length > cap) {
+    lines.push(pc.dim(`  … ${result.triples.length - cap} more (use --json)`));
+  }
+  if (result.trimmed !== null) {
+    lines.push(pc.dim(`  trimmed: ${result.trimmed}`));
+  }
+  return lines.join('\n');
+}
+
+/** Open a file with the OS default handler (export --open). Best-effort. */
+function openInDefaultApp(filePath: string): void {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { spawn } = require('node:child_process') as
+    typeof import('node:child_process');
+  const cmd =
+    process.platform === 'darwin'
+      ? 'open'
+      : process.platform === 'win32'
+        ? 'cmd'
+        : 'xdg-open';
+  const args =
+    process.platform === 'win32' ? ['/c', 'start', '', filePath] : [filePath];
+  try {
+    spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref();
+  } catch {
+    // Non-fatal: the path is in the JSON output anyway.
+  }
+}
+
 function writeErrorJson(body: CliErrorBody): void {
   let line = formatJson(body);
   if (process.stderr.isTTY) {
@@ -761,7 +884,7 @@ function buildProgram(): Command {
             globalDir(cmd),
           ),
         );
-        writeOk(result);
+        writeHumanReadable(result, () => renderQueryHuman(result));
       },
     );
 
@@ -805,7 +928,7 @@ function buildProgram(): Command {
             globalDir(cmd),
           ),
         );
-        writeOk(result);
+        writeHumanReadable(result, () => renderWhyHuman(result));
       },
     );
 
@@ -818,9 +941,15 @@ function buildProgram(): Command {
     )
     .option('--out <path>', 'output file (default <store>/exports/graph.<ext>)')
     .option('--max-triples <n>', 'cap exported triples (default 5000)', parseIntOpt)
+    .option('--open', 'open the exported file (html viewer) in your default app')
     .action(
       (
-        opts: { format: string; out?: string; maxTriples?: number },
+        opts: {
+          format: string;
+          out?: string;
+          maxTriples?: number;
+          open?: boolean;
+        },
         cmd: Command,
       ) => {
         if (!isExportFormat(opts.format)) {
@@ -841,6 +970,9 @@ function buildProgram(): Command {
             globalDir(cmd),
           ),
         );
+        if (opts.open === true) {
+          openInDefaultApp((result as { path: string }).path);
+        }
         writeOk(result);
       },
     );
@@ -850,7 +982,7 @@ function buildProgram(): Command {
     .description('Read store status (never uses projection as SoT)')
     .action((_opts: unknown, cmd: Command) => {
       const result = status(withDir({}, globalDir(cmd)));
-      writeOk(result);
+      writeHumanReadable(result, () => renderStatusHuman(result));
     });
 
   program
@@ -929,17 +1061,83 @@ function buildProgram(): Command {
   review
     .command('list')
     .description('List pending review-queue items')
+    .option(
+      '--kind <kind>',
+      'filter: entity_merge | predicate_unknown | type_unknown | schema_drift | conflict',
+    )
+    .option('--limit <n>', 'cap listed items (default: all)', parseIntOpt)
+    .action(
+      (opts: { kind?: string; limit?: number }, cmd: Command) => {
+        const storeRoot = resolveStoreRoot(
+          withDir({}, globalDir(cmd)) as { dir?: string },
+        );
+        const queue = loadReviewQueue(storeRoot);
+        let pending = queue.items.filter((i) => i.status === 'pending');
+        if (opts.kind !== undefined) {
+          pending = pending.filter((i) => i.kind === opts.kind);
+        }
+        const total = pending.length;
+        if (opts.limit !== undefined && opts.limit >= 0) {
+          pending = pending.slice(0, opts.limit);
+        }
+        writeOk({
+          schema_version: queue.schema_version,
+          items: pending,
+          decisions_count: queue.decisions.length,
+          pending_count: total,
+          listed_count: pending.length,
+          ...(opts.kind !== undefined ? { kind: opts.kind } : {}),
+        });
+      },
+    );
+
+  review
+    .command('summary')
+    .description('Pending counts by kind with triage hints')
     .action((_opts: unknown, cmd: Command) => {
       const storeRoot = resolveStoreRoot(
         withDir({}, globalDir(cmd)) as { dir?: string },
       );
       const queue = loadReviewQueue(storeRoot);
       const pending = queue.items.filter((i) => i.status === 'pending');
+      const byKind: Record<string, number> = {};
+      for (const i of pending) {
+        byKind[i.kind] = (byKind[i.kind] ?? 0) + 1;
+      }
+      // Most common proposed predicates — the usual bulk of the queue.
+      const predCounts = new Map<string, number>();
+      for (const i of pending) {
+        if (i.kind !== 'predicate_unknown') continue;
+        const p = String(i.payload.proposed_p ?? '');
+        if (p.length > 0) predCounts.set(p, (predCounts.get(p) ?? 0) + 1);
+      }
+      const topPredicates = [...predCounts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 10)
+        .map(([p, count]) => ({ p, count }));
+
+      const hints: string[] = [];
+      for (const { p, count } of topPredicates.slice(0, 3)) {
+        hints.push(
+          `accept all "${p}" (${count}): gsd-graph review accept --all --predicate ${p} --extend-ontology`,
+        );
+      }
+      if ((byKind.entity_merge ?? 0) > 0) {
+        hints.push(
+          'inspect merges: gsd-graph review list --kind entity_merge --limit 10',
+        );
+      }
+      if ((byKind.conflict ?? 0) > 0) {
+        hints.push(
+          'conflicts: gsd-graph review list --kind conflict, then gsd-graph supersede <winner> <loser>',
+        );
+      }
       writeOk({
-        schema_version: queue.schema_version,
-        items: pending,
-        decisions_count: queue.decisions.length,
         pending_count: pending.length,
+        by_kind: byKind,
+        top_predicates: topPredicates,
+        decisions_count: queue.decisions.length,
+        hints,
       });
     });
 
@@ -1411,7 +1609,7 @@ function buildProgram(): Command {
           dir,
         ),
       ).then((result) => {
-        writeOk(result);
+        writeHumanReadable(result, () => renderAnswerHuman(result));
       });
     }
 
@@ -1434,7 +1632,7 @@ function buildProgram(): Command {
         dir,
       ),
     );
-    writeOk(result);
+    writeHumanReadable(result, () => renderAnswerHuman(result));
   };
 
   program
