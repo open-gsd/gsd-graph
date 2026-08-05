@@ -4,12 +4,20 @@ import { z } from 'zod';
 import {
   answer,
   build,
+  detectCommunities,
+  diff,
+  loadGraphV1Cached,
   loadReviewQueue,
   packSubgraph,
+  projectSync,
   query,
+  resolveNodeTerm,
   resolveStoreRoot,
   reviewResolve,
   status,
+  suggestSeeds,
+  tokenizeQuestion,
+  why,
 } from '../index';
 import { GraphError } from '../errors';
 
@@ -19,12 +27,17 @@ export const DEFAULT_READ_TOOL_NAMES = [
   'graph_query',
   'graph_pack',
   'graph_answer',
+  'graph_why',
+  'graph_resolve',
+  'graph_diff',
+  'graph_communities',
   'graph_review_list',
 ] as const;
 
 /** Privileged write tools — off unless explicitly enabled (D-06, T-06-07). */
 export const WRITE_TOOL_NAMES = [
   'graph_build',
+  'graph_sync',
   'graph_review_resolve',
 ] as const;
 
@@ -77,6 +90,44 @@ export const toolSchemas = {
     hops: z.number().optional().describe('Hop expansion depth'),
     k_seeds: z.number().optional().describe('Max seed count'),
     budget: z.number().nullable().optional().describe('Token budget'),
+    global: z
+      .boolean()
+      .optional()
+      .describe('Force corpus-level community/theme answer'),
+  },
+  graph_why: {
+    from: z.string().describe('Source term (label, alias, or node id)'),
+    to: z.string().describe('Target term (label, alias, or node id)'),
+    depth: z.number().optional().describe('Max path depth'),
+    dir: z.string().optional().describe('Store directory override'),
+  },
+  graph_resolve: {
+    term: z.string().describe('Human term to resolve to a node id'),
+    dir: z.string().optional().describe('Store directory override'),
+  },
+  graph_diff: {
+    snapshot: z
+      .string()
+      .optional()
+      .describe('Named snapshot (default: last-diff-base)'),
+    dir: z.string().optional().describe('Store directory override'),
+  },
+  graph_communities: {
+    min_size: z.number().optional().describe('Minimum community size (default 3)'),
+    max_iter: z.number().optional().describe('Max LPA iterations (default 20)'),
+    write: z
+      .boolean()
+      .optional()
+      .describe('Also write communities/ sidecars (disposable, non-SoT)'),
+    dir: z.string().optional().describe('Store directory override'),
+  },
+  graph_sync: {
+    full: z.boolean().optional().describe('Force full re-extract'),
+    corpus: z
+      .array(z.string())
+      .optional()
+      .describe('Extra corpus roots merged into auto brownfield resolve'),
+    dir: z.string().optional().describe('Store directory override'),
   },
   graph_review_list: {
     dir: z.string().optional().describe('Store directory override'),
@@ -148,7 +199,7 @@ function withDirOpt<T extends object>(
 export function listRegisteredToolNames(opts?: McpGateOptions): string[] {
   const names: string[] = [...DEFAULT_READ_TOOL_NAMES];
   if (opts?.allowBuild === true) {
-    names.push('graph_build');
+    names.push('graph_build', 'graph_sync');
   }
   if (opts?.allowReviewWrite === true) {
     names.push('graph_review_resolve');
@@ -241,7 +292,112 @@ export async function handleToolCall(
         if (typeof args.k_seeds === 'number') answerOpts.kSeeds = args.k_seeds;
         if (args.budget === null) answerOpts.budget = null;
         else if (typeof args.budget === 'number') answerOpts.budget = args.budget;
+        if (args.global === true) answerOpts.global = true;
         return jsonResult(answer(answerOpts));
+      }
+      case 'graph_why': {
+        if (typeof args.from !== 'string' || typeof args.to !== 'string') {
+          throw new Error('graph_why requires from and to');
+        }
+        const dir = resolveDir(
+          typeof args.dir === 'string' ? args.dir : undefined,
+          defaultDir,
+        );
+        const whyOpts: Parameters<typeof why>[0] = withDirOpt(
+          { from: args.from, to: args.to },
+          dir,
+        );
+        if (typeof args.depth === 'number') whyOpts.maxDepth = args.depth;
+        return jsonResult(why(whyOpts));
+      }
+      case 'graph_resolve': {
+        if (typeof args.term !== 'string' || args.term.length === 0) {
+          throw new Error('graph_resolve requires term');
+        }
+        const dir = resolveDir(
+          typeof args.dir === 'string' ? args.dir : undefined,
+          defaultDir,
+        );
+        const storeRoot = resolveStoreRoot(
+          dir !== undefined ? { dir } : undefined,
+        );
+        const graph = loadGraphV1Cached(storeRoot);
+        const id = resolveNodeTerm(graph, args.term);
+        const node =
+          id !== null ? graph.nodes.find((n) => n.id === id) ?? null : null;
+        const suggestions =
+          id === null
+            ? suggestSeeds(graph, tokenizeQuestion(args.term))
+            : [];
+        return jsonResult({
+          term: args.term,
+          id,
+          node,
+          ...(suggestions.length > 0 ? { suggestions } : {}),
+        });
+      }
+      case 'graph_diff': {
+        const dir = resolveDir(
+          typeof args.dir === 'string' ? args.dir : undefined,
+          defaultDir,
+        );
+        const diffOpts: Parameters<typeof diff>[0] = withDirOpt({}, dir);
+        if (typeof args.snapshot === 'string' && args.snapshot.length > 0) {
+          diffOpts.snapshot = args.snapshot;
+        }
+        return jsonResult(diff(diffOpts));
+      }
+      case 'graph_communities': {
+        const dir = resolveDir(
+          typeof args.dir === 'string' ? args.dir : undefined,
+          defaultDir,
+        );
+        const comOpts: Parameters<typeof detectCommunities>[0] = withDirOpt(
+          {},
+          dir,
+        );
+        if (typeof args.min_size === 'number') comOpts.minSize = args.min_size;
+        if (typeof args.max_iter === 'number') {
+          comOpts.maxIterations = args.max_iter;
+        }
+        comOpts.write = args.write === true;
+        const det = detectCommunities(comOpts);
+        return jsonResult({
+          community_count: det.communities.length,
+          iterations: det.iterations,
+          stopped_reason: det.stopped_reason,
+          communities: det.communities.map((c) => ({
+            id: c.id,
+            label: c.label,
+            size: c.size,
+            top_nodes: c.top_nodes.slice(0, 5),
+            top_predicates: c.top_predicates.slice(0, 3),
+          })),
+          ...(det.index_path !== undefined ? { index_path: det.index_path } : {}),
+        });
+      }
+      case 'graph_sync': {
+        if (opts?.allowBuild !== true) {
+          throw new Error(
+            'graph_sync is not enabled (set --allow-build or mcp.allow_build)',
+          );
+        }
+        const dir = resolveDir(
+          typeof args.dir === 'string' ? args.dir : undefined,
+          defaultDir,
+        );
+        const syncOpts: Parameters<typeof projectSync>[0] = withDirOpt(
+          { cwd: process.cwd() },
+          dir,
+        );
+        if (args.full === true) syncOpts.full = true;
+        if (Array.isArray(args.corpus)) {
+          const extra = args.corpus.filter(
+            (c): c is string => typeof c === 'string' && c.length > 0,
+          );
+          if (extra.length > 0) syncOpts.extraCorpus = extra;
+        }
+        return jsonResult(projectSync(syncOpts));
       }
       case 'graph_review_list': {
         const dir = resolveDir(
@@ -326,11 +482,21 @@ export const TOOL_DESCRIPTIONS: Record<McpToolName, string> = {
   graph_pack:
     'Pack a grounded subgraph for a natural-language question (packSubgraph). Read-only.',
   graph_answer:
-    'Deterministic grounded answer over packSubgraph. Read-only; no ambient LLM.',
+    'Grounded multi-hop answer with citations. Overview questions get community-theme answers. PREFER this over re-reading planning docs. Read-only; no ambient LLM.',
+  graph_why:
+    'Explain how two concepts connect — shortest path as cited prose. Read-only.',
+  graph_resolve:
+    'Resolve a human term to a node id (with did-you-mean suggestions on miss). Read-only.',
+  graph_diff:
+    'Diff current graph against a snapshot or the last-build baseline. Read-only.',
+  graph_communities:
+    'Detect corpus-level theme communities (label propagation). Read-only unless write=true (disposable sidecars only).',
   graph_review_list:
     'List pending review-queue items. Read-only; does not accept/reject.',
   graph_build:
     'PRIVILEGED: Build graph from corpus (mutates store). Off unless --allow-build / mcp.allow_build.',
+  graph_sync:
+    'PRIVILEGED: Incremental project sync (auto brownfield corpus). Off unless --allow-build / mcp.allow_build.',
   graph_review_resolve:
     'PRIVILEGED: Accept or reject a review item (mutates store). Off unless --allow-review-write / mcp.allow_review_write.',
 };
