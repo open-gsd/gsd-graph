@@ -7,24 +7,40 @@
 
 import { GSD_GRAPH_REASON, GraphError } from '../errors';
 
+/** Wire shape family for the HTTP LLM endpoint. */
+export type LlmHttpProvider = 'openai' | 'anthropic';
+
+/** Default API key env var name per provider. */
+export function defaultApiKeyEnv(provider: LlmHttpProvider): string {
+  return provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
+}
+
 export interface HttpChatCompletionOptions {
   /** Base URL without trailing slash (e.g. https://api.openai.com). */
   baseUrl: string;
   /** Model id for chat completions. */
   model: string;
-  /** Messages (OpenAI chat format). */
+  /** Messages (OpenAI chat format; system role folded for Anthropic). */
   messages: Array<{ role: string; content: string }>;
   /**
    * Env var *name* holding the API key (e.g. OPENAI_API_KEY).
    * Read only when calling; missing key → PROMPT_RESULT_INVALID.
    */
   apiKeyEnv?: string;
+  /**
+   * Wire protocol: 'openai' (default) posts /v1/chat/completions with a
+   * Bearer token; 'anthropic' posts /v1/messages with x-api-key +
+   * anthropic-version headers and folds system messages into `system`.
+   */
+  provider?: LlmHttpProvider;
   /** Injectable fetch for tests (D-05, D-12). Defaults to global fetch. */
   fetchImpl?: typeof fetch;
   /** Env map for key lookup; defaults to process.env. */
   env?: NodeJS.ProcessEnv;
   /** Sampling temperature (default 0 for determinism). */
   temperature?: number;
+  /** Max output tokens (Anthropic requires it; default 4096). */
+  maxTokens?: number;
 }
 
 export interface HttpChatCompletionResult {
@@ -47,31 +63,57 @@ export async function httpChatCompletion(
     );
   }
 
+  const provider: LlmHttpProvider = opts.provider ?? 'openai';
   const base = opts.baseUrl.replace(/\/+$/, '');
-  const url = `${base}/v1/chat/completions`;
+  const url =
+    provider === 'anthropic'
+      ? `${base}/v1/messages`
+      : `${base}/v1/chat/completions`;
 
   const headers: Record<string, string> = {
     'content-type': 'application/json',
   };
 
+  let apiKey: string | undefined;
   if (opts.apiKeyEnv !== undefined && opts.apiKeyEnv.length > 0) {
     const env = opts.env ?? process.env;
-    const key = env[opts.apiKeyEnv];
-    if (key === undefined || key.length === 0) {
+    apiKey = env[opts.apiKeyEnv];
+    if (apiKey === undefined || apiKey.length === 0) {
       throw new GraphError(
         GSD_GRAPH_REASON.PROMPT_RESULT_INVALID,
         `http chat: API key env ${opts.apiKeyEnv} is empty or unset`,
         { apiKeyEnv: opts.apiKeyEnv },
       );
     }
-    headers.authorization = `Bearer ${key}`;
+    if (provider === 'anthropic') {
+      headers['x-api-key'] = apiKey;
+    } else {
+      headers.authorization = `Bearer ${apiKey}`;
+    }
   }
 
-  const body = {
-    model: opts.model,
-    messages: opts.messages,
-    temperature: opts.temperature ?? 0,
-  };
+  let body: object;
+  if (provider === 'anthropic') {
+    headers['anthropic-version'] = '2023-06-01';
+    const system = opts.messages
+      .filter((m) => m.role === 'system')
+      .map((m) => m.content)
+      .join('\n\n');
+    const userMessages = opts.messages.filter((m) => m.role !== 'system');
+    body = {
+      model: opts.model,
+      max_tokens: opts.maxTokens ?? 4096,
+      temperature: opts.temperature ?? 0,
+      ...(system.length > 0 ? { system } : {}),
+      messages: userMessages,
+    };
+  } else {
+    body = {
+      model: opts.model,
+      messages: opts.messages,
+      temperature: opts.temperature ?? 0,
+    };
+  }
 
   let response: Response;
   try {
@@ -113,16 +155,38 @@ export async function httpChatCompletion(
     );
   }
 
-  const content = extractContent(raw);
+  const content =
+    provider === 'anthropic'
+      ? extractAnthropicContent(raw)
+      : extractContent(raw);
   if (content === undefined || content.length === 0) {
     throw new GraphError(
       GSD_GRAPH_REASON.PROMPT_RESULT_INVALID,
-      'http chat empty choices[0].message.content',
+      provider === 'anthropic'
+        ? 'http chat empty content[].text (anthropic)'
+        : 'http chat empty choices[0].message.content',
       { raw },
     );
   }
 
   return { content, raw };
+}
+
+/** Anthropic /v1/messages: concatenate content blocks of type "text". */
+function extractAnthropicContent(raw: unknown): string | undefined {
+  if (raw === null || typeof raw !== 'object') return undefined;
+  const content = (raw as { content?: unknown }).content;
+  if (!Array.isArray(content)) return undefined;
+  const parts: string[] = [];
+  for (const block of content) {
+    if (block === null || typeof block !== 'object') continue;
+    const b = block as { type?: unknown; text?: unknown };
+    if (b.type === 'text' && typeof b.text === 'string') {
+      parts.push(b.text);
+    }
+  }
+  const joined = parts.join('');
+  return joined.length > 0 ? joined : undefined;
 }
 
 function extractContent(raw: unknown): string | undefined {

@@ -79,9 +79,13 @@ After a local install, `npx gsd-graph …` also works via `node_modules/.bin`.
 |---------|------|
 | `gsd-graph enable --mcp` | First time in a repo (+ register MCP hosts) |
 | `gsd-graph sync` | After docs / planning change (incremental) |
+| `gsd-graph sync --llm` | Also extract relationships from prose via your agent (or `--llm http`) |
 | `gsd-graph ask "…"` | Grounded multi-hop answer |
+| `gsd-graph why <a> <b>` | How A connects to B — cited prose chain |
+| `gsd-graph export --format html` | Interactive graph viewer (also mermaid / graphml / cypher) |
 | `gsd-graph status` | Counts / freshness |
 | `gsd-graph query <term>` | Seed-expand search |
+| `gsd-graph review accept --all --kind predicate_unknown` | Batch-resolve review queue |
 | `gsd-graph mcp install` | Wire Claude / Codex / Cursor + project `.mcp.json` |
 | `gsd-graph mcp doctor` | Check store + MCP registration |
 
@@ -131,6 +135,23 @@ gsd-graph sync --corpus ./specs --full
 npx -y @opengsd/gsd-graph sync --corpus ./specs --full
 ```
 
+**Deterministic extraction** reads explicit structure only: `A --predicate--> B`
+edge lines, `[[wiki]]` links, headings, `Term: definition` lines, `#tags`.
+Free prose never becomes a typed edge on its own (honesty by design).
+
+**LLM-assisted extraction** (opt-in) is how prose becomes relationships:
+
+```bash
+gsd-graph sync --llm            # writes .gsd-graph/.prompt-extract.json for your agent
+gsd-graph prompt apply extract  # merges the agent's result (INFERRED + review-gated)
+
+gsd-graph sync --llm http       # or call an endpoint directly (OpenAI- or Anthropic-compatible)
+```
+
+`config.json → llm.http`: `{ "provider": "anthropic" | "openai", "base_url", "model", "api_key_env" }`.
+LLM candidates are always `INFERRED`, carry `llm/*` provenance, and pass the
+same ontology gate + review queue as everything else.
+
 ---
 
 ## How AI uses the graph
@@ -161,15 +182,18 @@ Native query/answer APIs **never** treat projections as authority.
 ## Advanced surfaces
 
 ```bash
-gsd-graph init
+gsd-graph init --ontology engineering   # persisted; build/sync honor it
 gsd-graph build --corpus ./docs
 gsd-graph pack "question"
 gsd-graph path Concept:a Concept:b
+gsd-graph why "payments module" "postgres"
+gsd-graph export --format mermaid       # or graphml | cypher | html
 gsd-graph communities detect
 gsd-graph review list
+gsd-graph review accept --all --kind predicate_unknown --extend-ontology
 gsd-graph snapshot save pre-refactor
 gsd-graph mcp install
-# or: npx -y -p @opengsd/gsd-graph@0.2.11 gsd-graph-mcp
+# or: npx -y -p @opengsd/gsd-graph@0.3.0 gsd-graph-mcp
 ```
 
 Machine contract: **JSON on stdout** (K22). Library: `require('@opengsd/gsd-graph')`.

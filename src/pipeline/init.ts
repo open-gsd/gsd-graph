@@ -52,6 +52,26 @@ export function init(opts?: InitOptions): InitResult {
     };
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
     configWritten = true;
+  } else if (opts?.ontology !== undefined) {
+    // Explicit --ontology on re-init updates the persisted choice so later
+    // builds (which read config.json) honor it.
+    try {
+      const raw = JSON.parse(fs.readFileSync(configPath, 'utf8')) as Record<
+        string,
+        unknown
+      >;
+      if (raw.ontology !== opts.ontology) {
+        raw.ontology = opts.ontology;
+        fs.writeFileSync(
+          configPath,
+          JSON.stringify(raw, null, 2) + '\n',
+          'utf8',
+        );
+        configWritten = true;
+      }
+    } catch {
+      // Unreadable config: leave as-is; readOntologyFromConfig falls back.
+    }
   }
 
   const snapshotsPath = path.join(storeRoot, SNAPSHOTS_DIR);

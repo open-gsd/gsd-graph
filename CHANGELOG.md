@@ -5,6 +5,62 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-05
+
+### Added
+
+- **LLM-assisted extraction** (`build --llm` / `sync --llm`) — turns prose into
+  INFERRED triple candidates without weakening the honesty contract
+  - `--llm` / `--llm prompt` — writes `.prompt-extract.json` (corpus + ontology
+    allowlists) for the host agent; merge with `gsd-graph prompt apply extract`
+  - `--llm http` — live per-source extraction against an OpenAI- or
+    Anthropic-compatible endpoint (config: `config.json` → `llm.http`
+    `{ provider, base_url, model, api_key_env }`)
+  - All LLM candidates are clamped to `INFERRED` confidence with `llm/*`
+    extractor provenance and still flow through the ontology gate + review queue
+- **Anthropic-native HTTP adapter** — `provider: "anthropic"` posts
+  `/v1/messages` with `x-api-key` / `anthropic-version`; `ask --llm http` now
+  performs the live grounded answer (was previously an error)
+- **`gsd-graph why <a> <b>`** — resolves human terms to nodes, finds the
+  shortest path, and explains it as cited prose (`path:line` citations)
+- **`gsd-graph export --format mermaid|graphml|cypher|html`** — graph
+  projections including a self-contained interactive HTML viewer (no CDN)
+- **Batch review** — `review accept|reject --all --kind <kind>
+  --predicate <p>` resolves many pending items under one lock/publish
+  (`reviewResolveBatch` in the library)
+- **Alias suggestions** — normalize now emits suggest-only `entity_merge`
+  review items (`reason: alias_suggestion`) for plural/acronym near-matches
+- **Richer citations** — every distinct provenance source with line spans is
+  projected (`citations[].sources[]`); deterministic markdown renders
+  `path:line +N more`
+- **Distinct abstain reasons** — `no_seeds_matched`, `seeds_disconnected`,
+  `empty_subgraph` instead of one blanket reason
+- Hook: `sync_on_feature_branches: true` config opts into auto-sync on
+  non-default branches; failed detached syncs keep logs in
+  `.last-sync-failure.{out,err}` plus `stderr_tail` in `.last-sync-status.json`
+
+### Fixed
+
+- **Ontology selection is honored end-to-end** — `init --ontology <pack>` is
+  persisted to `config.json`, `build`/`sync` read it (previously always
+  `general`), and both commands accept `--ontology` directly; re-running
+  `init --ontology` updates an existing config
+- Engineering pack now includes `blocked_by`, `requires`, `uses`,
+  `implements`, `delivers`, `precedes`, `supports`, `mentions`, `Topic`, and
+  domain-open `depends_on` — the README's own examples are now expressible
+- Headings no longer emit the degenerate `Document --about--> Topic` self-echo
+  pair (was ~90% of typical graphs and flooded review with cross-type clashes)
+- IDF-weighted seed scoring — rare question tokens now dominate; common tokens
+  ("phase", "service") no longer match half the graph equally
+- Performance: linear-time path materialization and budget trimming
+  (previously quadratic), indexed triple dedup in the markdown extractor
+- Removed dead mode-resolution branch in `answerHttp`
+
+### Changed
+
+- `bin/gsd-graph.js` resolves `main()` as a promise (only `--llm http`
+  commands are actually async; everything else stays synchronous/offline)
+
 ## [0.2.11] - 2026-08-05
 
 ### Added

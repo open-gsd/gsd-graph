@@ -353,6 +353,25 @@ function mergeExactSameType(
         }
         byId.delete(b.id);
         dropped.add(b.id);
+        continue;
+      }
+
+      // Near-alias (plural / acronym) — suggest-only via review queue,
+      // never auto-merge (NORM-02: no fuzzy merges without a human).
+      if (suggestsAliasMatch(a, b)) {
+        pushReview(
+          ctx.reviewItems,
+          ctx.reviewSeen,
+          'entity_merge',
+          {
+            keep: a.id,
+            drop: b.id,
+            keep_id: a.id,
+            drop_id: b.id,
+            reason: 'alias_suggestion',
+          },
+          ctx.now,
+        );
       }
     }
   }
@@ -398,6 +417,35 @@ function exactAliasMatch(a: GraphNode, b: GraphNode): boolean {
 
 function sharesNormalizedLabel(a: GraphNode, b: GraphNode): boolean {
   return exactAliasMatch(a, b);
+}
+
+/** "ledger-service" → "ls" (initials of slug words, ≥2 words only). */
+function slugAcronym(slug: string): string | null {
+  const words = slug.split('-').filter((w) => w.length > 0);
+  if (words.length < 2) return null;
+  return words.map((w) => w[0]!).join('');
+}
+
+/**
+ * Conservative near-alias detection for suggest-only merges:
+ * - plural: one slug is the other + trailing "s" ("service" / "services")
+ * - acronym: one slug equals the initials of the other's words ("ls" / "ledger-service")
+ * Never used for auto-merge — only feeds entity_merge review items.
+ */
+function suggestsAliasMatch(a: GraphNode, b: GraphNode): boolean {
+  const aSlugs = nodeSlugs(a);
+  const bSlugs = nodeSlugs(b);
+  for (const sa of aSlugs) {
+    for (const sb of bSlugs) {
+      if (sa.length < 2 || sb.length < 2) continue;
+      if (sa === `${sb}s` || sb === `${sa}s`) return true;
+      const acA = slugAcronym(sa);
+      const acB = slugAcronym(sb);
+      if (acA !== null && acA === sb) return true;
+      if (acB !== null && acB === sa) return true;
+    }
+  }
+  return false;
 }
 
 function mergeInto(keeper: GraphNode, drop: GraphNode): void {

@@ -424,6 +424,8 @@ export interface ProjectSyncOptions {
   extraCorpus?: string[];
   /** Run communities detect after build (default: config gsd_graph.communities_on_sync). */
   communities?: boolean;
+  /** Ontology pack id or path (default: store config.json ontology, else general). */
+  ontology?: string;
   /** Write GRAPH_REPORT after build (default: config gsd_graph.report_on_sync). */
   report?: boolean;
   /** Progress updates for long sync (CLI spinner on stderr). */
@@ -499,14 +501,26 @@ export interface EnableResult {
 
 // --- Pack / grounded answer (PACK-01 / D-01 / D-02) ---
 
+/** One provenance source projected onto a citation (path + optional span). */
+export interface PackCitationSource {
+  source_path: string;
+  extractor?: string;
+  start_line?: number;
+  end_line?: number;
+}
+
 /** One citation projected from a remaining pack triple after budget. */
 export interface PackCitation {
   triple_id: string;
   s: NodeId;
   p: string;
   o: NodeId;
-  /** First provenance source_path when present. */
+  /** First provenance source_path when present (back-compat convenience). */
   source_path?: string;
+  /** First provenance start_line when present (back-compat convenience). */
+  start_line?: number;
+  /** Every distinct provenance source (path + span), extraction order. */
+  sources?: PackCitationSource[];
 }
 
 /**
@@ -645,6 +659,8 @@ export interface AnswerOptions extends PackOptions {
     baseUrl?: string;
     model?: string;
     apiKeyEnv?: string;
+    /** Wire protocol: 'openai' (default) or 'anthropic'. */
+    provider?: 'openai' | 'anthropic';
   };
 }
 

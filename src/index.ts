@@ -163,11 +163,26 @@ export {
   loadReviewQueue,
   mergeReviewItems,
   reviewResolve,
+  reviewResolveBatch,
 } from './pipeline/review';
-export type { ReviewResolveOptions } from './pipeline/review';
+export type {
+  ReviewResolveOptions,
+  ReviewResolveBatchOptions,
+  ReviewResolveBatchResult,
+} from './pipeline/review';
 
 // Build orchestrator + status (02-04)
-export { build, assertGraphCaps, MAX_NODES, MAX_TRIPLES } from './pipeline/build';
+export {
+  build,
+  mergeCandidates,
+  assertGraphCaps,
+  MAX_NODES,
+  MAX_TRIPLES,
+} from './pipeline/build';
+export type {
+  MergeCandidatesOptions,
+  MergeCandidatesResult,
+} from './pipeline/build';
 export { status } from './pipeline/status';
 
 // Project sync — brownfield + continuous update
@@ -249,6 +264,24 @@ export { diff, resolveBaseline } from './pipeline/diff';
 // Repair (03-04 / REP-01)
 export { repair } from './pipeline/repair';
 
+// Export projections + why explanations (disposable, never SoT)
+export {
+  exportGraph,
+  isExportFormat,
+  renderMermaid,
+  renderGraphml,
+  renderCypher,
+  renderHtml,
+} from './pipeline/export';
+export type {
+  ExportFormat,
+  ExportOptions,
+  ExportResult,
+} from './pipeline/export';
+
+export { why, resolveNodeTerm } from './pipeline/why';
+export type { WhyOptions, WhyResult, WhyCitation } from './pipeline/why';
+
 // Init (04-01 / CLI-03)
 export { init } from './pipeline/init';
 
@@ -307,11 +340,32 @@ export type { ResolveLlmModeInput } from './llm/provider';
 export {
   httpChatCompletion,
   parseHttpPromptResultJson,
+  defaultApiKeyEnv,
 } from './llm/http-client';
 export type {
   HttpChatCompletionOptions,
   HttpChatCompletionResult,
+  LlmHttpProvider,
 } from './llm/http-client';
+
+export {
+  collectLlmSources,
+  sanitizeExtractCandidates,
+  llmExtractHttp,
+  writeExtractPromptRequest,
+  buildExtractSystemPrompt,
+  LLM_EXTRACT_MAX_SOURCES,
+  LLM_EXTRACT_MAX_SOURCE_BYTES,
+} from './llm/extract';
+export type {
+  LlmSourceFile,
+  CollectLlmSourcesResult,
+  SanitizedCandidates,
+  LlmExtractHttpOptions,
+  LlmExtractHttpResult,
+  WriteExtractRequestOptions,
+  WriteExtractRequestOutput,
+} from './llm/extract';
 
 export {
   writePromptRequest,

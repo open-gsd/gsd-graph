@@ -11,6 +11,8 @@ export const GSD_GRAPH_REASON = Object.freeze({
   SCHEMA_INVALID: 'schema_invalid',
   ONTOLOGY_INVALID: 'ontology_invalid',
   EMPTY_SUBGRAPH: 'empty_subgraph',
+  NO_SEEDS_MATCHED: 'no_seeds_matched',
+  SEEDS_DISCONNECTED: 'seeds_disconnected',
   PROMPT_RESULT_INVALID: 'prompt_result_invalid',
   CORPUS_NOT_FOUND: 'corpus_not_found',
   PATH_ESCAPE: 'path_escape',

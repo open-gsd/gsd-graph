@@ -15,6 +15,7 @@ import type {
   GraphNode,
   GraphV1Document,
   PackCitation,
+  PackCitationSource,
   PackOptions,
   QueryPath,
   SubgraphPack,
@@ -79,10 +80,32 @@ interface ScoredSeed {
   labelLen: number;
 }
 
+interface NodeFields {
+  id: string;
+  label: string;
+  labelLen: number;
+  description: string;
+  aliases: string[];
+}
+
+function foldNodeFields(graph: GraphV1Document): NodeFields[] {
+  return graph.nodes.map((n) => ({
+    id: n.id,
+    label: n.label.normalize('NFKC').toLowerCase(),
+    labelLen: n.label.length,
+    description: (n.description ?? '').normalize('NFKC').toLowerCase(),
+    aliases: (n.aliases ?? []).map((a) => a.normalize('NFKC').toLowerCase()),
+  }));
+}
+
 /**
- * Score each node against tokens (D-02):
- *   label substring +3, alias substring +2, description substring +1 (summed).
+ * Score each node against tokens with IDF weighting (D-02, revised):
+ *   per token, field hit weight — label ×3, alias ×2, description ×1 —
+ *   multiplied by idf(token) = ln(1 + N / df), where df counts nodes matching
+ *   the token in any field. Rare tokens dominate; a token matching most of the
+ *   graph ("phase", "service") contributes little.
  * Top kSeeds by score desc; drop score 0; ties: shorter label then id asc.
+ * Deterministic: no randomness, stable sort keys.
  */
 export function scoreSeeds(
   graph: GraphV1Document,
@@ -93,23 +116,39 @@ export function scoreSeeds(
     return [];
   }
 
-  const scored: ScoredSeed[] = [];
-  for (const n of graph.nodes) {
-    const label = n.label.normalize('NFKC').toLowerCase();
-    const description = (n.description ?? '').normalize('NFKC').toLowerCase();
-    const aliases = (n.aliases ?? []).map((a) =>
-      a.normalize('NFKC').toLowerCase(),
-    );
+  const fields = foldNodeFields(graph);
+  const n = fields.length;
 
+  // Pass 1: document frequency per token (any-field match).
+  const idf = new Map<string, number>();
+  for (const token of tokens) {
+    if (idf.has(token)) continue;
+    let df = 0;
+    for (const f of fields) {
+      if (
+        f.label.includes(token) ||
+        f.description.includes(token) ||
+        f.aliases.some((a) => a.includes(token))
+      ) {
+        df += 1;
+      }
+    }
+    idf.set(token, df === 0 ? 0 : Math.log(1 + n / df));
+  }
+
+  // Pass 2: field-weighted IDF sum per node.
+  const scored: ScoredSeed[] = [];
+  for (const f of fields) {
     let score = 0;
     for (const token of tokens) {
-      if (label.includes(token)) score += 3;
-      if (description.includes(token)) score += 1;
-      if (aliases.some((a) => a.includes(token))) score += 2;
+      const w = idf.get(token) ?? 0;
+      if (w === 0) continue;
+      if (f.label.includes(token)) score += 3 * w;
+      if (f.description.includes(token)) score += 1 * w;
+      if (f.aliases.some((a) => a.includes(token))) score += 2 * w;
     }
-
     if (score > 0) {
-      scored.push({ id: n.id, score, labelLen: n.label.length });
+      scored.push({ id: f.id, score, labelLen: f.labelLen });
     }
   }
 
@@ -142,15 +181,35 @@ function emptyPack(
 
 function projectCitations(triples: readonly Triple[]): PackCitation[] {
   return triples.map((t) => {
-    const source_path = t.provenance?.[0]?.source_path;
     const cite: PackCitation = {
       triple_id: t.id,
       s: t.s,
       p: t.p,
       o: t.o,
     };
-    if (source_path !== undefined && source_path.length > 0) {
-      cite.source_path = source_path;
+
+    // Project every distinct (path, span) provenance source — build maintains
+    // the multiset union; citations must not discard it (D-02).
+    const sources: PackCitationSource[] = [];
+    const seen = new Set<string>();
+    for (const e of t.provenance ?? []) {
+      if (e.source_path === undefined || e.source_path.length === 0) continue;
+      const key = `${e.source_path}\0${e.span?.start_line ?? ''}\0${e.span?.end_line ?? ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const src: PackCitationSource = { source_path: e.source_path };
+      if (e.extractor !== undefined) src.extractor = e.extractor;
+      if (e.span?.start_line !== undefined) src.start_line = e.span.start_line;
+      if (e.span?.end_line !== undefined) src.end_line = e.span.end_line;
+      sources.push(src);
+    }
+
+    if (sources.length > 0) {
+      cite.sources = sources;
+      cite.source_path = sources[0]!.source_path;
+      if (sources[0]!.start_line !== undefined) {
+        cite.start_line = sources[0]!.start_line;
+      }
     }
     return cite;
   });

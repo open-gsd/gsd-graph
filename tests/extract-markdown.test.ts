@@ -186,23 +186,18 @@ describe('extractMarkdown OQ-1 grammar', () => {
     assert.equal(edge!.provenance[0]!.extractor, 'markdown/link');
   });
 
-  it('H1/H2 → Document + Topic + about EXTRACTED', () => {
+  it('H1/H2 → Document node only — no Topic twin, no self-echo about triple', () => {
     const content = '## Graph Topics\n';
     const result = mod.extractMarkdown('h.md', content, 'sha256:h');
     const doc = result.nodes.find(
       (n) => n.type === 'Document' && n.label === 'Graph Topics',
     );
+    assert.ok(doc);
     const topic = result.nodes.find(
       (n) => n.type === 'Topic' && n.label === 'Graph Topics',
     );
-    assert.ok(doc);
-    assert.ok(topic);
-    const about = result.triples.find(
-      (t) => t.p === 'about' && t.s === doc!.id && t.o === topic!.id,
-    );
-    assert.ok(about);
-    assert.equal(about!.confidence, 'EXTRACTED');
-    assert.equal(about!.provenance[0]!.extractor, 'markdown/heading');
+    assert.equal(topic, undefined);
+    assert.equal(result.triples.filter((t) => t.p === 'about').length, 0);
   });
 
   it('accepts Subject --predicate--> Object and Subject -predicate-> Object', () => {

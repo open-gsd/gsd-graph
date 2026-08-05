@@ -216,17 +216,18 @@ function materializePath(
   }
   const nodeIds = new Set(found.nodes);
   const tripleIds = new Set<string>();
-  // Match consecutive path edges to graph triples (undirected match on endpoints)
+  // Match consecutive path edges to graph triples (undirected match on endpoints).
+  // Indexed by (s,p,o) so path materialization stays linear in graph size.
+  const bySpo = new Map<string, string>();
+  for (const t of graph.triples) {
+    bySpo.set(`${t.s}\0${t.p}\0${t.o}`, t.id);
+  }
   for (let i = 0; i < found.predicates.length; i++) {
     const a = found.nodes[i]!;
     const b = found.nodes[i + 1]!;
     const p = found.predicates[i]!;
-    const match = graph.triples.find(
-      (t) =>
-        t.p === p &&
-        ((t.s === a && t.o === b) || (t.s === b && t.o === a)),
-    );
-    if (match) tripleIds.add(match.id);
+    const match = bySpo.get(`${a}\0${p}\0${b}`) ?? bySpo.get(`${b}\0${p}\0${a}`);
+    if (match !== undefined) tripleIds.add(match);
   }
   const { nodes, triples } = materializeFromIds(graph, nodeIds, tripleIds);
   return { nodes, triples, seeds: new Set(found.nodes) };
@@ -340,6 +341,7 @@ export function filterGraph(
   // Also include typed matches that may have no remaining edges
   if (opts.types !== undefined) {
     const typeSet = new Set(opts.types);
+    const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
     for (const n of graph.nodes) {
       if (typeSet.has(n.type)) {
         nodeIds.add(n.id);
@@ -348,7 +350,7 @@ export function filterGraph(
     // Restrict to typed nodes
     nodeIds = new Set(
       [...nodeIds].filter((id) => {
-        const node = graph.nodes.find((n) => n.id === id);
+        const node = nodeById.get(id);
         return node !== undefined && typeSet.has(node.type);
       }),
     );
@@ -357,10 +359,6 @@ export function filterGraph(
 
   const nodes = graph.nodes.filter((n) => nodeIds.has(n.id));
   return { nodes, triples };
-}
-
-function estimateTokens(nodes: GraphNode[], triples: Triple[]): number {
-  return Math.ceil(JSON.stringify({ nodes, triples }).length / 4);
 }
 
 /**
@@ -384,16 +382,26 @@ export function applyBudget(
     return a.id.localeCompare(b.id);
   });
 
-  let kept = ordered;
-  let trimmed: string | null = null;
+  // Incremental length accounting: dropping array element i from compact
+  // JSON.stringify removes exactly its serialization plus one comma while the
+  // array stays non-empty. Keeps trim O(n) instead of re-serializing per drop.
   const dropped: string[] = [];
-
-  while (kept.length > 0 && estimateTokens(nodes, kept) > budgetTokens) {
-    const victim = kept[0]!;
-    kept = kept.slice(1);
+  let serializedLen = JSON.stringify({ nodes, triples: ordered }).length;
+  let start = 0;
+  while (
+    start < ordered.length &&
+    Math.ceil(serializedLen / 4) > budgetTokens
+  ) {
+    const victim = ordered[start]!;
+    const remaining = ordered.length - start;
+    serializedLen -=
+      JSON.stringify(victim).length + (remaining > 1 ? 1 : 0);
     dropped.push(`${victim.id} (${victim.confidence})`);
-    trimmed = `dropped ${dropped.join(', ')}`;
+    start += 1;
   }
+  const kept = start === 0 ? ordered : ordered.slice(start);
+  const trimmed: string | null =
+    dropped.length > 0 ? `dropped ${dropped.join(', ')}` : null;
 
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
   const keepNodeIds = new Set<string>(seedIds);

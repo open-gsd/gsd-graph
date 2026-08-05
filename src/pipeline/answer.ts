@@ -15,7 +15,6 @@ import {
   httpChatCompletion,
   parseHttpPromptResultJson,
 } from '../llm/http-client';
-import { resolveLlmMode } from '../llm/provider';
 import type {
   AnswerOptions,
   GroundedAnswer,
@@ -46,10 +45,20 @@ function renderPath(path: QueryPath): string {
 
 function renderCitation(c: PackCitation): string {
   const core = `\`${c.triple_id}\`: ${c.s} —${c.p}→ ${c.o}`;
-  if (c.source_path !== undefined && c.source_path.length > 0) {
-    return `- ${core} (${c.source_path})`;
+  const sources = c.sources ?? [];
+  if (sources.length === 0) {
+    if (c.source_path !== undefined && c.source_path.length > 0) {
+      return `- ${core} (${c.source_path})`;
+    }
+    return `- ${core}`;
   }
-  return `- ${core}`;
+  const first = sources[0]!;
+  const loc =
+    first.start_line !== undefined
+      ? `${first.source_path}:${first.start_line}`
+      : first.source_path;
+  const extra = sources.length > 1 ? ` +${sources.length - 1} more` : '';
+  return `- ${core} (${loc}${extra})`;
 }
 
 /**
@@ -120,13 +129,25 @@ function loadPromptResultObject(opts: AnswerOptions): unknown {
   );
 }
 
+/**
+ * Abstain with a discriminating reason (ANS-02, revised):
+ * - no_seeds_matched — the question's tokens matched no node at all
+ * - seeds_disconnected — seeds matched but their neighborhood has no triples
+ * - empty_subgraph — fallback (e.g. budget trimmed everything away)
+ */
 function abstainEmpty(pack: SubgraphPack): GroundedAnswer {
+  let reason: string = GSD_GRAPH_REASON.EMPTY_SUBGRAPH;
+  if (pack.seeds.length === 0) {
+    reason = GSD_GRAPH_REASON.NO_SEEDS_MATCHED;
+  } else if (pack.trimmed === null) {
+    reason = GSD_GRAPH_REASON.SEEDS_DISCONNECTED;
+  }
   return {
     pack,
     answer_markdown: '',
     mode: 'abstain',
     abstained: true,
-    abstain_reason: GSD_GRAPH_REASON.EMPTY_SUBGRAPH,
+    abstain_reason: reason,
   };
 }
 
@@ -207,15 +228,8 @@ export interface AnswerHttpOptions extends AnswerOptions {
 export async function answerHttp(
   opts: AnswerHttpOptions,
 ): Promise<GroundedAnswer> {
-  const mode = resolveLlmMode({
-    ...(opts.llmMode !== undefined ? { flagMode: opts.llmMode } : {}),
-  });
-  // Force http for this entry, but still require explicit opt-in via llmMode or call site.
-  if (mode !== 'http' && opts.llmMode !== 'http') {
-    // Library call to answerHttp is explicit opt-in; allow even if resolve says none
-    // when caller passed fetchImpl / http config — treat as http.
-  }
-
+  // Calling answerHttp() is itself the explicit http opt-in (D-01) — no extra
+  // mode resolution needed here; CLI callers resolve flags before dispatch.
   const pack = packSubgraph(opts);
   if (pack.triples.length === 0) {
     return abstainEmpty(pack);
@@ -233,10 +247,16 @@ export async function answerHttp(
     };
   }
 
+  const provider = opts.llmHttp?.provider ?? 'openai';
   const baseUrl = opts.httpBaseUrl ?? opts.llmHttp?.baseUrl;
-  const model = opts.httpModel ?? opts.llmHttp?.model ?? 'gpt-4o-mini';
+  const model =
+    opts.httpModel ??
+    opts.llmHttp?.model ??
+    (provider === 'anthropic' ? 'claude-sonnet-5' : 'gpt-4o-mini');
   const apiKeyEnv =
-    opts.httpApiKeyEnv ?? opts.llmHttp?.apiKeyEnv ?? 'OPENAI_API_KEY';
+    opts.httpApiKeyEnv ??
+    opts.llmHttp?.apiKeyEnv ??
+    (provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY');
 
   if (baseUrl === undefined || baseUrl.length === 0) {
     throw new GraphError(
@@ -280,6 +300,7 @@ export async function answerHttp(
     model,
     messages,
     apiKeyEnv,
+    provider,
     ...(opts.fetchImpl !== undefined ? { fetchImpl: opts.fetchImpl } : {}),
     ...(opts.env !== undefined ? { env: opts.env } : {}),
   });

@@ -11,8 +11,15 @@ import {
   readPromptResult,
   requirePromptFileStage,
 } from './llm/prompt-files';
-import { answer } from './pipeline/answer';
-import { build } from './pipeline/build';
+import { answer, answerHttp } from './pipeline/answer';
+import { build, mergeCandidates } from './pipeline/build';
+import {
+  collectLlmSources,
+  llmExtractHttp,
+  sanitizeExtractCandidates,
+  writeExtractPromptRequest,
+} from './llm/extract';
+import { defaultApiKeyEnv, type LlmHttpProvider } from './llm/http-client';
 import {
   detectCommunities,
   writeCommunityReports,
@@ -39,7 +46,13 @@ import { packSubgraph } from './pipeline/pack';
 import { query } from './pipeline/query';
 import { writeGraphReport } from './pipeline/report';
 import { repair } from './pipeline/repair';
-import { loadReviewQueue, reviewResolve } from './pipeline/review';
+import { exportGraph, isExportFormat } from './pipeline/export';
+import { why } from './pipeline/why';
+import {
+  loadReviewQueue,
+  reviewResolve,
+  reviewResolveBatch,
+} from './pipeline/review';
 import {
   snapshotList,
   snapshotRestore,
@@ -167,6 +180,156 @@ function withDir<T extends object>(
   return { ...base, dir };
 }
 
+/** HTTP LLM settings resolved from store config.json `llm.http` + defaults. */
+interface ResolvedLlmHttp {
+  baseUrl: string;
+  model: string;
+  apiKeyEnv: string;
+  provider: LlmHttpProvider;
+}
+
+/** Default endpoints per provider — used only after explicit `--llm http`. */
+function defaultLlmBaseUrl(provider: LlmHttpProvider): string {
+  return provider === 'anthropic'
+    ? 'https://api.anthropic.com'
+    : 'https://api.openai.com';
+}
+
+function defaultLlmModel(provider: LlmHttpProvider): string {
+  return provider === 'anthropic' ? 'claude-sonnet-5' : 'gpt-4o-mini';
+}
+
+/** Read store config.json `llm.http` section (all fields optional). */
+function readStoreLlmHttp(dir: string | undefined): ResolvedLlmHttp {
+  let raw: {
+    provider?: unknown;
+    base_url?: unknown;
+    model?: unknown;
+    api_key_env?: unknown;
+  } = {};
+  try {
+    const storeRoot = resolveStoreRoot(dir !== undefined ? { dir } : {});
+    const configPath = require('node:path').join(storeRoot, 'config.json');
+    const fs = require('node:fs') as typeof import('node:fs');
+    if (fs.existsSync(configPath)) {
+      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
+        llm?: { http?: typeof raw };
+      };
+      raw = parsed.llm?.http ?? {};
+    }
+  } catch {
+    raw = {};
+  }
+  const provider: LlmHttpProvider =
+    raw.provider === 'anthropic' ? 'anthropic' : 'openai';
+  return {
+    provider,
+    baseUrl:
+      typeof raw.base_url === 'string' && raw.base_url.length > 0
+        ? raw.base_url
+        : defaultLlmBaseUrl(provider),
+    model:
+      typeof raw.model === 'string' && raw.model.length > 0
+        ? raw.model
+        : defaultLlmModel(provider),
+    apiKeyEnv:
+      typeof raw.api_key_env === 'string' && raw.api_key_env.length > 0
+        ? raw.api_key_env
+        : defaultApiKeyEnv(provider),
+  };
+}
+
+/** Load the active ontology allowlists for LLM extract prompts. */
+function loadLlmAllowlists(dir: string | undefined): {
+  types: string[];
+  predicates: string[];
+} {
+  let packId = 'general';
+  try {
+    const storeRoot = resolveStoreRoot(dir !== undefined ? { dir } : {});
+    const fs = require('node:fs') as typeof import('node:fs');
+    const configPath = require('node:path').join(storeRoot, 'config.json');
+    if (fs.existsSync(configPath)) {
+      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
+        ontology?: unknown;
+      };
+      if (typeof parsed.ontology === 'string' && parsed.ontology.length > 0) {
+        packId = parsed.ontology;
+      }
+    }
+  } catch {
+    packId = 'general';
+  }
+  const loaded = loadOntologyPack({ packIdOrPath: packId });
+  return {
+    types: [...loaded.pack.node_types],
+    predicates: loaded.pack.predicates.map((p) => p.id),
+  };
+}
+
+/**
+ * LLM extract stage shared by build/sync (D-01: only on explicit --llm):
+ * - prompt → write `.prompt-extract.json`; host agent replies, then
+ *   `gsd-graph prompt apply extract` merges.
+ * - http → live completion per source, merge INFERRED candidates now.
+ * Returns a JSON-safe summary for the command result (null when mode none).
+ */
+function runLlmExtractStage(
+  mode: import('./types').LlmMode,
+  corpus: string | string[],
+  dir: string | undefined,
+): object | Promise<object> | null {
+  if (mode === 'none') return null;
+  const allow = loadLlmAllowlists(dir);
+
+  if (mode === 'prompt') {
+    const out = writeExtractPromptRequest({
+      ...(dir !== undefined ? { dir } : {}),
+      corpus,
+      allowedTypes: allow.types,
+      allowedPredicates: allow.predicates,
+    });
+    return {
+      mode: 'prompt',
+      request_path: out.request.path,
+      sources: out.sources,
+      skipped: out.skipped,
+      next: 'write .prompt-extract-result.json, then: gsd-graph prompt apply extract',
+    };
+  }
+
+  // http — async live extraction + merge
+  const http = readStoreLlmHttp(dir);
+  const { files, skipped } = collectLlmSources(corpus);
+  return llmExtractHttp(files, {
+    baseUrl: http.baseUrl,
+    model: http.model,
+    provider: http.provider,
+    apiKeyEnv: http.apiKeyEnv,
+    allowedTypes: allow.types,
+    allowedPredicates: allow.predicates,
+  }).then((extracted) => {
+    const merged = mergeCandidates({
+      ...(dir !== undefined ? { dir } : {}),
+      nodes: extracted.nodes,
+      triples: extracted.triples,
+    });
+    return {
+      mode: 'http',
+      provider: http.provider,
+      model: http.model,
+      sources_extracted: extracted.sources_extracted,
+      candidate_nodes: extracted.nodes.length,
+      candidate_triples: extracted.triples.length,
+      node_count: merged.node_count,
+      triple_count: merged.triple_count,
+      review_pending: merged.review_pending,
+      failures: extracted.failures,
+      skipped_sources: skipped,
+    };
+  });
+}
+
 /** Parent command groups: bare `gsd-graph <group>` prints that group's help. */
 function defaultGroupHelp(cmd: Command): Command {
   return cmd.action(function (this: Command) {
@@ -185,8 +348,12 @@ Quick start:
   gsd-graph mcp doctor       verify MCP registration
 
 Also useful:
+  gsd-graph why <a> <b>      how A connects to B (cited prose)
+  gsd-graph export --format html   interactive viewer (mermaid|graphml|cypher too)
+  gsd-graph sync --llm       LLM-assisted extraction (prompt file or --llm http)
   gsd-graph query <term>     seed-expand search
   gsd-graph review list      pending ontology / merge items
+  gsd-graph review accept --all --kind <kind>   batch resolve
   gsd-graph --version        package version (JSON)
   gsd-graph --update         install latest from npm
 
@@ -412,16 +579,21 @@ function buildProgram(): Command {
   program
     .command('init')
     .description('Create store layout and append gitignore entry when present')
-    .option('--ontology <idOrPath>', 'ontology pack id or path', 'general')
+    .option(
+      '--ontology <idOrPath>',
+      'ontology pack id or path (default: general; persisted to config.json)',
+    )
     .action((opts: { ontology?: string }, cmd: Command) => {
       const dir = globalDir(cmd);
       const initOpts: {
         cwd: string;
-        ontology: string;
+        ontology?: string;
         dir?: string;
       } = {
         cwd: process.cwd(),
-        ontology: opts.ontology ?? 'general',
+        // Only pass when explicit so re-init without the flag never rewrites
+        // an existing persisted choice.
+        ...(opts.ontology !== undefined ? { ontology: opts.ontology } : {}),
       };
       if (dir !== undefined) {
         initOpts.dir = dir;
@@ -448,6 +620,14 @@ function buildProgram(): Command {
     )
     .option('--communities', 'run communities detect after build')
     .option('--report', 'write GRAPH_REPORT.md after build')
+    .option(
+      '--ontology <idOrPath>',
+      'ontology pack id or path (default: config.json ontology, else general)',
+    )
+    .option(
+      '--llm [mode]',
+      'LLM-assisted extraction: omit/prompt → request file; http → live endpoint',
+    )
     .action(
       (
         opts: {
@@ -455,9 +635,11 @@ function buildProgram(): Command {
           corpus?: string[];
           communities?: boolean;
           report?: boolean;
+          ontology?: string;
+          llm?: string | boolean;
         },
         cmd: Command,
-      ) => {
+      ): void | Promise<void> => {
         const dir = globalDir(cmd);
         const result = withSpinner(
           opts.full === true ? 'Full project sync…' : 'Project sync…',
@@ -471,11 +653,27 @@ function buildProgram(): Command {
                 : {}),
               ...(opts.communities === true ? { communities: true } : {}),
               ...(opts.report === true ? { report: true } : {}),
+              ...(opts.ontology !== undefined
+                ? { ontology: opts.ontology }
+                : {}),
               onProgress: report,
             }),
         );
+        const flagMode = parseLlmFlag(opts.llm);
+        const mode = resolveLlmMode(
+          flagMode === undefined ? {} : { flagMode },
+        );
+        const stage = runLlmExtractStage(mode, result.corpus, dir);
+        if (stage !== null && typeof (stage as Promise<object>).then === 'function') {
+          return (stage as Promise<object>).then((llm) => {
+            printSyncWrapup(result);
+            writeOkHumanCommand({ ...result, llm_extract: llm });
+          });
+        }
         printSyncWrapup(result);
-        writeOkHumanCommand(result);
+        writeOkHumanCommand(
+          stage === null ? result : { ...result, llm_extract: stage },
+        );
       },
     );
 
@@ -485,18 +683,50 @@ function buildProgram(): Command {
     .description('Offline extract/normalize/publish from a corpus root')
     .requiredOption('--corpus <path>', 'corpus root directory to discover')
     .option('--full', 're-extract all sources (ignore fresh hashes)')
-    .action((opts: { corpus: string; full?: boolean }, cmd: Command) => {
-      const result = build(
-        withDir(
-          {
-            corpus: opts.corpus,
-            ...(opts.full === true ? { full: true } : {}),
-          },
-          globalDir(cmd),
-        ),
-      );
-      writeOk(result);
-    });
+    .option(
+      '--ontology <idOrPath>',
+      'ontology pack id or path (default: config.json ontology, else general)',
+    )
+    .option(
+      '--llm [mode]',
+      'LLM-assisted extraction: omit/prompt → request file; http → live endpoint',
+    )
+    .action(
+      (
+        opts: {
+          corpus: string;
+          full?: boolean;
+          ontology?: string;
+          llm?: string | boolean;
+        },
+        cmd: Command,
+      ): void | Promise<void> => {
+        const dir = globalDir(cmd);
+        const result = build(
+          withDir(
+            {
+              corpus: opts.corpus,
+              ...(opts.full === true ? { full: true } : {}),
+              ...(opts.ontology !== undefined
+                ? { ontology: opts.ontology }
+                : {}),
+            },
+            dir,
+          ),
+        );
+        const flagMode = parseLlmFlag(opts.llm);
+        const mode = resolveLlmMode(
+          flagMode === undefined ? {} : { flagMode },
+        );
+        const stage = runLlmExtractStage(mode, opts.corpus, dir);
+        if (stage !== null && typeof (stage as Promise<object>).then === 'function') {
+          return (stage as Promise<object>).then((llm) => {
+            writeOk({ ...result, llm_extract: llm });
+          });
+        }
+        writeOk(stage === null ? result : { ...result, llm_extract: stage });
+      },
+    );
 
   program
     .command('query')
@@ -545,6 +775,64 @@ function buildProgram(): Command {
       );
       writeOk(result);
     });
+
+  program
+    .command('why')
+    .description('Explain how two concepts connect — path + cited prose')
+    .argument('<from>', 'source term (label, alias, or node id)')
+    .argument('<to>', 'target term (label, alias, or node id)')
+    .option('--depth <n>', 'max path depth', parseIntOpt)
+    .action(
+      (from: string, to: string, opts: { depth?: number }, cmd: Command) => {
+        const result = why(
+          withDir(
+            {
+              from,
+              to,
+              ...(opts.depth !== undefined ? { maxDepth: opts.depth } : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        writeOk(result);
+      },
+    );
+
+  program
+    .command('export')
+    .description('Export graph to mermaid | graphml | cypher | html viewer')
+    .requiredOption(
+      '--format <fmt>',
+      'output format: mermaid | graphml | cypher | html',
+    )
+    .option('--out <path>', 'output file (default <store>/exports/graph.<ext>)')
+    .option('--max-triples <n>', 'cap exported triples (default 5000)', parseIntOpt)
+    .action(
+      (
+        opts: { format: string; out?: string; maxTriples?: number },
+        cmd: Command,
+      ) => {
+        if (!isExportFormat(opts.format)) {
+          throw new GraphError(
+            GSD_GRAPH_REASON.SCHEMA_INVALID,
+            `unknown export format: ${opts.format} (mermaid | graphml | cypher | html)`,
+          );
+        }
+        const result = exportGraph(
+          withDir(
+            {
+              format: opts.format,
+              ...(opts.out !== undefined ? { out: opts.out } : {}),
+              ...(opts.maxTriples !== undefined
+                ? { maxTriples: opts.maxTriples }
+                : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        writeOk(result);
+      },
+    );
 
   program
     .command('status')
@@ -644,42 +932,115 @@ function buildProgram(): Command {
       });
     });
 
+  const reviewBatchAction = (
+    action: 'accept' | 'reject',
+    id: string | undefined,
+    opts: {
+      extendOntology?: boolean;
+      all?: boolean;
+      kind?: string;
+      predicate?: string;
+    },
+    cmd: Command,
+  ): void => {
+    const storeRoot = resolveStoreRoot(
+      withDir({}, globalDir(cmd)) as { dir?: string },
+    );
+    const hasFilters =
+      opts.all === true ||
+      opts.kind !== undefined ||
+      opts.predicate !== undefined;
+
+    if (id !== undefined && !hasFilters) {
+      reviewResolve({
+        storeRoot,
+        id,
+        action,
+        ...(opts.extendOntology === true ? { extendOntology: true } : {}),
+      });
+      writeOk({ ok: true, id, action });
+      return;
+    }
+    if (!hasFilters) {
+      throw new GraphError(
+        GSD_GRAPH_REASON.SCHEMA_INVALID,
+        `review ${action} requires an item id, or --all / --kind / --predicate for batch resolve`,
+      );
+    }
+    const result = reviewResolveBatch({
+      storeRoot,
+      action,
+      ...(opts.all === true ? { all: true } : {}),
+      ...(opts.kind !== undefined
+        ? { kind: opts.kind as import('./types').ReviewKind }
+        : {}),
+      ...(opts.predicate !== undefined ? { predicate: opts.predicate } : {}),
+      ...(id !== undefined ? { ids: [id] } : {}),
+      ...(opts.extendOntology === true ? { extendOntology: true } : {}),
+    });
+    writeOk({
+      ok: true,
+      action,
+      resolved: result.resolved,
+      resolved_count: result.resolved.length,
+      skipped: result.skipped,
+    });
+  };
+
   review
     .command('accept')
-    .description('Accept a pending review item')
-    .argument('<id>', 'review item id')
+    .description('Accept pending review item(s) — single id or batch filters')
+    .argument('[id]', 'review item id (omit when using batch filters)')
     .option(
       '--extend-ontology',
       'allow ontology.lock extend on unknown type/predicate accept',
     )
+    .option('--all', 'accept every pending item (respects --kind/--predicate)')
+    .option(
+      '--kind <kind>',
+      'batch filter: entity_merge | predicate_unknown | type_unknown | schema_drift',
+    )
+    .option(
+      '--predicate <p>',
+      'batch filter: predicate_unknown items proposing this predicate',
+    )
     .action(
-      (id: string, opts: { extendOntology?: boolean }, cmd: Command) => {
-        const storeRoot = resolveStoreRoot(
-          withDir({}, globalDir(cmd)) as { dir?: string },
-        );
-        reviewResolve({
-          storeRoot,
-          id,
-          action: 'accept',
-          ...(opts.extendOntology === true
-            ? { extendOntology: true }
-            : {}),
-        });
-        writeOk({ ok: true, id, action: 'accept' });
+      (
+        id: string | undefined,
+        opts: {
+          extendOntology?: boolean;
+          all?: boolean;
+          kind?: string;
+          predicate?: string;
+        },
+        cmd: Command,
+      ) => {
+        reviewBatchAction('accept', id, opts, cmd);
       },
     );
 
   review
     .command('reject')
-    .description('Reject a pending review item')
-    .argument('<id>', 'review item id')
-    .action((id: string, _opts: unknown, cmd: Command) => {
-      const storeRoot = resolveStoreRoot(
-        withDir({}, globalDir(cmd)) as { dir?: string },
-      );
-      reviewResolve({ storeRoot, id, action: 'reject' });
-      writeOk({ ok: true, id, action: 'reject' });
-    });
+    .description('Reject pending review item(s) — single id or batch filters')
+    .argument('[id]', 'review item id (omit when using batch filters)')
+    .option('--all', 'reject every pending item (respects --kind/--predicate)')
+    .option(
+      '--kind <kind>',
+      'batch filter: entity_merge | predicate_unknown | type_unknown | schema_drift',
+    )
+    .option(
+      '--predicate <p>',
+      'batch filter: predicate_unknown items proposing this predicate',
+    )
+    .action(
+      (
+        id: string | undefined,
+        opts: { all?: boolean; kind?: string; predicate?: string },
+        cmd: Command,
+      ) => {
+        reviewBatchAction('reject', id, opts, cmd);
+      },
+    );
 
   const ontology = defaultGroupHelp(
     program
@@ -811,9 +1172,35 @@ function buildProgram(): Command {
       llm?: string | boolean;
     },
     cmd: Command,
-  ) => {
+  ): void | Promise<void> => {
     const flagMode = parseLlmFlag(opts.llm);
     const mode = resolveLlmMode(flagMode === undefined ? {} : { flagMode });
+    const dir = globalDir(cmd);
+
+    // Live http answer — explicit --llm http only (D-01). Config supplies
+    // provider/endpoint; abstention still happens before any network call.
+    if (mode === 'http' && opts.applyPromptResult !== true) {
+      const http = readStoreLlmHttp(dir);
+      return answerHttp(
+        withDir(
+          {
+            question,
+            ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
+            llmMode: 'http' as const,
+            llmHttp: {
+              baseUrl: http.baseUrl,
+              model: http.model,
+              apiKeyEnv: http.apiKeyEnv,
+              provider: http.provider,
+            },
+          },
+          dir,
+        ),
+      ).then((result) => {
+        writeOk(result);
+      });
+    }
+
     const result = answer(
       withDir(
         {
@@ -823,13 +1210,13 @@ function buildProgram(): Command {
             ? {
                 applyPromptResult: true,
                 promptResult: readPromptResult(
-                  withDir({ stage: 'answer' as const }, globalDir(cmd)),
+                  withDir({ stage: 'answer' as const }, dir),
                 ),
               }
             : {}),
           ...(mode !== 'none' ? { llmMode: mode } : {}),
         },
-        globalDir(cmd),
+        dir,
       ),
     );
     writeOk(result);
@@ -932,6 +1319,31 @@ function buildProgram(): Command {
         }
 
         const applied = promptApply({ stage, result: resultObj });
+
+        // Extract results now merge into the store: sanitize to INFERRED
+        // llm/prompt provenance, then run the normalize/review/publish path.
+        if (applied.stage === 'extract') {
+          const sanitized = sanitizeExtractCandidates(applied, {
+            extractorTag: 'llm/prompt',
+          });
+          const merged = mergeCandidates(
+            withDir(
+              { nodes: sanitized.nodes, triples: sanitized.triples },
+              dir,
+            ),
+          );
+          writeOk({
+            stage: 'extract',
+            candidate_nodes: sanitized.nodes.length,
+            candidate_triples: sanitized.triples.length,
+            node_count: merged.node_count,
+            triple_count: merged.triple_count,
+            review_pending: merged.review_pending,
+            store_dir: merged.store_dir,
+          });
+          return;
+        }
+
         writeOk(applied);
       },
     );
@@ -1001,52 +1413,79 @@ function handleTopLevelMetaFlags(argv: string[]): number | null {
   return null;
 }
 
-/**
- * CLI entry used by bin/gsd-graph.js and tests (D-11).
- * Returns process exit code; does not call process.exit.
- */
-export function main(argv: string[]): number {
-  const metaCode = handleTopLevelMetaFlags(argv);
-  if (metaCode !== null) return metaCode;
-
-  const program = buildProgram();
-  try {
-    program.parse(argv);
-    return 0;
-  } catch (err) {
-    if (err instanceof GraphError) {
-      writeErrorJson({
-        ok: false,
-        reason: err.reason,
-        message: err.message,
-      });
-      return mapCliError(err);
-    }
-    if (err instanceof CommanderError) {
-      // -h / --help / `help` already printed human text via writeOut
-      if (
-        err.code === 'commander.helpDisplayed' ||
-        err.code === 'commander.help'
-      ) {
-        return 0;
-      }
-      writeErrorJson({
-        ok: false,
-        reason: 'usage',
-        message: errorMessage(err),
-      });
-      return 1;
+/** Shared exit-code + JSON mapping for main() errors (sync and async paths). */
+function handleMainError(err: unknown): number {
+  if (err instanceof GraphError) {
+    writeErrorJson({
+      ok: false,
+      reason: err.reason,
+      message: err.message,
+    });
+    return mapCliError(err);
+  }
+  if (err instanceof CommanderError) {
+    // -h / --help / `help` already printed human text via writeOut
+    if (
+      err.code === 'commander.helpDisplayed' ||
+      err.code === 'commander.help'
+    ) {
+      return 0;
     }
     writeErrorJson({
       ok: false,
       reason: 'usage',
       message: errorMessage(err),
     });
-    return mapCliError(err);
+    return 1;
+  }
+  writeErrorJson({
+    ok: false,
+    reason: 'usage',
+    message: errorMessage(err),
+  });
+  return mapCliError(err);
+}
+
+/** True when argv requests live HTTP LLM work (`--llm http` / `--llm=http`). */
+export function argvNeedsAsync(argv: string[]): boolean {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (a === '--llm' && argv[i + 1] === 'http') return true;
+    if (a === '--llm=http') return true;
+  }
+  return false;
+}
+
+/**
+ * CLI entry used by bin/gsd-graph.js and tests (D-11).
+ * Returns process exit code; does not call process.exit.
+ * Commands that hit the network (`--llm http`) return a Promise<number>;
+ * everything else stays synchronous (D-01: offline by default).
+ */
+export function main(argv: string[]): number | Promise<number> {
+  const metaCode = handleTopLevelMetaFlags(argv);
+  if (metaCode !== null) return metaCode;
+
+  const program = buildProgram();
+
+  if (argvNeedsAsync(argv)) {
+    return program
+      .parseAsync(argv)
+      .then(() => 0)
+      .catch((err: unknown) => handleMainError(err));
+  }
+
+  try {
+    program.parse(argv);
+    return 0;
+  } catch (err) {
+    return handleMainError(err);
   }
 }
 
 // Local debug: node dist/cli.js … (published bin always calls main explicitly)
 if (require.main === module) {
-  process.exitCode = main(process.argv);
+  Promise.resolve(main(process.argv)).then((code) => {
+    process.exitCode = code;
+  });
 }

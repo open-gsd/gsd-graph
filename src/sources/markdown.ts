@@ -4,7 +4,9 @@
  * OQ-1 MD edge grammar (locked):
  *  1. Wiki: [[Label]] → Concept + mentions EXTRACTED (from Document when set)
  *  2. MD link: [label](url-or-path) → mentions EXTRACTED (path not fetched)
- *  3. Heading: /^#{1,2}\s+(.+)$/ → Document + Topic + Document--about-->Topic EXTRACTED
+ *  3. Heading: /^#{1,2}\s+(.+)$/ → Document node only (sets mentions context).
+ *     No Topic twin / no self-echo `about` triple — that pair carried zero
+ *     information and flooded normalize with cross-type label clashes.
  *  4. Edge line (primary family):
  *       [[A]] --predicate--> [[B]]
  *       Subject --predicate--> Object
@@ -59,7 +61,7 @@ export function extractMarkdown(
   contentHash: string,
 ): ExtractResult {
   const nodesById = new Map<string, GraphNode>();
-  const triples: Triple[] = [];
+  const triples = new Map<string, Triple>();
   const diagnostics: ExtractResult['diagnostics'] = [];
 
   const lines = content.split(/\r?\n/);
@@ -79,21 +81,7 @@ export function extractMarkdown(
         type: 'Document',
         label: title,
       });
-      const topicId = upsertNode(nodesById, {
-        type: 'Topic',
-        label: title,
-      });
       currentDocumentId = docId;
-      pushTriple(triples, {
-        s: docId,
-        p: 'about',
-        o: topicId,
-        sourcePath,
-        extractor: 'markdown/heading',
-        contentHash,
-        confidence: 'EXTRACTED',
-        span: { start_line: lineNum, end_line: lineNum },
-      });
       continue;
     }
 
@@ -242,7 +230,7 @@ export function extractMarkdown(
 
   return {
     nodes: [...nodesById.values()],
-    triples,
+    triples: [...triples.values()],
     diagnostics,
   };
 }
@@ -320,7 +308,7 @@ function upsertNode(
 }
 
 function pushTriple(
-  triples: Triple[],
+  triples: Map<string, Triple>,
   args: {
     s: string;
     p: string;
@@ -341,7 +329,7 @@ function pushTriple(
   if (args.span) provenance.span = args.span;
 
   const id = tripleId(args.s, args.p, args.o);
-  const existing = triples.find((t) => t.id === id);
+  const existing = triples.get(id);
   if (existing) {
     const key = `${provenance.source_path}|${provenance.extractor}|${provenance.content_hash}|${provenance.confidence}`;
     const has = existing.provenance.some(
@@ -352,7 +340,7 @@ function pushTriple(
     if (!has) existing.provenance.push(provenance);
     return;
   }
-  triples.push({
+  triples.set(id, {
     id,
     s: args.s,
     p: args.p,

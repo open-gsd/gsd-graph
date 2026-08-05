@@ -203,7 +203,7 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
   progress?.(full ? 'Discovering corpus (full rebuild)…' : 'Discovering corpus…');
 
   const ontology = loadOntologyPack({
-    packIdOrPath: opts.ontology ?? 'general',
+    packIdOrPath: opts.ontology ?? readConfigOntology(storeRoot) ?? 'general',
   });
 
   const discovered = discoverSources(
@@ -470,6 +470,24 @@ function shouldWriteReportOnBuild(
   return readReportWriteOnBuild(storeRoot);
 }
 
+/**
+ * Read config.json `ontology` so builds honor the init-time pack choice.
+ * Explicit BuildOptions.ontology always wins; missing/invalid config → null.
+ */
+function readConfigOntology(storeRoot: string): string | null {
+  const configPath = storeFile(storeRoot, 'config.json');
+  if (!fs.existsSync(configPath)) return null;
+  try {
+    const raw = readJsonFile(configPath) as { ontology?: unknown };
+    if (typeof raw?.ontology === 'string' && raw.ontology.length > 0) {
+      return raw.ontology;
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
 /** Read config.json report.write_on_build (default false). */
 function readReportWriteOnBuild(storeRoot: string): boolean {
   const configPath = storeFile(storeRoot, 'config.json');
@@ -481,6 +499,113 @@ function readReportWriteOnBuild(storeRoot: string): boolean {
     return raw?.report?.write_on_build === true;
   } catch {
     return false;
+  }
+}
+
+export interface MergeCandidatesOptions {
+  /** Store directory override (resolveStoreRoot). */
+  dir?: string;
+  /** Candidate nodes to merge (e.g. LLM extract output). */
+  nodes: GraphNode[];
+  /** Candidate triples to merge; ontology policy gating still applies. */
+  triples: Triple[];
+  /** Ontology pack override; default config.json ontology, else general. */
+  ontology?: string;
+  /** Optional fixed clock for tests. */
+  now?: string;
+  onProgress?: (message: string) => void;
+}
+
+export interface MergeCandidatesResult {
+  store_dir: string;
+  node_count: number;
+  triple_count: number;
+  review_pending: number;
+  candidate_nodes: number;
+  candidate_triples: number;
+}
+
+/**
+ * Merge candidate nodes/triples (e.g. validated LLM extract output) into the
+ * published graph under the build lock. Everything still flows through
+ * normalize: ontology policy gate, review queue, provenance union, caps.
+ * Sources manifest is untouched — candidates are additive, not corpus state.
+ */
+export function mergeCandidates(
+  opts: MergeCandidatesOptions,
+): MergeCandidatesResult {
+  const storeRoot = ensureStoreRoot(
+    resolveStoreRoot(opts.dir !== undefined ? { dir: opts.dir } : {}),
+  );
+  const lock = acquireBuildLock(storeRoot, 'lib');
+  try {
+    const built_at = opts.now ?? new Date().toISOString();
+    const engine_version = readEngineVersion();
+    const ontology = loadOntologyPack({
+      packIdOrPath:
+        opts.ontology ?? readConfigOntology(storeRoot) ?? 'general',
+    });
+    const prior = loadPriorGraph(storeRoot);
+
+    const workingNodes = [
+      ...(prior?.nodes.map(cloneNode) ?? []),
+      ...opts.nodes,
+    ];
+    const workingTriples = [...(prior?.triples ?? []), ...opts.triples];
+
+    opts.onProgress?.(
+      `Merging ${opts.triples.length} candidate triple(s) into graph…`,
+    );
+    const normalized = normalize({
+      ontology,
+      nodes: workingNodes,
+      triples: workingTriples,
+      now: built_at,
+    });
+
+    assertGraphCaps(normalized.nodes, normalized.triples);
+
+    const graphV1: GraphV1Document = {
+      schema_version: 1,
+      engine: 'gsd-graph',
+      engine_version,
+      ontology_pack_id: ontology.pack.id,
+      ontology_version: ontology.pack.version,
+      built_at,
+      nodes: normalized.nodes,
+      triples: normalized.triples,
+      stats: {
+        node_count: normalized.nodes.length,
+        triple_count: normalized.triples.length,
+      },
+    };
+
+    const existingQueue = loadReviewQueue(storeRoot);
+    const reviewQueue = mergeReviewItems(existingQueue, normalized.reviewItems);
+
+    publishGraphFiles({
+      storeRoot,
+      graphV1,
+      writeProjection: false,
+      projection: null,
+      sidecars: {
+        [QUEUE_BASENAME]: reviewQueue,
+        [ONTOLOGY_LOCK_BASENAME]: buildOntologyLock(ontology),
+      },
+    });
+    writeLastDiffBase(storeRoot, graphV1);
+
+    return {
+      store_dir: storeRoot,
+      node_count: normalized.nodes.length,
+      triple_count: normalized.triples.length,
+      review_pending: reviewQueue.items.filter((i) => i.status === 'pending')
+        .length,
+      candidate_nodes: opts.nodes.length,
+      candidate_triples: opts.triples.length,
+    };
+  } finally {
+    lock.release();
   }
 }
 
