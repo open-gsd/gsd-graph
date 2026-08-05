@@ -374,7 +374,10 @@ export function filterGraph(
 }
 
 /**
- * Drop triples worst-first (AMBIGUOUS → INFERRED → EXTRACTED), then id asc.
+ * Drop triples worst-first, then id asc. Default order is confidence tier
+ * (AMBIGUOUS → INFERRED → EXTRACTED); callers may pass a relevance scorer
+ * (higher = keep longer) — pack uses seed proximity + predicate weight +
+ * provenance count, with confidence still the dominant term.
  * Token unit: ceil(JSON.stringify({nodes,triples}).length / 4) (QRY-02, OQ-2).
  * Seed nodes retained when rebuilding the node set.
  */
@@ -383,13 +386,15 @@ export function applyBudget(
   triples: Triple[],
   budgetTokens: number | null | undefined,
   seedIds: ReadonlySet<string>,
+  scoreOf?: (t: Triple) => number,
 ): { nodes: GraphNode[]; triples: Triple[]; trimmed: string | null } {
   if (budgetTokens == null || budgetTokens <= 0) {
     return { nodes, triples, trimmed: null };
   }
 
+  const score = scoreOf ?? ((t: Triple) => confidenceRank(t.confidence));
   const ordered = [...triples].sort((a, b) => {
-    const dr = confidenceRank(a.confidence) - confidenceRank(b.confidence);
+    const dr = score(a) - score(b);
     if (dr !== 0) return dr;
     return a.id.localeCompare(b.id);
   });

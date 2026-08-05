@@ -328,6 +328,7 @@ export {
   singularizeToken,
   tokenVariants,
   suggestSeeds,
+  packRelevanceScore,
 } from './pipeline/pack';
 
 // Deterministic grounded answer (05-02 / ANS-01 / ANS-02)

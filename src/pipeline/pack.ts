@@ -21,12 +21,14 @@ import type {
   SubgraphPack,
   Triple,
 } from '../types';
+import { confidenceRank } from './ids';
 import {
   applyBudget,
   buildAdjacencyMap,
   DEFAULT_SEED_HOPS,
   expandHops,
   query,
+  type AdjacencyMap,
 } from './query';
 
 /**
@@ -323,6 +325,65 @@ function emptyPack(
   };
 }
 
+/** BFS depth of every node from the nearest seed (capped at maxHops). */
+function seedDistances(
+  adj: AdjacencyMap,
+  seeds: readonly string[],
+  maxHops: number,
+): Map<string, number> {
+  const dist = new Map<string, number>();
+  let frontier: string[] = [];
+  for (const s of seeds) {
+    dist.set(s, 0);
+    frontier.push(s);
+  }
+  for (let d = 1; d <= maxHops && frontier.length > 0; d++) {
+    const next: string[] = [];
+    for (const u of frontier) {
+      for (const edge of adj.get(u) ?? []) {
+        if (!dist.has(edge.neighbor)) {
+          dist.set(edge.neighbor, d);
+          next.push(edge.neighbor);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return dist;
+}
+
+/**
+ * Relevance for budget trimming (higher = keep longer). Confidence stays the
+ * dominant term (AMBIGUOUS always drops before EXTRACTED); seed proximity,
+ * non-noise predicates, and multi-source provenance break ties so the budget
+ * stops evicting the one triple that answers the question.
+ */
+export function packRelevanceScore(
+  t: Triple,
+  distances: ReadonlyMap<string, number>,
+): number {
+  const conf = confidenceRank(t.confidence) * 100;
+  const dS = distances.get(t.s) ?? 99;
+  const dO = distances.get(t.o) ?? 99;
+  const d = Math.min(dS, dO);
+  const proximity = Math.max(0, 12 - 4 * Math.min(d, 3));
+  const predicate = t.p === 'mentions' ? 0 : 4;
+  const sources = new Set(
+    (t.provenance ?? []).map((e) => `${e.source_path}\0${e.span?.start_line ?? ''}`),
+  ).size;
+  const provenance = Math.min(sources, 5) * 2;
+  return conf + proximity + predicate + provenance;
+}
+
+function distinctSourceCount(t: Triple): number {
+  const seen = new Set<string>();
+  for (const e of t.provenance ?? []) {
+    if (!e.source_path) continue;
+    seen.add(`${e.source_path}\0${e.span?.start_line ?? ''}\0${e.span?.end_line ?? ''}`);
+  }
+  return seen.size;
+}
+
 function projectCitations(triples: readonly Triple[]): PackCitation[] {
   return triples.map((t) => {
     const cite: PackCitation = {
@@ -330,6 +391,8 @@ function projectCitations(triples: readonly Triple[]): PackCitation[] {
       s: t.s,
       p: t.p,
       o: t.o,
+      confidence: t.confidence,
+      source_count: distinctSourceCount(t),
     };
 
     // Project every distinct (path, span) provenance source — build maintains
@@ -426,7 +489,10 @@ export function packSubgraph(opts: PackOptions): SubgraphPack {
   }
 
   const seedIdSet = new Set(seeds);
-  const budgeted = applyBudget(nodes, triples, budget, seedIdSet);
+  const distances = seedDistances(adj, seeds, hops + 2);
+  const budgeted = applyBudget(nodes, triples, budget, seedIdSet, (t) =>
+    packRelevanceScore(t, distances),
+  );
   nodes = budgeted.nodes;
   triples = budgeted.triples;
 

@@ -515,6 +515,10 @@ export interface PackCitation {
   s: NodeId;
   p: string;
   o: NodeId;
+  /** Confidence tier of the cited triple (trust signal in rendered answers). */
+  confidence?: Confidence;
+  /** Count of distinct provenance sources (path + span) backing the triple. */
+  source_count?: number;
   /** First provenance source_path when present (back-compat convenience). */
   source_path?: string;
   /** First provenance start_line when present (back-compat convenience). */

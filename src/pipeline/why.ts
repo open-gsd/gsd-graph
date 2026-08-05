@@ -26,6 +26,8 @@ export interface WhyCitation {
   s: string;
   p: string;
   o: string;
+  /** Confidence tier of the cited triple (trust signal). */
+  confidence?: string;
   sources: PackCitationSource[];
 }
 
@@ -178,6 +180,7 @@ export function why(opts: WhyOptions): WhyResult {
         s: t.s,
         p: t.p,
         o: t.o,
+        confidence: t.confidence,
         sources: citeSources(t),
       });
     }
@@ -194,7 +197,8 @@ export function why(opts: WhyOptions): WhyResult {
           ? `${first.source_path}:${first.start_line}`
           : first.source_path;
     const extra = c.sources.length > 1 ? ` +${c.sources.length - 1} more` : '';
-    return `- \`${c.triple_id}\`: ${c.s} —${c.p}→ ${c.o} (${loc}${extra})`;
+    const tier = c.confidence !== undefined ? ` [${c.confidence}]` : '';
+    return `- \`${c.triple_id}\`: ${c.s} —${c.p}→ ${c.o}${tier} (${loc}${extra})`;
   });
 
   const explanation = [

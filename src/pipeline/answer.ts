@@ -45,12 +45,18 @@ function renderPath(path: QueryPath): string {
 
 function renderCitation(c: PackCitation): string {
   const core = `\`${c.triple_id}\`: ${c.s} —${c.p}→ ${c.o}`;
+  // Trust signal: a 5-source EXTRACTED fact should not read like a lone
+  // AMBIGUOUS one (D-02 spirit — confidence is part of the citation).
+  const tier =
+    c.confidence !== undefined
+      ? ` [${c.confidence}${(c.source_count ?? 0) > 1 ? ` ×${c.source_count}` : ''}]`
+      : '';
   const sources = c.sources ?? [];
   if (sources.length === 0) {
     if (c.source_path !== undefined && c.source_path.length > 0) {
-      return `- ${core} (${c.source_path})`;
+      return `- ${core}${tier} (${c.source_path})`;
     }
-    return `- ${core}`;
+    return `- ${core}${tier}`;
   }
   const first = sources[0]!;
   const loc =
@@ -58,7 +64,7 @@ function renderCitation(c: PackCitation): string {
       ? `${first.source_path}:${first.start_line}`
       : first.source_path;
   const extra = sources.length > 1 ? ` +${sources.length - 1} more` : '';
-  return `- ${core} (${loc}${extra})`;
+  return `- ${core}${tier} (${loc}${extra})`;
 }
 
 /**
