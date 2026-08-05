@@ -576,6 +576,11 @@ export interface PackOptions {
    * null/undefined skips trim (QRY-02).
    */
   budget?: number | null;
+  /**
+   * Fallback seed node ids used ONLY when lexical scoring finds no seeds
+   * (semantic scorer output, caller-known anchors). Unknown ids are ignored.
+   */
+  extraSeeds?: string[];
 }
 
 // --- Optional LLM modes (LLM-01 / D-01) ---

@@ -404,6 +404,52 @@ export function answer(opts: AnswerOptions): GroundedAnswer {
   };
 }
 
+/**
+ * Async answer with the semantic seed fallback (opt-in): when the plain
+ * deterministic answer abstains with no_seeds_matched, consult the registered
+ * SeedScorer (or the embedding sidecar) and retry with its candidates as
+ * fallback seeds. Traversal, budget, and citations stay deterministic.
+ */
+export async function answerSemantic(
+  opts: AnswerOptions & {
+    fetchImpl?: typeof fetch;
+    env?: NodeJS.ProcessEnv;
+  },
+): Promise<GroundedAnswer> {
+  const first = answer(opts);
+  if (
+    !first.abstained ||
+    first.abstain_reason !== GSD_GRAPH_REASON.NO_SEEDS_MATCHED
+  ) {
+    return first;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const scorers = require('../embeddings/scorer') as
+    typeof import('../embeddings/scorer');
+  const scorer =
+    scorers.getSeedScorer() ??
+    scorers.embeddingSeedScorer({
+      ...(opts.dir !== undefined ? { dir: opts.dir } : {}),
+      ...(opts.fetchImpl !== undefined ? { fetchImpl: opts.fetchImpl } : {}),
+      ...(opts.env !== undefined ? { env: opts.env } : {}),
+    });
+
+  let candidates: Array<{ id: string; score: number }> = [];
+  try {
+    candidates = await scorer.score(
+      loadAnswerGraph(opts),
+      opts.question,
+      opts.kSeeds ?? 5,
+    );
+  } catch {
+    candidates = []; // semantic fallback is best-effort, never a new failure
+  }
+  if (candidates.length === 0) return first;
+
+  return answer({ ...opts, extraSeeds: candidates.map((c) => c.id) });
+}
+
 export interface AnswerHttpOptions extends AnswerOptions {
   /** System + user messages for chat completions. Built from pack when omitted. */
   messages?: Array<{ role: string; content: string }>;

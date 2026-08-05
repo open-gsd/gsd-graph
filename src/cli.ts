@@ -12,7 +12,12 @@ import {
   readPromptResult,
   requirePromptFileStage,
 } from './llm/prompt-files';
-import { answer, answerHttp } from './pipeline/answer';
+import { answer, answerHttp, answerSemantic } from './pipeline/answer';
+import {
+  buildEmbeddingSidecar,
+  loadEmbeddingSidecar,
+  readEmbeddingsConfig,
+} from './embeddings/sidecar';
 import { build, mergeCandidates } from './pipeline/build';
 import {
   collectLlmSources,
@@ -1312,6 +1317,48 @@ function buildProgram(): Command {
       writeOk(result);
     });
 
+  // Opt-in embedding sidecar (semantic seed fallback)
+  const embeddings = defaultGroupHelp(
+    program
+      .command('embeddings')
+      .description('Opt-in embedding sidecar for semantic seed fallback'),
+  );
+
+  embeddings
+    .command('build')
+    .description(
+      'Embed node labels/aliases via llm.embeddings config into embeddings.v1.json',
+    )
+    .action((_opts: unknown, cmd: Command): Promise<void> => {
+      const dir = globalDir(cmd);
+      return buildEmbeddingSidecar(withDir({}, dir)).then((result) => {
+        writeOk({ ok: true, ...result });
+      });
+    });
+
+  embeddings
+    .command('status')
+    .description('Show embedding sidecar freshness and coverage')
+    .action((_opts: unknown, cmd: Command) => {
+      const storeRoot = resolveStoreRoot(
+        withDir({}, globalDir(cmd)) as { dir?: string },
+      );
+      const sidecar = loadEmbeddingSidecar(storeRoot);
+      const config = readEmbeddingsConfig(storeRoot);
+      writeOk({
+        configured: config !== null,
+        exists: sidecar !== null,
+        ...(sidecar !== null
+          ? {
+              model: sidecar.model,
+              entries: sidecar.entries.length,
+              built_at: sidecar.built_at,
+              graph_built_at: sidecar.graph_built_at,
+            }
+          : {}),
+      });
+    });
+
   const answerAction = (
     question: string,
     opts: {
@@ -1319,6 +1366,7 @@ function buildProgram(): Command {
       applyPromptResult?: boolean;
       llm?: string | boolean;
       global?: boolean;
+      semantic?: boolean;
     },
     cmd: Command,
   ): void | Promise<void> => {
@@ -1342,6 +1390,23 @@ function buildProgram(): Command {
               apiKeyEnv: http.apiKeyEnv,
               provider: http.provider,
             },
+          },
+          dir,
+        ),
+      ).then((result) => {
+        writeOk(result);
+      });
+    }
+
+    // Semantic seed fallback (async, opt-in): retries a no_seeds_matched
+    // abstain with embedding-sidecar candidates as fallback seeds.
+    if (opts.semantic === true && opts.applyPromptResult !== true) {
+      return answerSemantic(
+        withDir(
+          {
+            question,
+            ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
+            ...(opts.global === true ? { global: true } : {}),
           },
           dir,
         ),
@@ -1378,6 +1443,7 @@ function buildProgram(): Command {
     .argument('<question>', 'question text')
     .option('--budget <n>', 'token budget', parseIntOpt)
     .option('--global', 'corpus-level theme answer from communities')
+    .option('--semantic', 'retry no-seed abstains with embedding-sidecar seeds (async)')
     .option(
       '--apply-prompt-result',
       'apply store .prompt-answer-result.json (Ajv + citation gate)',
@@ -1395,6 +1461,7 @@ function buildProgram(): Command {
     .argument('<question>', 'question text')
     .option('--budget <n>', 'token budget', parseIntOpt)
     .option('--global', 'corpus-level theme answer from communities')
+    .option('--semantic', 'retry no-seed abstains with embedding-sidecar seeds (async)')
     .option(
       '--apply-prompt-result',
       'apply store .prompt-answer-result.json (Ajv + citation gate)',
@@ -1607,12 +1674,14 @@ function handleMainError(err: unknown): number {
   return mapCliError(err);
 }
 
-/** True when argv requests live HTTP LLM work (`--llm http` / `--llm=http`). */
+/** True when argv requests network work (`--llm http`, `--semantic`, embeddings build). */
 export function argvNeedsAsync(argv: string[]): boolean {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === '--llm' && argv[i + 1] === 'http') return true;
     if (a === '--llm=http') return true;
+    if (a === '--semantic') return true;
+    if (a === 'embeddings' && argv[i + 1] === 'build') return true;
   }
   return false;
 }

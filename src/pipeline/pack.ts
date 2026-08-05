@@ -441,7 +441,14 @@ export function packSubgraph(opts: PackOptions): SubgraphPack {
   const question = opts.question;
 
   const tokens = tokenizeQuestion(question);
-  const seeds = scoreSeeds(graph, tokens, kSeeds);
+  let seeds = scoreSeeds(graph, tokens, kSeeds);
+
+  // Fallback seeds (semantic scorer / caller anchors) only when lexical
+  // scoring found nothing — the deterministic path always wins when it can.
+  if (seeds.length === 0 && opts.extraSeeds !== undefined) {
+    const known = new Set(graph.nodes.map((n) => n.id));
+    seeds = opts.extraSeeds.filter((id) => known.has(id)).slice(0, kSeeds);
+  }
 
   if (seeds.length === 0) {
     return emptyPack(

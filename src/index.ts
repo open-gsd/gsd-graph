@@ -370,9 +370,37 @@ export {
 export {
   answer,
   answerHttp,
+  answerSemantic,
   formatDeterministicMarkdown,
   OVERVIEW_QUESTION_RE,
 } from './pipeline/answer';
+
+// Opt-in embedding sidecar + SeedScorer seam
+export {
+  buildEmbeddingSidecar,
+  loadEmbeddingSidecar,
+  semanticSeedCandidates,
+  readEmbeddingsConfig,
+  cosineSimilarity,
+  EMBEDDINGS_BASENAME,
+  EMBEDDINGS_MAX_NODES,
+  SEMANTIC_SEED_MIN_SIMILARITY,
+} from './embeddings/sidecar';
+export type {
+  EmbeddingsConfig,
+  EmbeddingEntry,
+  EmbeddingSidecarDocument,
+  SemanticSeedCandidate,
+  SemanticSeedOptions,
+  BuildEmbeddingSidecarOptions,
+  BuildEmbeddingSidecarResult,
+} from './embeddings/sidecar';
+export {
+  setSeedScorer,
+  getSeedScorer,
+  embeddingSeedScorer,
+} from './embeddings/scorer';
+export type { SeedScorer, SeedScorerCandidate } from './embeddings/scorer';
 export type { AnswerHttpOptions } from './pipeline/answer';
 
 // Minimal GRAPH_REPORT from published v1 (06-03 / RPT-01 / D-08)
