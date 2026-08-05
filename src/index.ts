@@ -155,8 +155,29 @@ export type { AdjacencyEdge, AdjacencyMap } from './pipeline/query';
 export { fingerprintFile } from './sources/fingerprint';
 export { extractMarkdown } from './sources/markdown';
 export { extractJsonl } from './sources/jsonl';
+export {
+  extractYaml,
+  parseFlatYaml,
+  splitFrontmatter,
+  YAML_RELATIONAL_KEYS,
+} from './sources/yaml';
+export type {
+  FlatYamlEntry,
+  ParseFlatYamlResult,
+  YamlExtractOptions,
+} from './sources/yaml';
 export { extractByPath } from './pipeline/extract';
 export type { ExtractByPathOptions } from './pipeline/extract';
+export {
+  registerExtractor,
+  extractorForExtension,
+  listExtractors,
+  registeredExtensions,
+} from './pipeline/extractors';
+export type {
+  Extractor,
+  RegisterExtractorOptions,
+} from './pipeline/extractors';
 export { redactSecrets } from './sources/redact';
 export { discoverSources, DEFAULT_MAX_BYTES } from './sources/discover';
 export type {

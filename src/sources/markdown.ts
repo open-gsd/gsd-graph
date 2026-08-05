@@ -25,6 +25,7 @@ import type {
 } from '../types';
 import { nodeId, tripleId } from '../pipeline/ids';
 import { redactSecrets } from './redact';
+import { extractYaml, splitFrontmatter } from './yaml';
 
 const PREDICATE_RE = /^[a-z][a-z0-9_]*$/;
 
@@ -64,8 +65,36 @@ export function extractMarkdown(
   const triples = new Map<string, Triple>();
   const diagnostics: ExtractResult['diagnostics'] = [];
 
-  const lines = content.split(/\r?\n/);
   let currentDocumentId: string | null = null;
+
+  // Leading YAML frontmatter: structured extract via the flat-YAML mapping,
+  // then blank those lines so the prose grammar (definitions, tags) never
+  // re-reads `status: draft` as a Concept definition.
+  const fm = splitFrontmatter(content);
+  let effectiveContent = content;
+  if (fm.yaml !== null) {
+    const fmResult = extractYaml(sourcePath, fm.yaml, contentHash, {
+      extractorTag: 'markdown/frontmatter',
+      lineOffset: fm.yamlStartLine - 1,
+    });
+    for (const n of fmResult.nodes) {
+      const existing = nodesById.get(n.id);
+      if (existing === undefined) nodesById.set(n.id, n);
+      else if (existing.description === undefined && n.description !== undefined) {
+        existing.description = n.description;
+      }
+    }
+    for (const t of fmResult.triples) {
+      triples.set(t.id, t);
+    }
+    diagnostics.push(...fmResult.diagnostics);
+    // Body structure (wiki links, tags) attaches to the frontmatter Document.
+    const doc = fmResult.nodes.find((n) => n.type === 'Document');
+    if (doc !== undefined) currentDocumentId = doc.id;
+    effectiveContent = fm.bodyWithBlankedFrontmatter;
+  }
+
+  const lines = effectiveContent.split(/\r?\n/);
 
   for (let i = 0; i < lines.length; i++) {
     const lineNum = i + 1;

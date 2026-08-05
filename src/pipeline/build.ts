@@ -47,6 +47,7 @@ import type {
   Triple,
 } from '../types';
 import { extractByPath } from './extract';
+import { extractorForExtension } from './extractors';
 import { invalidateProvenance, normPathKey } from './maintain';
 import { normalize } from './normalize';
 import { projectGraph } from './project';
@@ -151,17 +152,7 @@ function loadPriorGraph(storeRoot: string): GraphV1Document | null {
 
 function extractorForPath(absPath: string): string {
   const ext = path.extname(absPath).toLowerCase();
-  switch (ext) {
-    case '.md':
-    case '.markdown':
-    case '.txt':
-      return 'markdown';
-    case '.json':
-    case '.jsonl':
-      return 'jsonl';
-    default:
-      return 'unknown';
-  }
+  return extractorForExtension(ext)?.id ?? 'unknown';
 }
 
 function cloneNode(n: GraphNode): GraphNode {
