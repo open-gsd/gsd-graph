@@ -189,6 +189,22 @@ export type {
 export { normalize, DIRECTIONAL_PREDICATES } from './pipeline/normalize';
 export { supersede } from './pipeline/supersede';
 export type { SupersedeOptions, SupersedeResult } from './pipeline/supersede';
+
+// Agent/user write path — assert/retract + episode replay
+export {
+  assertFact,
+  retractFact,
+  loadEpisodeCandidates,
+  EPISODES_BASENAME,
+} from './pipeline/assert';
+export type {
+  AssertFactOptions,
+  AssertFactResult,
+  RetractFactOptions,
+  RetractFactResult,
+  EpisodeRecord,
+  EpisodeCandidates,
+} from './pipeline/assert';
 export type {
   NormalizeInput,
   NormalizeOutput,

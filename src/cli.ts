@@ -59,6 +59,7 @@ import {
   snapshotSave,
 } from './pipeline/snapshot';
 import { supersede } from './pipeline/supersede';
+import { assertFact, retractFact } from './pipeline/assert';
 import { status } from './pipeline/status';
 
 export interface CliErrorBody {
@@ -1040,6 +1041,92 @@ function buildProgram(): Command {
         cmd: Command,
       ) => {
         reviewBatchAction('reject', id, opts, cmd);
+      },
+    );
+
+  program
+    .command('assert')
+    .description(
+      'Assert a fact into the graph (ontology-gated; recorded in episodes.jsonl)',
+    )
+    .argument('<subject>', 'subject node id, label, or alias')
+    .argument('<predicate>', 'predicate id (unknown → review queue)')
+    .argument('<object>', 'object node id, label, or alias')
+    .option('--type-s <type>', 'node type when creating the subject (default Concept)')
+    .option('--type-o <type>', 'node type when creating the object (default Concept)')
+    .option(
+      '--confidence <tier>',
+      'EXTRACTED | INFERRED | AMBIGUOUS (default INFERRED)',
+    )
+    .option('--note <text>', 'evidence note recorded in the episode log')
+    .option('--supersedes <tripleId>', 'triple this assertion supersedes')
+    .option('--actor <tag>', 'who asserts (default user/assert)')
+    .action(
+      (
+        s: string,
+        p: string,
+        o: string,
+        opts: {
+          typeS?: string;
+          typeO?: string;
+          confidence?: string;
+          note?: string;
+          supersedes?: string;
+          actor?: string;
+        },
+        cmd: Command,
+      ) => {
+        const conf =
+          opts.confidence === 'EXTRACTED' ||
+          opts.confidence === 'INFERRED' ||
+          opts.confidence === 'AMBIGUOUS'
+            ? opts.confidence
+            : undefined;
+        const result = assertFact(
+          withDir(
+            {
+              s,
+              p,
+              o,
+              ...(opts.typeS !== undefined ? { sType: opts.typeS } : {}),
+              ...(opts.typeO !== undefined ? { oType: opts.typeO } : {}),
+              ...(conf !== undefined ? { confidence: conf } : {}),
+              ...(opts.note !== undefined ? { note: opts.note } : {}),
+              ...(opts.supersedes !== undefined
+                ? { supersedes: opts.supersedes }
+                : {}),
+              ...(opts.actor !== undefined ? { actor: opts.actor } : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        writeOk({ ok: true, ...result });
+      },
+    );
+
+  program
+    .command('retract')
+    .description('Retract a triple by id (recorded in episodes.jsonl)')
+    .argument('<tripleId>', 'triple id to retract')
+    .option('--note <text>', 'reason recorded in the episode log')
+    .option('--actor <tag>', 'who retracts (default user/retract)')
+    .action(
+      (
+        tripleId: string,
+        opts: { note?: string; actor?: string },
+        cmd: Command,
+      ) => {
+        const result = retractFact(
+          withDir(
+            {
+              tripleId,
+              ...(opts.note !== undefined ? { note: opts.note } : {}),
+              ...(opts.actor !== undefined ? { actor: opts.actor } : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        writeOk({ ok: true, ...result });
       },
     );
 

@@ -17,6 +17,8 @@ const MCP_PKG = '@modelcontextprotocol/sdk';
 export interface CreateMcpServerOptions {
   allowBuild?: boolean;
   allowReviewWrite?: boolean;
+  /** Enable graph_assert / graph_retract (agent memory write path). */
+  allowAssert?: boolean;
   /** Default store dir for tools when args omit dir. */
   dir?: string;
   /** Override package version for server info. */
@@ -58,6 +60,7 @@ function toGateOptions(opts?: CreateMcpServerOptions): McpGateOptions {
   const gate: McpGateOptions = {};
   if (opts?.allowBuild === true) gate.allowBuild = true;
   if (opts?.allowReviewWrite === true) gate.allowReviewWrite = true;
+  if (opts?.allowAssert === true) gate.allowAssert = true;
   if (opts?.dir !== undefined && opts.dir !== '') gate.defaultDir = opts.dir;
   return gate;
 }
@@ -75,6 +78,8 @@ export function parseMcpArgv(argv: string[]): CreateMcpServerOptions {
       opts.allowBuild = true;
     } else if (a === '--allow-review-write') {
       opts.allowReviewWrite = true;
+    } else if (a === '--allow-assert') {
+      opts.allowAssert = true;
     } else if (a === '--dir' || a === '--store') {
       const next = args[i + 1];
       if (next !== undefined && !next.startsWith('-')) {
@@ -138,6 +143,10 @@ export async function createGsdGraphMcpServer(
   }
   if (gate.allowReviewWrite === true) {
     register('graph_review_resolve', toolSchemas.graph_review_resolve);
+  }
+  if (gate.allowAssert === true) {
+    register('graph_assert', toolSchemas.graph_assert);
+    register('graph_retract', toolSchemas.graph_retract);
   }
 
   // Resources: session-start briefing material for hosts that read resources.

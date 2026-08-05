@@ -46,6 +46,7 @@ import type {
   SourcesManifest,
   Triple,
 } from '../types';
+import { loadEpisodeCandidates } from './assert';
 import { extractByPath } from './extract';
 import { extractorForExtension } from './extractors';
 import { invalidateProvenance, normPathKey } from './maintain';
@@ -342,6 +343,17 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
     };
   }
 
+  // Replay agent/user episodes so asserted facts survive full rebuilds and
+  // retractions keep holding (last action per key wins).
+  const episodes = loadEpisodeCandidates(storeRoot);
+  if (episodes.triples.length > 0 || episodes.nodes.length > 0) {
+    progress?.(
+      `Replaying ${episodes.episode_count} episode(s) from ${'episodes.jsonl'}…`,
+    );
+    workingNodes.push(...episodes.nodes);
+    workingTriples.push(...episodes.triples);
+  }
+
   progress?.(
     `Normalizing ${workingNodes.length.toLocaleString('en-US')} nodes · ${workingTriples.length.toLocaleString('en-US')} triples…`,
   );
@@ -363,6 +375,16 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
       ...normalized,
       nodes: injected.nodes,
       triples: injected.triples,
+    };
+  }
+
+  // Honor retraction episodes: drop retracted (s,p,o) keys post-normalize.
+  if (episodes.retractKeys.size > 0) {
+    normalized = {
+      ...normalized,
+      triples: normalized.triples.filter(
+        (t) => !episodes.retractKeys.has(`${t.s}\0${t.p}\0${t.o}`),
+      ),
     };
   }
 

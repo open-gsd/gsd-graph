@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import {
   answer,
+  assertFact,
   build,
   detectCommunities,
   diff,
@@ -13,6 +14,7 @@ import {
   query,
   resolveNodeTerm,
   resolveStoreRoot,
+  retractFact,
   reviewResolve,
   status,
   suggestSeeds,
@@ -39,6 +41,8 @@ export const WRITE_TOOL_NAMES = [
   'graph_build',
   'graph_sync',
   'graph_review_resolve',
+  'graph_assert',
+  'graph_retract',
 ] as const;
 
 export type DefaultReadToolName = (typeof DEFAULT_READ_TOOL_NAMES)[number];
@@ -48,6 +52,8 @@ export type McpToolName = DefaultReadToolName | WriteToolName;
 export interface McpGateOptions {
   allowBuild?: boolean;
   allowReviewWrite?: boolean;
+  /** Enable graph_assert / graph_retract (agent memory write path). */
+  allowAssert?: boolean;
   /** Default store dir when tool args omit dir (from --dir). */
   defaultDir?: string;
 }
@@ -147,6 +153,28 @@ export const toolSchemas = {
       .optional()
       .describe('Allow ontology.lock extension on accept (privileged)'),
   },
+  graph_assert: {
+    s: z.string().describe('Subject node id, label, or alias'),
+    p: z.string().describe('Predicate id (unknown → review queue)'),
+    o: z.string().describe('Object node id, label, or alias'),
+    s_type: z.string().optional().describe('Type when creating subject (default Concept)'),
+    o_type: z.string().optional().describe('Type when creating object (default Concept)'),
+    confidence: z
+      .enum(['EXTRACTED', 'INFERRED', 'AMBIGUOUS'])
+      .optional()
+      .describe('Assertion confidence (default INFERRED)'),
+    note: z.string().optional().describe('Evidence note for the episode log'),
+    supersedes: z
+      .string()
+      .optional()
+      .describe('Triple id this assertion supersedes'),
+    dir: z.string().optional().describe('Store directory override'),
+  },
+  graph_retract: {
+    triple_id: z.string().describe('Triple id to retract'),
+    note: z.string().optional().describe('Reason for the episode log'),
+    dir: z.string().optional().describe('Store directory override'),
+  },
 } as const;
 
 function jsonResult(data: unknown): McpToolResult {
@@ -203,6 +231,9 @@ export function listRegisteredToolNames(opts?: McpGateOptions): string[] {
   }
   if (opts?.allowReviewWrite === true) {
     names.push('graph_review_resolve');
+  }
+  if (opts?.allowAssert === true) {
+    names.push('graph_assert', 'graph_retract');
   }
   return names;
 }
@@ -466,6 +497,62 @@ export async function handleToolCall(
         reviewResolve(resolveOpts);
         return jsonResult({ ok: true, id: args.id, action: args.action });
       }
+      case 'graph_assert': {
+        if (opts?.allowAssert !== true) {
+          throw new Error(
+            'graph_assert is not enabled (set --allow-assert or mcp.allow_assert)',
+          );
+        }
+        if (
+          typeof args.s !== 'string' ||
+          typeof args.p !== 'string' ||
+          typeof args.o !== 'string'
+        ) {
+          throw new Error('graph_assert requires s, p, and o');
+        }
+        const dir = resolveDir(
+          typeof args.dir === 'string' ? args.dir : undefined,
+          defaultDir,
+        );
+        const assertOpts: Parameters<typeof assertFact>[0] = withDirOpt(
+          { s: args.s, p: args.p, o: args.o, actor: 'agent/mcp' },
+          dir,
+        );
+        if (typeof args.s_type === 'string') assertOpts.sType = args.s_type;
+        if (typeof args.o_type === 'string') assertOpts.oType = args.o_type;
+        if (
+          args.confidence === 'EXTRACTED' ||
+          args.confidence === 'INFERRED' ||
+          args.confidence === 'AMBIGUOUS'
+        ) {
+          assertOpts.confidence = args.confidence;
+        }
+        if (typeof args.note === 'string') assertOpts.note = args.note;
+        if (typeof args.supersedes === 'string') {
+          assertOpts.supersedes = args.supersedes;
+        }
+        return jsonResult(assertFact(assertOpts));
+      }
+      case 'graph_retract': {
+        if (opts?.allowAssert !== true) {
+          throw new Error(
+            'graph_retract is not enabled (set --allow-assert or mcp.allow_assert)',
+          );
+        }
+        if (typeof args.triple_id !== 'string' || args.triple_id.length === 0) {
+          throw new Error('graph_retract requires triple_id');
+        }
+        const dir = resolveDir(
+          typeof args.dir === 'string' ? args.dir : undefined,
+          defaultDir,
+        );
+        const retractOpts: Parameters<typeof retractFact>[0] = withDirOpt(
+          { tripleId: args.triple_id, actor: 'agent/mcp' },
+          dir,
+        );
+        if (typeof args.note === 'string') retractOpts.note = args.note;
+        return jsonResult(retractFact(retractOpts));
+      }
       default:
         throw new Error(`Unknown MCP tool: ${name}`);
     }
@@ -499,4 +586,8 @@ export const TOOL_DESCRIPTIONS: Record<McpToolName, string> = {
     'PRIVILEGED: Incremental project sync (auto brownfield corpus). Off unless --allow-build / mcp.allow_build.',
   graph_review_resolve:
     'PRIVILEGED: Accept or reject a review item (mutates store). Off unless --allow-review-write / mcp.allow_review_write.',
+  graph_assert:
+    'PRIVILEGED: Assert a learned fact into the graph (ontology-gated; recorded in episodes.jsonl; survives rebuilds). Off unless --allow-assert / mcp.allow_assert.',
+  graph_retract:
+    'PRIVILEGED: Retract a triple by id (recorded in episodes.jsonl). Off unless --allow-assert / mcp.allow_assert.',
 };
