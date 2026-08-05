@@ -74,6 +74,38 @@ export function tokenizeQuestion(question: string): string[] {
   return raw.filter((t) => !PACK_STOPWORDS.has(t));
 }
 
+/**
+ * Preferred singular form ("dependencies" → "dependency", "phases" → "phase").
+ * Conservative plural rules only — no verb stemming, no dictionary.
+ */
+export function singularizeToken(t: string): string {
+  if (t.length >= 4 && t.endsWith('ies')) return `${t.slice(0, -3)}y`;
+  if (t.length >= 3 && t.endsWith('s') && !t.endsWith('ss')) return t.slice(0, -1);
+  return t;
+}
+
+/**
+ * All plural-strip variants of a word (including itself). English plurals are
+ * ambiguous without a dictionary ("phases"→phase but "buses"→bus), so both
+ * sides of a match contribute every variant and a hit is any intersection.
+ */
+export function tokenVariants(t: string): string[] {
+  const out = new Set([t]);
+  if (t.length >= 4 && t.endsWith('ies')) out.add(`${t.slice(0, -3)}y`);
+  if (t.length >= 4 && t.endsWith('es')) out.add(t.slice(0, -2));
+  if (t.length >= 3 && t.endsWith('s') && !t.endsWith('ss')) out.add(t.slice(0, -1));
+  return [...out];
+}
+
+function wordStems(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const w of text.split(/[^a-z0-9]+/u)) {
+    if (w.length < 2) continue;
+    for (const v of tokenVariants(w)) out.add(v);
+  }
+  return out;
+}
+
 interface ScoredSeed {
   id: string;
   score: number;
@@ -86,16 +118,31 @@ interface NodeFields {
   labelLen: number;
   description: string;
   aliases: string[];
+  labelStems: Set<string>;
+  descriptionStems: Set<string>;
+  aliasStems: Set<string>;
 }
 
 function foldNodeFields(graph: GraphV1Document): NodeFields[] {
-  return graph.nodes.map((n) => ({
-    id: n.id,
-    label: n.label.normalize('NFKC').toLowerCase(),
-    labelLen: n.label.length,
-    description: (n.description ?? '').normalize('NFKC').toLowerCase(),
-    aliases: (n.aliases ?? []).map((a) => a.normalize('NFKC').toLowerCase()),
-  }));
+  return graph.nodes.map((n) => {
+    const label = n.label.normalize('NFKC').toLowerCase();
+    const description = (n.description ?? '').normalize('NFKC').toLowerCase();
+    const aliases = (n.aliases ?? []).map((a) => a.normalize('NFKC').toLowerCase());
+    const aliasStems = new Set<string>();
+    for (const a of aliases) {
+      for (const s of wordStems(a)) aliasStems.add(s);
+    }
+    return {
+      id: n.id,
+      label,
+      labelLen: n.label.length,
+      description,
+      aliases,
+      labelStems: wordStems(label),
+      descriptionStems: wordStems(description),
+      aliasStems,
+    };
+  });
 }
 
 /**
@@ -119,17 +166,25 @@ export function scoreSeeds(
   const fields = foldNodeFields(graph);
   const n = fields.length;
 
+  // Field hit = substring match (original behavior) OR stem-variant word match
+  // ("phases" tokens hit a node labeled "phase" and vice versa).
+  const anyVariant = (set: Set<string>, variants: readonly string[]): boolean =>
+    variants.some((v) => set.has(v));
+  const labelHit = (f: NodeFields, token: string, variants: readonly string[]): boolean =>
+    f.label.includes(token) || anyVariant(f.labelStems, variants);
+  const descHit = (f: NodeFields, token: string, variants: readonly string[]): boolean =>
+    f.description.includes(token) || anyVariant(f.descriptionStems, variants);
+  const aliasHit = (f: NodeFields, token: string, variants: readonly string[]): boolean =>
+    f.aliases.some((a) => a.includes(token)) || anyVariant(f.aliasStems, variants);
+
   // Pass 1: document frequency per token (any-field match).
   const idf = new Map<string, number>();
   for (const token of tokens) {
     if (idf.has(token)) continue;
+    const variants = tokenVariants(token);
     let df = 0;
     for (const f of fields) {
-      if (
-        f.label.includes(token) ||
-        f.description.includes(token) ||
-        f.aliases.some((a) => a.includes(token))
-      ) {
+      if (labelHit(f, token, variants) || descHit(f, token, variants) || aliasHit(f, token, variants)) {
         df += 1;
       }
     }
@@ -143,9 +198,10 @@ export function scoreSeeds(
     for (const token of tokens) {
       const w = idf.get(token) ?? 0;
       if (w === 0) continue;
-      if (f.label.includes(token)) score += 3 * w;
-      if (f.description.includes(token)) score += 1 * w;
-      if (f.aliases.some((a) => a.includes(token))) score += 2 * w;
+      const variants = tokenVariants(token);
+      if (labelHit(f, token, variants)) score += 3 * w;
+      if (descHit(f, token, variants)) score += 1 * w;
+      if (aliasHit(f, token, variants)) score += 2 * w;
     }
     if (score > 0) {
       scored.push({ id: f.id, score, labelLen: f.labelLen });
@@ -161,11 +217,96 @@ export function scoreSeeds(
   return scored.slice(0, kSeeds).map((s) => s.id);
 }
 
+/** Bounded Levenshtein distance; returns limit+1 when exceeded (early exit). */
+function boundedEditDistance(a: string, b: string, limit: number): number {
+  if (Math.abs(a.length - b.length) > limit) return limit + 1;
+  let prev = new Array<number>(b.length + 1);
+  let cur = new Array<number>(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    cur[0] = i;
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j]! + 1, cur[j - 1]! + 1, prev[j - 1]! + cost);
+      if (cur[j]! < rowMin) rowMin = cur[j]!;
+    }
+    if (rowMin > limit) return limit + 1;
+    [prev, cur] = [cur, prev];
+  }
+  return prev[b.length]!;
+}
+
+/**
+ * "Did you mean" candidates for a question that matched no seeds:
+ * nodes whose label/alias words are within a small edit distance of some
+ * question token. Deterministic ranking: total distance asc, label length
+ * asc, id asc. Exported for direct use in abstain UIs.
+ */
+export function suggestSeeds(
+  graph: GraphV1Document,
+  tokens: readonly string[],
+  k = 5,
+): Array<{ id: string; label: string }> {
+  const usable = tokens.filter((t) => t.length >= 3);
+  if (usable.length === 0) return [];
+  const fields = foldNodeFields(graph);
+  const ranked: Array<{
+    id: string;
+    label: string;
+    dist: number;
+    labelLen: number;
+  }> = [];
+
+  for (const f of fields) {
+    let total = 0;
+    let hits = 0;
+    for (const token of usable) {
+      const stem = singularizeToken(token);
+      const limit = stem.length >= 6 ? 2 : 1;
+      let best = limit + 1;
+      for (const w of f.labelStems) {
+        const d = boundedEditDistance(stem, w, limit);
+        if (d < best) best = d;
+        if (best === 0) break;
+      }
+      if (best > limit) {
+        for (const w of f.aliasStems) {
+          const d = boundedEditDistance(stem, w, limit);
+          if (d < best) best = d;
+          if (best === 0) break;
+        }
+      }
+      if (best <= limit) {
+        total += best;
+        hits += 1;
+      }
+    }
+    if (hits > 0) {
+      const node = graph.nodes.find((n) => n.id === f.id);
+      ranked.push({
+        id: f.id,
+        label: node?.label ?? f.id,
+        dist: total + (usable.length - hits) * 3,
+        labelLen: f.labelLen,
+      });
+    }
+  }
+
+  ranked.sort((a, b) => {
+    if (a.dist !== b.dist) return a.dist - b.dist;
+    if (a.labelLen !== b.labelLen) return a.labelLen - b.labelLen;
+    return a.id.localeCompare(b.id);
+  });
+  return ranked.slice(0, k).map(({ id, label }) => ({ id, label }));
+}
+
 function emptyPack(
   question: string,
   seeds: string[],
   budget: number | null,
   trimmed: string | null = null,
+  seedSuggestions?: Array<{ id: string; label: string }>,
 ): SubgraphPack {
   return {
     question,
@@ -176,6 +317,9 @@ function emptyPack(
     citations: [],
     trimmed,
     budget_tokens: budget,
+    ...(seedSuggestions !== undefined && seedSuggestions.length > 0
+      ? { seed_suggestions: seedSuggestions }
+      : {}),
   };
 }
 
@@ -231,7 +375,13 @@ export function packSubgraph(opts: PackOptions): SubgraphPack {
   const seeds = scoreSeeds(graph, tokens, kSeeds);
 
   if (seeds.length === 0) {
-    return emptyPack(question, seeds, budget);
+    return emptyPack(
+      question,
+      seeds,
+      budget,
+      null,
+      suggestSeeds(graph, tokens),
+    );
   }
 
   const adj = buildAdjacencyMap(graph);

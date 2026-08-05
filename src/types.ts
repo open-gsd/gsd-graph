@@ -538,6 +538,8 @@ export interface SubgraphPack {
   citations: PackCitation[];
   trimmed: string | null;
   budget_tokens: number | null;
+  /** "Did you mean" candidates when no seeds matched (near-miss labels). */
+  seed_suggestions?: Array<{ id: string; label: string }>;
 }
 
 /** Options for packSubgraph (PACK-01). Prefer in-memory graph for tests (D-10). */
@@ -625,6 +627,8 @@ export interface GroundedAnswer {
   abstained: boolean;
   /** Machine-readable reason when abstained (e.g. GSD_GRAPH_REASON.EMPTY_SUBGRAPH). */
   abstain_reason?: string;
+  /** "Did you mean" node labels when no seeds matched (`Label (id)` strings). */
+  suggestions?: string[];
   /** Reserved for Phase 6 LLM prompt apply — unused in Phase 5 (D-05). */
   prompt_bundle?: object;
 }

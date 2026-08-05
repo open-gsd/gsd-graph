@@ -320,7 +320,15 @@ export type { WhyOptions, WhyResult, WhyCitation } from './pipeline/why';
 export { init } from './pipeline/init';
 
 // Pack / grounded subgraph (05-01 / PACK-01)
-export { packSubgraph, PACK_STOPWORDS, tokenizeQuestion, scoreSeeds } from './pipeline/pack';
+export {
+  packSubgraph,
+  PACK_STOPWORDS,
+  tokenizeQuestion,
+  scoreSeeds,
+  singularizeToken,
+  tokenVariants,
+  suggestSeeds,
+} from './pipeline/pack';
 
 // Deterministic grounded answer (05-02 / ANS-01 / ANS-02)
 export { answer, answerHttp, formatDeterministicMarkdown } from './pipeline/answer';

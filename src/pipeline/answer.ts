@@ -142,12 +142,16 @@ function abstainEmpty(pack: SubgraphPack): GroundedAnswer {
   } else if (pack.trimmed === null) {
     reason = GSD_GRAPH_REASON.SEEDS_DISCONNECTED;
   }
+  const suggestions = (pack.seed_suggestions ?? []).map(
+    (s) => `${s.label} (${s.id})`,
+  );
   return {
     pack,
     answer_markdown: '',
     mode: 'abstain',
     abstained: true,
     abstain_reason: reason,
+    ...(suggestions.length > 0 ? { suggestions } : {}),
   };
 }
 
