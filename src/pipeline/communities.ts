@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { GSD_GRAPH_REASON, GraphError } from '../errors';
-import { loadGraphV1 } from '../io/load-graph';
+import { loadGraphV1Cached } from '../io/graph-cache';
 import { confineUnderRoot, resolveStoreRoot } from '../io/paths';
 import { readJsonFile, writeJsonAtomicTemp } from '../io/safe-json';
 import type {
@@ -678,7 +678,7 @@ export function detectCommunities(
   } else {
     storeRoot = resolveCommunitiesStoreRoot(opts.dir);
     try {
-      graph = loadGraphV1(storeRoot);
+      graph = loadGraphV1Cached(storeRoot);
     } catch (err) {
       if (err instanceof GraphError) throw err;
       throw new GraphError(

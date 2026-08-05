@@ -9,7 +9,7 @@
  * SoT: opts.graph or loadGraphV1 via resolveStoreRoot — never projection (D-10).
  */
 
-import { loadGraphV1 } from '../io/load-graph';
+import { loadGraphV1Cached } from '../io/graph-cache';
 import { resolveStoreRoot } from '../io/paths';
 import type {
   GraphNode,
@@ -62,7 +62,7 @@ function loadPackGraph(opts: PackOptions): GraphV1Document {
     opts.dir !== undefined
       ? resolveStoreRoot({ dir: opts.dir })
       : resolveStoreRoot();
-  return loadGraphV1(storeRoot);
+  return loadGraphV1Cached(storeRoot);
 }
 
 /**

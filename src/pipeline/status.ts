@@ -7,7 +7,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadGraphV1 } from '../io/load-graph';
+import { loadGraphV1Cached } from '../io/graph-cache';
 import { STALE_MS } from '../io/lock';
 import { resolveStoreRoot, storeFile } from '../io/paths';
 import { readJsonFile } from '../io/safe-json';
@@ -158,7 +158,7 @@ export function status(opts?: StatusOptions): StatusResult {
   }
 
   // loadGraphV1 validates schema; never falls back to projection
-  const graph = loadGraphV1(storeRoot);
+  const graph = loadGraphV1Cached(storeRoot);
   const lastStatus = readLastBuildStatus(storeRoot);
   const manifest = loadManifest(storeRoot);
 

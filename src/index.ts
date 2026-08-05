@@ -111,6 +111,11 @@ export {
 } from './io/migrations';
 export type { GraphMigration, MigrateGraphResult } from './io/migrations';
 
+export { loadGraphV1Cached, clearGraphV1Cache } from './io/graph-cache';
+
+export { GsdGraph } from './facade';
+export type { GsdGraphOpenOptions } from './facade';
+
 export { acquireBuildLock, STALE_MS } from './io/lock';
 export type {
   BuildLockOwner,

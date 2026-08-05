@@ -6,7 +6,7 @@
  * public query ops only (D-01); abstains honestly when no path exists.
  */
 
-import { loadGraphV1 } from '../io/load-graph';
+import { loadGraphV1Cached } from '../io/graph-cache';
 import { resolveStoreRoot } from '../io/paths';
 import type { GraphV1Document, PackCitationSource, Triple } from '../types';
 import { matchTermSeeds, query } from './query';
@@ -97,7 +97,7 @@ function citeSources(t: Triple): PackCitationSource[] {
 export function why(opts: WhyOptions): WhyResult {
   const graph =
     opts.graph ??
-    loadGraphV1(
+    loadGraphV1Cached(
       resolveStoreRoot(opts.dir !== undefined ? { dir: opts.dir } : {}),
     );
 

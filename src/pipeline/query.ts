@@ -18,7 +18,7 @@
  */
 
 import { GSD_GRAPH_REASON, GraphError } from '../errors';
-import { loadGraphV1 } from '../io/load-graph';
+import { loadGraphV1Cached } from '../io/graph-cache';
 import { resolveStoreRoot } from '../io/paths';
 import type {
   GraphNode,
@@ -58,9 +58,20 @@ export interface AdjacencyEdge {
 export type AdjacencyMap = Map<string, AdjacencyEdge[]>;
 
 /**
+ * Adjacency memo per loaded document. Documents are immutable after load
+ * (write paths publish fresh files), so identity keying is safe; WeakMap
+ * lets rebuilt graphs and their maps be collected together.
+ */
+const adjacencyMemo = new WeakMap<GraphV1Document, AdjacencyMap>();
+
+/**
  * Index undirected edges for traversal while preserving directed triple fields.
+ * Memoized per document — repeated walks (pack path pairs, MCP server calls)
+ * reuse the same map instead of re-indexing every triple.
  */
 export function buildAdjacencyMap(graph: GraphV1Document): AdjacencyMap {
+  const memo = adjacencyMemo.get(graph);
+  if (memo !== undefined) return memo;
   const adj: AdjacencyMap = new Map();
 
   const push = (from: string, edge: AdjacencyEdge): void => {
@@ -98,6 +109,7 @@ export function buildAdjacencyMap(graph: GraphV1Document): AdjacencyMap {
     }
   }
 
+  adjacencyMemo.set(graph, adj);
   return adj;
 }
 
@@ -425,7 +437,7 @@ function loadQueryGraph(opts: QueryOptions): GraphV1Document {
     opts.dir !== undefined
       ? resolveStoreRoot({ dir: opts.dir })
       : resolveStoreRoot();
-  return loadGraphV1(storeRoot);
+  return loadGraphV1Cached(storeRoot);
 }
 
 /**
