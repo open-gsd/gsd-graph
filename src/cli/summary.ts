@@ -5,14 +5,17 @@ import pc from 'picocolors';
 import type { EnableResult, ProjectSyncResult } from '../types';
 
 function isQuiet(): boolean {
-  if (process.env.CI === 'true' || process.env.CI === '1') return true;
   if (process.env.GSD_GRAPH_NO_SUMMARY === '1') return true;
-  // Always allow summary on TTY; also when GSD_GRAPH_PROGRESS forces plain logs
-  if (process.stderr.isTTY) return false;
-  return !(
+  // Explicit progress/log mode forces wrap-up (including CI tests).
+  if (
     process.env.GSD_GRAPH_PROGRESS === '1' ||
     process.env.GSD_GRAPH_PROGRESS === 'true'
-  );
+  ) {
+    return false;
+  }
+  // Default: quiet in CI / non-TTY so agent JSON pipelines stay clean.
+  if (process.env.CI === 'true' || process.env.CI === '1') return true;
+  return !process.stderr.isTTY;
 }
 
 function n(num: number): string {
