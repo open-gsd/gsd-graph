@@ -14,6 +14,24 @@ GSD > GRAPH
 
 `@opengsd/gsd-graph` builds a local knowledge graph from project docs (not plain RAG). Store: `.gsd-graph/graph.v1.json`.
 
+## Graph-first routing (IMPORTANT)
+
+When this project has a graph store, route questions about the project THROUGH THE GRAPH before re-reading `.planning/`, `docs/`, or README files — that is the entire token-savings point of the tool.
+
+**If the gsd-graph MCP server is registered** (check for `graph_*` tools), prefer these over file reads:
+
+| Question shape | Tool |
+|----------------|------|
+| "why/how does A relate to B", multi-hop questions | `graph_answer` (citations included) |
+| "how does A connect to B" | `graph_why` |
+| "what are the main areas / overview" | `graph_answer` (auto community themes) or `graph_communities` |
+| find a concept / fuzzy name | `graph_resolve`, `graph_query` |
+| "what changed" | `graph_diff` |
+| session-start briefing | read resources `gsd-graph://report` and `gsd-graph://communities` |
+| record a learned fact (if `graph_assert` present) | `graph_assert` (episodes survive rebuilds) |
+
+**Without MCP**, use the CLI equivalents: `gsd-graph ask`, `why`, `top`, `query`, `assert`. Only fall back to reading the underlying files when the graph abstains AND its `suggestions` don't resolve the question — then consider `gsd-graph sync` (stale graph) before a manual doc crawl.
+
 ## Resolve CLI
 
 1. `command -v gsd-graph`

@@ -682,7 +682,7 @@ function buildProgram(): Command {
                     `  ${h.ok ? '✔' : '✖'} ${h.host}: ${h.message}`,
                 )
                 .join('\n') +
-              `\n\n  Next: restart Claude / Codex / Cursor\n  Then: gsd-graph mcp doctor\n\n`,
+              `\n\n  Next: restart Claude / Codex / Cursor\n  Then: gsd-graph mcp doctor\n  Tools: graph_answer · graph_why · graph_query · graph_communities (agents: use these before re-reading docs)\n\n`,
           );
         }
         writeOk(result);
