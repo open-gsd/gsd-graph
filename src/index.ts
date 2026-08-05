@@ -186,7 +186,9 @@ export type {
 } from './sources/discover';
 
 // Normalize + review (02-03)
-export { normalize } from './pipeline/normalize';
+export { normalize, DIRECTIONAL_PREDICATES } from './pipeline/normalize';
+export { supersede } from './pipeline/supersede';
+export type { SupersedeOptions, SupersedeResult } from './pipeline/supersede';
 export type {
   NormalizeInput,
   NormalizeOutput,

@@ -184,6 +184,7 @@ export function normalize(input: NormalizeInput): NormalizeOutput {
       existing.provenance = unionProvenance(
         existing.provenance,
         raw.provenance ?? [],
+        now,
       );
       existing.confidence = bestTier(existing.provenance);
       if (raw.score !== undefined) {
@@ -192,8 +193,9 @@ export function normalize(input: NormalizeInput): NormalizeOutput {
             ? raw.score
             : Math.max(existing.score, raw.score);
       }
+      mergeSupersession(existing, raw);
     } else {
-      const provenance = unionProvenance([], raw.provenance ?? []);
+      const provenance = unionProvenance([], raw.provenance ?? [], now);
       const triple: Triple = {
         id: tripleId(s, p, o),
         s,
@@ -203,9 +205,14 @@ export function normalize(input: NormalizeInput): NormalizeOutput {
         provenance,
       };
       if (raw.score !== undefined) triple.score = raw.score;
+      mergeSupersession(triple, raw);
       tripleMap.set(key, triple);
     }
   }
+
+  // Conflict surfacing (never suppression): reciprocal cycles on directional
+  // predicates and supports/contradicts on the same endpoints go to review.
+  detectConflicts(tripleMap, reviewItems, reviewSeen, now);
 
   return {
     nodes: mergedNodes,
@@ -213,6 +220,94 @@ export function normalize(input: NormalizeInput): NormalizeOutput {
     reviewItems,
     diagnostics,
   };
+}
+
+/**
+ * Directional predicates where A→B and B→A together read as a contradiction
+ * or a cycle worth a human look (planning corpora reverse decisions often).
+ */
+export const DIRECTIONAL_PREDICATES: ReadonlySet<string> = new Set([
+  'causes',
+  'depends_on',
+  'blocked_by',
+  'blocks',
+  'precedes',
+  'part_of',
+  'requires',
+  'uses',
+  'implements',
+  'delivers',
+  'derived_from',
+  'authored',
+  'owns',
+  'mitigates',
+  'deploys',
+  'cites',
+  'works_for',
+  'located_in',
+  'member_of',
+  'uses_method',
+  'evaluates',
+]);
+
+function mergeSupersession(target: Triple, raw: Triple): void {
+  if (raw.supersedes !== undefined && raw.supersedes.length > 0) {
+    target.supersedes = [
+      ...new Set([...(target.supersedes ?? []), ...raw.supersedes]),
+    ];
+  }
+  if (raw.superseded_by !== undefined && raw.superseded_by.length > 0) {
+    target.superseded_by = [
+      ...new Set([...(target.superseded_by ?? []), ...raw.superseded_by]),
+    ];
+  }
+}
+
+function detectConflicts(
+  tripleMap: Map<string, Triple>,
+  reviewItems: ReviewItem[],
+  reviewSeen: Set<string>,
+  now: string,
+): void {
+  for (const t of tripleMap.values()) {
+    // Reciprocal cycle on a directional predicate: emit once per unordered pair.
+    if (DIRECTIONAL_PREDICATES.has(t.p) && t.s < t.o) {
+      const reverse = tripleMap.get(`${t.o}\0${t.p}\0${t.s}`);
+      if (reverse !== undefined) {
+        pushReview(
+          reviewItems,
+          reviewSeen,
+          'conflict',
+          {
+            reason: 'reciprocal_cycle',
+            p: t.p,
+            a: t.s,
+            b: t.o,
+            triples: [t.id, reverse.id],
+          },
+          now,
+        );
+      }
+    }
+    // supports vs contradicts on identical endpoints.
+    if (t.p === 'supports') {
+      const opposing = tripleMap.get(`${t.s}\0contradicts\0${t.o}`);
+      if (opposing !== undefined) {
+        pushReview(
+          reviewItems,
+          reviewSeen,
+          'conflict',
+          {
+            reason: 'opposing_predicates',
+            s: t.s,
+            o: t.o,
+            triples: [t.id, opposing.id],
+          },
+          now,
+        );
+      }
+    }
+  }
 }
 
 function canonicalizeNodes(nodes: GraphNode[]): GraphNode[] {
@@ -469,15 +564,44 @@ function provenanceKey(e: ProvenanceEntry): string {
   return `${e.source_path}\0${e.extractor}\0${e.content_hash}\0${e.confidence}`;
 }
 
+/**
+ * Multiset provenance union with observation timestamps: a never-seen entry
+ * is stamped first_seen/last_seen = now (unless it already carries stamps
+ * from a prior publish); a re-observed entry (unstamped duplicate from a
+ * fresh extract) keeps its earliest first_seen and bumps last_seen to now.
+ */
 function unionProvenance(
   a: readonly ProvenanceEntry[],
   b: readonly ProvenanceEntry[],
+  now: string,
 ): ProvenanceEntry[] {
   const map = new Map<string, ProvenanceEntry>();
-  for (const e of a) map.set(provenanceKey(e), e);
-  for (const e of b) {
-    if (!map.has(provenanceKey(e))) map.set(provenanceKey(e), e);
-  }
+  const add = (e: ProvenanceEntry): void => {
+    const key = provenanceKey(e);
+    const existing = map.get(key);
+    if (existing === undefined) {
+      const copy: ProvenanceEntry = { ...e };
+      if (copy.first_seen === undefined) copy.first_seen = now;
+      if (copy.last_seen === undefined) copy.last_seen = copy.first_seen;
+      map.set(key, copy);
+      return;
+    }
+    const firsts = [existing.first_seen, e.first_seen].filter(
+      (x): x is string => x !== undefined,
+    );
+    existing.first_seen = firsts.sort()[0] ?? now;
+    // An unstamped duplicate means this evidence was extracted again now.
+    if (e.first_seen === undefined) {
+      existing.last_seen = now;
+    } else {
+      const lasts = [existing.last_seen, e.last_seen].filter(
+        (x): x is string => x !== undefined,
+      );
+      existing.last_seen = lasts.sort().pop() ?? now;
+    }
+  };
+  for (const e of a) add(e);
+  for (const e of b) add(e);
   return [...map.values()];
 }
 

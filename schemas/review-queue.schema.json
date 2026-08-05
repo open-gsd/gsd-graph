@@ -4,7 +4,11 @@
   "title": "gsd-graph review-queue",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "items", "decisions"],
+  "required": [
+    "schema_version",
+    "items",
+    "decisions"
+  ],
   "properties": {
     "schema_version": {
       "const": 1
@@ -34,19 +38,27 @@
               "entity_merge",
               "predicate_unknown",
               "type_unknown",
-              "schema_drift"
+              "schema_drift",
+              "conflict"
             ]
           },
           "status": {
             "type": "string",
-            "enum": ["pending", "accepted", "rejected"]
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected"
+            ]
           },
           "created_at": {
             "type": "string",
             "format": "date-time"
           },
           "updated_at": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "payload": {
@@ -54,15 +66,23 @@
           },
           "decision": {
             "oneOf": [
-              { "type": "null" },
+              {
+                "type": "null"
+              },
               {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["action", "at"],
+                "required": [
+                  "action",
+                  "at"
+                ],
                 "properties": {
                   "action": {
                     "type": "string",
-                    "enum": ["accept", "reject"]
+                    "enum": [
+                      "accept",
+                      "reject"
+                    ]
                   },
                   "at": {
                     "type": "string",
@@ -83,7 +103,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "action", "at"],
+        "required": [
+          "id",
+          "action",
+          "at"
+        ],
         "properties": {
           "id": {
             "type": "string",
@@ -91,7 +115,10 @@
           },
           "action": {
             "type": "string",
-            "enum": ["accept", "reject"]
+            "enum": [
+              "accept",
+              "reject"
+            ]
           },
           "at": {
             "type": "string",

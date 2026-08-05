@@ -23,6 +23,10 @@ export interface ProvenanceEntry {
   confidence: Confidence;
   score?: number;
   span?: ProvenanceSpan;
+  /** ISO time this exact evidence was first observed (stamped at normalize). */
+  first_seen?: string;
+  /** ISO time this exact evidence was last re-observed. */
+  last_seen?: string;
 }
 
 export interface GraphNode {
@@ -41,6 +45,10 @@ export interface Triple {
   o: NodeId;
   confidence: Confidence;
   score?: number;
+  /** Triple ids this fact supersedes (decision reversals; ranked above them). */
+  supersedes?: string[];
+  /** Triple ids that supersede this fact (ranked below fresh facts, flagged in citations). */
+  superseded_by?: string[];
   provenance: ProvenanceEntry[];
 }
 
@@ -85,7 +93,8 @@ export type ReviewKind =
   | 'entity_merge'
   | 'predicate_unknown'
   | 'type_unknown'
-  | 'schema_drift';
+  | 'schema_drift'
+  | 'conflict';
 
 /** Decision embedded on a resolved review item. */
 export interface ReviewItemDecision {
@@ -519,6 +528,8 @@ export interface PackCitation {
   confidence?: Confidence;
   /** Count of distinct provenance sources (path + span) backing the triple. */
   source_count?: number;
+  /** True when a newer fact supersedes this triple (flagged in rendering). */
+  superseded?: boolean;
   /** First provenance source_path when present (back-compat convenience). */
   source_path?: string;
   /** First provenance start_line when present (back-compat convenience). */

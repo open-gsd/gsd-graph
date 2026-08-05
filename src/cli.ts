@@ -58,6 +58,7 @@ import {
   snapshotRestore,
   snapshotSave,
 } from './pipeline/snapshot';
+import { supersede } from './pipeline/supersede';
 import { status } from './pipeline/status';
 
 export interface CliErrorBody {
@@ -1041,6 +1042,18 @@ function buildProgram(): Command {
         reviewBatchAction('reject', id, opts, cmd);
       },
     );
+
+  program
+    .command('supersede')
+    .description(
+      'Record that one triple supersedes another (decision reversal verdict)',
+    )
+    .argument('<winner>', 'triple id that wins (current fact)')
+    .argument('<loser>', 'triple id that is superseded (stale fact)')
+    .action((winner: string, loser: string, _opts: unknown, cmd: Command) => {
+      const result = supersede(withDir({ winner, loser }, globalDir(cmd)));
+      writeOk({ ok: true, ...result });
+    });
 
   const ontology = defaultGroupHelp(
     program

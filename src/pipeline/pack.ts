@@ -372,7 +372,10 @@ export function packRelevanceScore(
     (t.provenance ?? []).map((e) => `${e.source_path}\0${e.span?.start_line ?? ''}`),
   ).size;
   const provenance = Math.min(sources, 5) * 2;
-  return conf + proximity + predicate + provenance;
+  // Superseded facts drop below one full confidence tier — history, not garbage.
+  const superseded =
+    t.superseded_by !== undefined && t.superseded_by.length > 0 ? -150 : 0;
+  return conf + proximity + predicate + provenance + superseded;
 }
 
 function distinctSourceCount(t: Triple): number {
@@ -393,6 +396,9 @@ function projectCitations(triples: readonly Triple[]): PackCitation[] {
       o: t.o,
       confidence: t.confidence,
       source_count: distinctSourceCount(t),
+      ...(t.superseded_by !== undefined && t.superseded_by.length > 0
+        ? { superseded: true }
+        : {}),
     };
 
     // Project every distinct (path, span) provenance source — build maintains

@@ -54,8 +54,10 @@ function renderCitation(c: PackCitation): string {
   // AMBIGUOUS one (D-02 spirit — confidence is part of the citation).
   const tier =
     c.confidence !== undefined
-      ? ` [${c.confidence}${(c.source_count ?? 0) > 1 ? ` ×${c.source_count}` : ''}]`
-      : '';
+      ? ` [${c.confidence}${(c.source_count ?? 0) > 1 ? ` ×${c.source_count}` : ''}${c.superseded === true ? ' · superseded' : ''}]`
+      : c.superseded === true
+        ? ' [superseded]'
+        : '';
   const sources = c.sources ?? [];
   if (sources.length === 0) {
     if (c.source_path !== undefined && c.source_path.length > 0) {

@@ -393,6 +393,10 @@ function applyAccept(
     case 'schema_drift':
       // Record-only accept (DESIGN table)
       return;
+    case 'conflict':
+      // Record-only: acknowledging a conflict never mutates the graph.
+      // Deciding which side wins is `gsd-graph supersede <winner> <loser>`.
+      return;
     default: {
       const _exhaustive: never = item.kind;
       void _exhaustive;
