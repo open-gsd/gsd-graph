@@ -219,12 +219,14 @@ export function projectSync(opts?: ProjectSyncOptions): ProjectSyncResult {
   const initResult = init({
     cwd,
     ...(dir !== undefined ? { dir } : {}),
+    ...(opts?.ontology !== undefined ? { ontology: opts.ontology } : {}),
   });
 
   progress?.(full ? 'Building graph (full extract)…' : 'Building graph…');
   const buildResult: BuildResult = build({
     corpus,
     ...(dir !== undefined ? { dir } : {}),
+    ...(opts?.ontology !== undefined ? { ontology: opts.ontology } : {}),
     full,
     writeReportOnBuild: report === true,
     ...(progress !== undefined ? { onProgress: progress } : {}),

@@ -676,7 +676,7 @@ function escapeReg(s: string): string {
 }
 
 describe('answer abstain empty pack (ANS-02 / D-04)', () => {
-  it('stopword / no-match questions abstain with empty_subgraph and do not throw', () => {
+  it('stopword / no-match questions abstain with no_seeds_matched and do not throw', () => {
     const g = multiHopGraph();
 
     const stopOnly = mod.answer({
@@ -685,8 +685,8 @@ describe('answer abstain empty pack (ANS-02 / D-04)', () => {
     });
     assert.equal(stopOnly.abstained, true);
     assert.equal(stopOnly.mode, 'abstain');
-    assert.equal(stopOnly.abstain_reason, mod.GSD_GRAPH_REASON.EMPTY_SUBGRAPH);
-    assert.equal(stopOnly.abstain_reason, 'empty_subgraph');
+    assert.equal(stopOnly.abstain_reason, mod.GSD_GRAPH_REASON.NO_SEEDS_MATCHED);
+    assert.equal(stopOnly.abstain_reason, 'no_seeds_matched');
     assert.equal(stopOnly.pack.triples.length, 0);
     assert.ok(stopOnly.pack !== undefined, 'pack field still present for consumers');
 
@@ -696,7 +696,7 @@ describe('answer abstain empty pack (ANS-02 / D-04)', () => {
     });
     assert.equal(noMatch.abstained, true);
     assert.equal(noMatch.mode, 'abstain');
-    assert.equal(noMatch.abstain_reason, mod.GSD_GRAPH_REASON.EMPTY_SUBGRAPH);
+    assert.equal(noMatch.abstain_reason, mod.GSD_GRAPH_REASON.NO_SEEDS_MATCHED);
     assert.equal(noMatch.pack.triples.length, 0);
   });
 
@@ -726,7 +726,7 @@ describe('answer abstain empty pack (ANS-02 / D-04)', () => {
     });
     assert.equal(emptyAns.abstained, true);
     assert.equal(emptyAns.mode, 'abstain');
-    assert.equal(emptyAns.abstain_reason, 'empty_subgraph');
+    assert.equal(emptyAns.abstain_reason, 'no_seeds_matched');
     // Must not invent causes chain from the question text
     assert.doesNotMatch(emptyAns.answer_markdown, /—causes→/);
     assert.doesNotMatch(emptyAns.answer_markdown, /-causes→/);
@@ -760,7 +760,7 @@ describe('answer abstain empty pack (ANS-02 / D-04)', () => {
     });
     assert.equal(ans.abstained, true);
     assert.equal(ans.mode, 'abstain');
-    assert.equal(ans.abstain_reason, mod.GSD_GRAPH_REASON.EMPTY_SUBGRAPH);
+    assert.equal(ans.abstain_reason, mod.GSD_GRAPH_REASON.NO_SEEDS_MATCHED);
     assert.equal(ans.pack.triples.length, 0);
     assert.equal(ans.pack.paths.length, 0);
     assert.doesNotMatch(ans.answer_markdown, /—causes→/);

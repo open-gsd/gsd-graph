@@ -17,6 +17,8 @@ const MCP_PKG = '@modelcontextprotocol/sdk';
 export interface CreateMcpServerOptions {
   allowBuild?: boolean;
   allowReviewWrite?: boolean;
+  /** Enable graph_assert / graph_retract (agent memory write path). */
+  allowAssert?: boolean;
   /** Default store dir for tools when args omit dir. */
   dir?: string;
   /** Override package version for server info. */
@@ -30,6 +32,14 @@ interface McpServerInstance {
     description: string,
     params: Record<string, unknown>,
     handler: (args: Record<string, unknown>) => Promise<unknown>,
+  ): unknown;
+  /** SDK 1.x resource registration (optional across SDK minor versions). */
+  resource?(
+    name: string,
+    uri: string,
+    handler: (uri: URL) => Promise<{
+      contents: Array<{ uri: string; text: string; mimeType?: string }>;
+    }>,
   ): unknown;
   connect(transport: unknown): Promise<void>;
   close(): Promise<void>;
@@ -50,6 +60,7 @@ function toGateOptions(opts?: CreateMcpServerOptions): McpGateOptions {
   const gate: McpGateOptions = {};
   if (opts?.allowBuild === true) gate.allowBuild = true;
   if (opts?.allowReviewWrite === true) gate.allowReviewWrite = true;
+  if (opts?.allowAssert === true) gate.allowAssert = true;
   if (opts?.dir !== undefined && opts.dir !== '') gate.defaultDir = opts.dir;
   return gate;
 }
@@ -67,6 +78,8 @@ export function parseMcpArgv(argv: string[]): CreateMcpServerOptions {
       opts.allowBuild = true;
     } else if (a === '--allow-review-write') {
       opts.allowReviewWrite = true;
+    } else if (a === '--allow-assert') {
+      opts.allowAssert = true;
     } else if (a === '--dir' || a === '--store') {
       const next = args[i + 1];
       if (next !== undefined && !next.startsWith('-')) {
@@ -117,17 +130,115 @@ export async function createGsdGraphMcpServer(
   register('graph_query', toolSchemas.graph_query);
   register('graph_pack', toolSchemas.graph_pack);
   register('graph_answer', toolSchemas.graph_answer);
+  register('graph_why', toolSchemas.graph_why);
+  register('graph_resolve', toolSchemas.graph_resolve);
+  register('graph_diff', toolSchemas.graph_diff);
+  register('graph_communities', toolSchemas.graph_communities);
   register('graph_review_list', toolSchemas.graph_review_list);
 
   // Privileged write tools — only when explicitly enabled (D-06, T-06-07)
   if (gate.allowBuild === true) {
     register('graph_build', toolSchemas.graph_build);
+    register('graph_sync', toolSchemas.graph_sync);
   }
   if (gate.allowReviewWrite === true) {
     register('graph_review_resolve', toolSchemas.graph_review_resolve);
   }
+  if (gate.allowAssert === true) {
+    register('graph_assert', toolSchemas.graph_assert);
+    register('graph_retract', toolSchemas.graph_retract);
+  }
+
+  // Resources: session-start briefing material for hosts that read resources.
+  registerStoreResources(server, gate.defaultDir);
 
   return { server, toolNames };
+}
+
+/**
+ * Expose GRAPH_REPORT.md and community theme reports as MCP resources so
+ * hosts get a free store briefing without spending tool calls.
+ */
+function registerStoreResources(
+  server: McpServerInstance,
+  defaultDir: string | undefined,
+): void {
+  if (typeof server.resource !== 'function') return;
+
+  const readStoreText = (relParts: string[]): string | null => {
+    try {
+      // Lazy require to keep server bootstrap free of store deps.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const lib = require('../index') as {
+        resolveStoreRoot: (o?: { dir?: string }) => string;
+        confineUnderRoot: (root: string, candidate: string) => string;
+      };
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('node:fs') as typeof import('node:fs');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const path = require('node:path') as typeof import('node:path');
+      const root = lib.resolveStoreRoot(
+        defaultDir !== undefined && defaultDir !== '' ? { dir: defaultDir } : {},
+      );
+      const p = lib.confineUnderRoot(root, path.join(...relParts));
+      if (!fs.existsSync(p)) return null;
+      return fs.readFileSync(p, 'utf8');
+    } catch {
+      return null;
+    }
+  };
+
+  server.resource(
+    'graph-report',
+    'gsd-graph://report',
+    async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: 'text/markdown',
+          text:
+            readStoreText(['GRAPH_REPORT.md']) ??
+            'GRAPH_REPORT.md not found — run `gsd-graph report` (or sync with report enabled).',
+        },
+      ],
+    }),
+  );
+
+  server.resource(
+    'graph-communities',
+    'gsd-graph://communities',
+    async (uri) => {
+      const index = readStoreText(['communities', 'index.json']);
+      let text: string;
+      if (index === null) {
+        text =
+          'communities/index.json not found — run `gsd-graph communities detect`.';
+      } else {
+        text = index;
+        try {
+          const parsed = JSON.parse(index) as {
+            communities?: Array<{ id?: string }>;
+          };
+          const reports: string[] = [];
+          for (const c of parsed.communities ?? []) {
+            if (typeof c.id !== 'string') continue;
+            const md = readStoreText(['communities', `community-${c.id}.md`]);
+            if (md !== null) reports.push(md);
+          }
+          if (reports.length > 0) {
+            text = reports.join('\n\n---\n\n');
+          }
+        } catch {
+          // keep raw index text
+        }
+      }
+      return {
+        contents: [
+          { uri: uri.href, mimeType: 'text/markdown', text },
+        ],
+      };
+    },
+  );
 }
 
 /** Connect stdio transport and serve (host process entry). */

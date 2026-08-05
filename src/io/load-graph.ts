@@ -7,6 +7,7 @@ import {
   formatAjvErrors,
   validateGraphV1,
 } from '../schema/validators';
+import { migrateGraphDocument } from './migrations';
 import { storeFile } from './paths';
 import { readJsonFile } from './safe-json';
 
@@ -17,13 +18,23 @@ import { readJsonFile } from './safe-json';
  * Missing or invalid SoT → SCHEMA_INVALID.
  */
 export function loadGraphV1(storeRoot: string): GraphV1Document {
+  // First-run friendliness: a missing store directory is not an escape or a
+  // schema problem — tell the user how to create one (STORE_NOT_FOUND).
+  if (!fs.existsSync(storeRoot)) {
+    throw new GraphError(
+      GSD_GRAPH_REASON.STORE_NOT_FOUND,
+      `no graph found at ${storeRoot} — run \`gsd-graph enable\` to build one (or \`gsd-graph sync\`)`,
+      { store_dir: storeRoot },
+    );
+  }
+
   const v1Path = storeFile(storeRoot, 'graph.v1.json');
 
   if (!fs.existsSync(v1Path)) {
     throw new GraphError(
-      GSD_GRAPH_REASON.SCHEMA_INVALID,
-      'graph.v1.json missing — projection is not source of truth',
-      { path: v1Path },
+      GSD_GRAPH_REASON.STORE_NOT_FOUND,
+      `no graph found at ${storeRoot} — run \`gsd-graph enable\` to build one (or \`gsd-graph sync\`)`,
+      { path: v1Path, store_dir: storeRoot },
     );
   }
 
@@ -37,6 +48,9 @@ export function loadGraphV1(storeRoot: string): GraphV1Document {
       { path: v1Path },
     );
   }
+
+  // Forward-only store migrations (older stores upgrade in memory; newer fail closed).
+  data = migrateGraphDocument(data).doc;
 
   if (!validateGraphV1(data)) {
     throw new GraphError(

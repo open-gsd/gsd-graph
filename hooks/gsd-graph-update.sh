@@ -51,6 +51,26 @@ esac
 
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
+# Optional: sync on any branch when sync_on_feature_branches is true
+# (store config first, then .planning gsd_graph).
+SYNC_ANY_BRANCH=$(node -e '
+const fs = require("fs");
+let v = "0";
+try {
+  if (fs.existsSync("./.gsd-graph/config.json")) {
+    const c = JSON.parse(fs.readFileSync("./.gsd-graph/config.json", "utf8"));
+    if (c.sync_on_feature_branches === true) v = "1";
+  }
+} catch {}
+try {
+  if (v === "0" && fs.existsSync("./.planning/config.json")) {
+    const c = JSON.parse(fs.readFileSync("./.planning/config.json", "utf8"));
+    if (c.gsd_graph && c.gsd_graph.sync_on_feature_branches === true) v = "1";
+  }
+} catch {}
+process.stdout.write(v);
+' 2>/dev/null || echo "0")
+
 DEFAULT_BRANCH=""
 if [ -f .planning/config.json ]; then
   DEFAULT_BRANCH=$(node -e '
@@ -69,8 +89,10 @@ if [ -z "$DEFAULT_BRANCH" ]; then
   done
 fi
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-[ -n "$DEFAULT_BRANCH" ] || exit 0
-[ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ] || exit 0
+if [ "$SYNC_ANY_BRANCH" != "1" ]; then
+  [ -n "$DEFAULT_BRANCH" ] || exit 0
+  [ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ] || exit 0
+fi
 
 # Gate: enabled + auto_update (store config first, then .planning)
 ENABLED=$(node -e '

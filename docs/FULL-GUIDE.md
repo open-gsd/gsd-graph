@@ -187,11 +187,17 @@ node bin/gsd-graph.js enable
 | First-time setup | `gsd-graph enable` |
 | Incremental refresh | `gsd-graph sync` |
 | Force re-extract all | `gsd-graph sync --full` |
+| Prose → relationships (agent) | `gsd-graph sync --llm` then `gsd-graph prompt apply extract` |
+| Prose → relationships (endpoint) | `gsd-graph sync --llm http` |
 | Question | `gsd-graph ask "…"` or `answer` |
+| How A connects to B | `gsd-graph why <a> <b>` |
 | Term search | `gsd-graph query <term>` |
 | Path between ids | `gsd-graph path <fromId> <toId>` |
+| Visualize / hand off | `gsd-graph export --format html` (or `mermaid` / `graphml` / `cypher`) |
 | Health | `gsd-graph status` |
 | Explicit corpus build | `gsd-graph build --corpus ./docs` |
+| Pick an ontology pack | `gsd-graph init --ontology engineering` (persisted; build/sync honor it) |
+| Batch review | `gsd-graph review accept --all --kind predicate_unknown --extend-ontology` |
 | Themes | `gsd-graph communities detect` |
 
 **Machine contract (K22):** successful commands print **JSON on stdout**. Errors print JSON on stderr with non-zero exit (`1` usage, `2` GraphError, `3` build locked).
@@ -284,6 +290,36 @@ gsd-graph build --corpus ./docs --full
 | Optional LLM extract | Richer free-prose edges (`--llm`, opt-in) |
 
 Confidence tiers: **`EXTRACTED` > `INFERRED` > `AMBIGUOUS`**. Budgeted query drops weak first.
+
+### LLM-assisted extraction (`--llm`)
+
+Free prose only becomes typed edges through the opt-in LLM stage:
+
+- `sync --llm` (or `--llm prompt`) writes `.gsd-graph/.prompt-extract.json` —
+  corpus contents plus the active ontology allowlists. The host agent writes
+  `.prompt-extract-result.json`; `gsd-graph prompt apply extract` Ajv-validates
+  and merges it. No API key, no network.
+- `sync --llm http` calls a configured endpoint per source file. Configure in
+  `.gsd-graph/config.json`:
+
+  ```json
+  {
+    "llm": {
+      "http": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5",
+        "api_key_env": "ANTHROPIC_API_KEY"
+      }
+    }
+  }
+  ```
+
+  `provider` is `openai` (default, `/v1/chat/completions`) or `anthropic`
+  (`/v1/messages`). `base_url` overrides the provider default endpoint.
+
+Merged candidates are always clamped to `INFERRED` confidence with `llm/http`
+or `llm/prompt` extractor provenance; unknown predicates/types still land in
+the review queue, never in the graph.
 
 ### Tips for high-quality offline graphs
 
@@ -567,15 +603,24 @@ npx -y -p @opengsd/gsd-graph@0.2.11 gsd-graph-mcp
 | `graph_status` | `status` |
 | `graph_query` | query / path / neighborhood / filter IR |
 | `graph_pack` | `packSubgraph` |
-| `graph_answer` | `answer` |
+| `graph_answer` | `answer` (overview questions → community themes; `global` flag) |
+| `graph_why` | `why` — cited path prose |
+| `graph_resolve` | term → node id (did-you-mean on miss) |
+| `graph_diff` | `diff` vs snapshot / last-build baseline |
+| `graph_communities` | community detection (read-only unless `write`) |
 | `graph_review_list` | review queue list |
+
+Resources: `gsd-graph://report` (GRAPH_REPORT.md) and
+`gsd-graph://communities` (theme reports) for session-start briefings.
 
 ### Privileged (off by default)
 
 | Tool | Enable |
 |------|--------|
 | `graph_build` | `--allow-build` / `mcp.allow_build` |
+| `graph_sync` | `--allow-build` / `mcp.allow_build` |
 | `graph_review_resolve` | `--allow-review-write` / `mcp.allow_review_write` |
+| `graph_assert` / `graph_retract` | `--allow-assert` / `mcp.allow_assert` |
 
 Manual MCP client config (prefer `gsd-graph mcp install` instead):
 

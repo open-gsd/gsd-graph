@@ -284,7 +284,7 @@ describe('prompt answer apply — citation honesty (D-02)', () => {
     });
     assert.equal(ans.mode, 'abstain');
     assert.equal(ans.abstained, true);
-    assert.equal(ans.abstain_reason, mod.GSD_GRAPH_REASON.EMPTY_SUBGRAPH);
+    assert.equal(ans.abstain_reason, 'seeds_disconnected');
     assert.equal(ans.answer_markdown, '');
   });
 

@@ -23,6 +23,12 @@ export interface ProvenanceEntry {
   confidence: Confidence;
   score?: number;
   span?: ProvenanceSpan;
+  /** ISO time this exact evidence was first observed (stamped at normalize). */
+  first_seen?: string;
+  /** ISO time this exact evidence was last re-observed. */
+  last_seen?: string;
+  /** Version hash of the prompt template that produced this evidence (LLM stages). */
+  prompt_version?: string;
 }
 
 export interface GraphNode {
@@ -41,6 +47,10 @@ export interface Triple {
   o: NodeId;
   confidence: Confidence;
   score?: number;
+  /** Triple ids this fact supersedes (decision reversals; ranked above them). */
+  supersedes?: string[];
+  /** Triple ids that supersede this fact (ranked below fresh facts, flagged in citations). */
+  superseded_by?: string[];
   provenance: ProvenanceEntry[];
 }
 
@@ -85,7 +95,8 @@ export type ReviewKind =
   | 'entity_merge'
   | 'predicate_unknown'
   | 'type_unknown'
-  | 'schema_drift';
+  | 'schema_drift'
+  | 'conflict';
 
 /** Decision embedded on a resolved review item. */
 export interface ReviewItemDecision {
@@ -424,6 +435,8 @@ export interface ProjectSyncOptions {
   extraCorpus?: string[];
   /** Run communities detect after build (default: config gsd_graph.communities_on_sync). */
   communities?: boolean;
+  /** Ontology pack id or path (default: store config.json ontology, else general). */
+  ontology?: string;
   /** Write GRAPH_REPORT after build (default: config gsd_graph.report_on_sync). */
   report?: boolean;
   /** Progress updates for long sync (CLI spinner on stderr). */
@@ -499,14 +512,32 @@ export interface EnableResult {
 
 // --- Pack / grounded answer (PACK-01 / D-01 / D-02) ---
 
+/** One provenance source projected onto a citation (path + optional span). */
+export interface PackCitationSource {
+  source_path: string;
+  extractor?: string;
+  start_line?: number;
+  end_line?: number;
+}
+
 /** One citation projected from a remaining pack triple after budget. */
 export interface PackCitation {
   triple_id: string;
   s: NodeId;
   p: string;
   o: NodeId;
-  /** First provenance source_path when present. */
+  /** Confidence tier of the cited triple (trust signal in rendered answers). */
+  confidence?: Confidence;
+  /** Count of distinct provenance sources (path + span) backing the triple. */
+  source_count?: number;
+  /** True when a newer fact supersedes this triple (flagged in rendering). */
+  superseded?: boolean;
+  /** First provenance source_path when present (back-compat convenience). */
   source_path?: string;
+  /** First provenance start_line when present (back-compat convenience). */
+  start_line?: number;
+  /** Every distinct provenance source (path + span), extraction order. */
+  sources?: PackCitationSource[];
 }
 
 /**
@@ -524,6 +555,8 @@ export interface SubgraphPack {
   citations: PackCitation[];
   trimmed: string | null;
   budget_tokens: number | null;
+  /** "Did you mean" candidates when no seeds matched (near-miss labels). */
+  seed_suggestions?: Array<{ id: string; label: string }>;
 }
 
 /** Options for packSubgraph (PACK-01). Prefer in-memory graph for tests (D-10). */
@@ -543,6 +576,11 @@ export interface PackOptions {
    * null/undefined skips trim (QRY-02).
    */
   budget?: number | null;
+  /**
+   * Fallback seed node ids used ONLY when lexical scoring finds no seeds
+   * (semantic scorer output, caller-known anchors). Unknown ids are ignored.
+   */
+  extraSeeds?: string[];
 }
 
 // --- Optional LLM modes (LLM-01 / D-01) ---
@@ -604,13 +642,17 @@ export interface GroundedAnswer {
   answer_markdown: string;
   /**
    * Answer production mode.
-   * Phase 5: 'deterministic' | 'abstain' only; 'prompt_pending' | 'http' for Phase 6 (D-05).
+   * 'deterministic' | 'abstain' (Phase 5); 'prompt_pending' | 'http' (Phase 6);
+   * 'global' — corpus-level theme answer from community detection when the
+   * question is overview-shaped or matched no seeds.
    */
-  mode: 'deterministic' | 'prompt_pending' | 'http' | 'abstain';
+  mode: 'deterministic' | 'prompt_pending' | 'http' | 'abstain' | 'global';
   /** True when pack has no triples — no fabricated relationships (ANS-02, D-04). */
   abstained: boolean;
   /** Machine-readable reason when abstained (e.g. GSD_GRAPH_REASON.EMPTY_SUBGRAPH). */
   abstain_reason?: string;
+  /** "Did you mean" node labels when no seeds matched (`Label (id)` strings). */
+  suggestions?: string[];
   /** Reserved for Phase 6 LLM prompt apply — unused in Phase 5 (D-05). */
   prompt_bundle?: object;
 }
@@ -621,6 +663,12 @@ export interface GroundedAnswer {
  * Loads graph only via packSubgraph (opts.graph or loadGraphV1) (D-10).
  */
 export interface AnswerOptions extends PackOptions {
+  /**
+   * Force the corpus-level community/theme answer (mode 'global') regardless
+   * of seed matches. Default: automatic fallback for overview-shaped
+   * questions that produced an empty pack.
+   */
+  global?: boolean;
   /**
    * When true, apply a validated prompt answer result (in-memory or file) after pack.
    * Empty pack still abstains before apply (ANS-02).
@@ -645,6 +693,8 @@ export interface AnswerOptions extends PackOptions {
     baseUrl?: string;
     model?: string;
     apiKeyEnv?: string;
+    /** Wire protocol: 'openai' (default) or 'anthropic'. */
+    provider?: 'openai' | 'anthropic';
   };
 }
 

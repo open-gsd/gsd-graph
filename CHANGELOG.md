@@ -5,6 +5,129 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-08-05
+
+### Added
+
+- **Agent/user write path** — `gsd-graph assert <s> <p> <o>` and
+  `gsd-graph retract <tripleId>` record facts through the normal
+  ontology/review/provenance gates into an append-only `episodes.jsonl`;
+  full rebuilds replay episodes so asserts survive and retractions hold.
+  MCP: `graph_assert` / `graph_retract` behind the new `--allow-assert` gate
+- **MCP parity** — default read tools now include `graph_why`,
+  `graph_resolve` (term→id with did-you-mean), `graph_diff`, and
+  `graph_communities`; `graph_sync` behind the allow-build gate;
+  `GRAPH_REPORT.md` + community themes exposed as MCP resources
+  (`gsd-graph://report`, `gsd-graph://communities`)
+- **Global theme answers** — overview-shaped questions (`what are the main
+  areas…`) that pack empty answer from community detection (mode `global`)
+  instead of abstaining; `ask --global` forces it
+- **Retrieval recall** — stem-aware seed matching (`phases` seeds `phase`),
+  and `no_seeds_matched` abstains now return top-5 did-you-mean candidates
+- **Relevance-ranked budget trimming** — pack trimming scores seed proximity,
+  predicate weight, and provenance count (confidence still dominant);
+  citations render trust tags like `[EXTRACTED ×3]`
+- **Conflict surfacing + supersession** — `conflict` review kind for
+  reciprocal directional edges and supports/contradicts pairs;
+  `gsd-graph supersede <winner> <loser>` records decision reversals
+  (superseded facts rank a tier lower and are flagged in citations);
+  provenance entries stamp `first_seen` / `last_seen`
+- **YAML + frontmatter extraction** — flat `.yaml`/`.yml` files and markdown
+  frontmatter: `title`/`description` as Document fields, tags→`mentions`
+  Topic edges, relational keys (`depends_on`, `blocked_by`, …) as
+  ontology-gated edges, other scalars folded into searchable descriptions
+- **Extractor registry** — `registerExtractor` makes source formats
+  pluggable; discovery defaults derive from the registry
+- **Eval harness** — `gsd-graph eval` runs a QA case file
+  (`evals/gsd-graph.json`): pass/fail, seed recall, citation validity
+- **Centrality analytics** — `gsd-graph top` (PageRank / degree, pure TS);
+  `why --k <n>` returns alternative routes; GRAPH_REPORT gains a
+  Central-nodes section
+- **Watch mode + plain git hook** — `gsd-graph watch` (debounced incremental
+  sync via fs.watch) and `gsd-graph hook install-git` (guarded
+  `.git/hooks/post-commit` block) bring freshness to non-Claude-Code editors
+- **Opt-in embedding sidecar** — `gsd-graph embeddings build|status` +
+  `ask --semantic`: OpenAI-compatible embeddings as a fallback seed source
+  behind a `SeedScorer` seam; the deterministic path stays the default
+- **Ontology composition** — single-level `extends` with collision-error
+  semantics, project-local `ontology-packs/<id>/` resolution, and
+  `gsd-graph ontology eject` (materialize active pack + accepted lock
+  extensions as a committable local pack)
+- **Prompt templates wired** — `prompts/<stage>.md` now actually drive LLM
+  stages (store-local override wins); template hash recorded as
+  `prompt_version` in provenance
+- **Library facade** — `GsdGraph.open()` handle (status/query/pack/ask/why/
+  communities) over an mtime-keyed graph cache; adjacency maps memoized
+- **Store migrations** — forward-only `schema_version` migration registry;
+  newer-engine stores fail closed; builds stamp `built_at_commit`
+
+### Changed
+
+- `ask` / `why` / `status` / `query` / `top` render human output on an
+  interactive TTY (JSON when piped / `--json` / CI); abstains print
+  did-you-mean suggestions; `status` prints prescriptive next steps
+- `review summary` (counts by kind + batch-accept hints), `review list
+  --kind/--limit`, and a sync wrap-up nudge when the queue passes 25 items
+- `export --open` opens the HTML viewer; first-run errors now say
+  `no graph found — run gsd-graph enable` (STORE_NOT_FOUND) instead of a
+  path-escape/schema error
+
+## [0.3.0] - 2026-08-05
+
+### Added
+
+- **LLM-assisted extraction** (`build --llm` / `sync --llm`) — turns prose into
+  INFERRED triple candidates without weakening the honesty contract
+  - `--llm` / `--llm prompt` — writes `.prompt-extract.json` (corpus + ontology
+    allowlists) for the host agent; merge with `gsd-graph prompt apply extract`
+  - `--llm http` — live per-source extraction against an OpenAI- or
+    Anthropic-compatible endpoint (config: `config.json` → `llm.http`
+    `{ provider, base_url, model, api_key_env }`)
+  - All LLM candidates are clamped to `INFERRED` confidence with `llm/*`
+    extractor provenance and still flow through the ontology gate + review queue
+- **Anthropic-native HTTP adapter** — `provider: "anthropic"` posts
+  `/v1/messages` with `x-api-key` / `anthropic-version`; `ask --llm http` now
+  performs the live grounded answer (was previously an error)
+- **`gsd-graph why <a> <b>`** — resolves human terms to nodes, finds the
+  shortest path, and explains it as cited prose (`path:line` citations)
+- **`gsd-graph export --format mermaid|graphml|cypher|html`** — graph
+  projections including a self-contained interactive HTML viewer (no CDN)
+- **Batch review** — `review accept|reject --all --kind <kind>
+  --predicate <p>` resolves many pending items under one lock/publish
+  (`reviewResolveBatch` in the library)
+- **Alias suggestions** — normalize now emits suggest-only `entity_merge`
+  review items (`reason: alias_suggestion`) for plural/acronym near-matches
+- **Richer citations** — every distinct provenance source with line spans is
+  projected (`citations[].sources[]`); deterministic markdown renders
+  `path:line +N more`
+- **Distinct abstain reasons** — `no_seeds_matched`, `seeds_disconnected`,
+  `empty_subgraph` instead of one blanket reason
+- Hook: `sync_on_feature_branches: true` config opts into auto-sync on
+  non-default branches; failed detached syncs keep logs in
+  `.last-sync-failure.{out,err}` plus `stderr_tail` in `.last-sync-status.json`
+
+### Fixed
+
+- **Ontology selection is honored end-to-end** — `init --ontology <pack>` is
+  persisted to `config.json`, `build`/`sync` read it (previously always
+  `general`), and both commands accept `--ontology` directly; re-running
+  `init --ontology` updates an existing config
+- Engineering pack now includes `blocked_by`, `requires`, `uses`,
+  `implements`, `delivers`, `precedes`, `supports`, `mentions`, `Topic`, and
+  domain-open `depends_on` — the README's own examples are now expressible
+- Headings no longer emit the degenerate `Document --about--> Topic` self-echo
+  pair (was ~90% of typical graphs and flooded review with cross-type clashes)
+- IDF-weighted seed scoring — rare question tokens now dominate; common tokens
+  ("phase", "service") no longer match half the graph equally
+- Performance: linear-time path materialization and budget trimming
+  (previously quadratic), indexed triple dedup in the markdown extractor
+- Removed dead mode-resolution branch in `answerHttp`
+
+### Changed
+
+- `bin/gsd-graph.js` resolves `main()` as a promise (only `--llm http`
+  commands are actually async; everything else stays synchronous/offline)
+
 ## [0.2.11] - 2026-08-05
 
 ### Added

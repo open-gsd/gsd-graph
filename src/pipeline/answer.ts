@@ -10,20 +10,25 @@
 
 import { readFileSync } from 'node:fs';
 import { GSD_GRAPH_REASON, GraphError } from '../errors';
+import { loadGraphV1Cached } from '../io/graph-cache';
+import { resolveStoreRoot } from '../io/paths';
 import { promptApplyAnswer } from '../llm/apply';
+import { loadPromptTemplate } from '../llm/prompt-templates';
 import {
   httpChatCompletion,
   parseHttpPromptResultJson,
 } from '../llm/http-client';
-import { resolveLlmMode } from '../llm/provider';
 import type {
   AnswerOptions,
+  Community,
+  GraphV1Document,
   GroundedAnswer,
   PackCitation,
   QueryPath,
   SubgraphPack,
   Triple,
 } from '../types';
+import { detectCommunities } from './communities';
 import { packSubgraph } from './pack';
 
 function renderRelationship(t: Triple): string {
@@ -46,10 +51,28 @@ function renderPath(path: QueryPath): string {
 
 function renderCitation(c: PackCitation): string {
   const core = `\`${c.triple_id}\`: ${c.s} —${c.p}→ ${c.o}`;
-  if (c.source_path !== undefined && c.source_path.length > 0) {
-    return `- ${core} (${c.source_path})`;
+  // Trust signal: a 5-source EXTRACTED fact should not read like a lone
+  // AMBIGUOUS one (D-02 spirit — confidence is part of the citation).
+  const tier =
+    c.confidence !== undefined
+      ? ` [${c.confidence}${(c.source_count ?? 0) > 1 ? ` ×${c.source_count}` : ''}${c.superseded === true ? ' · superseded' : ''}]`
+      : c.superseded === true
+        ? ' [superseded]'
+        : '';
+  const sources = c.sources ?? [];
+  if (sources.length === 0) {
+    if (c.source_path !== undefined && c.source_path.length > 0) {
+      return `- ${core}${tier} (${c.source_path})`;
+    }
+    return `- ${core}${tier}`;
   }
-  return `- ${core}`;
+  const first = sources[0]!;
+  const loc =
+    first.start_line !== undefined
+      ? `${first.source_path}:${first.start_line}`
+      : first.source_path;
+  const extra = sources.length > 1 ? ` +${sources.length - 1} more` : '';
+  return `- ${core}${tier} (${loc}${extra})`;
 }
 
 /**
@@ -120,20 +143,199 @@ function loadPromptResultObject(opts: AnswerOptions): unknown {
   );
 }
 
+/**
+ * Abstain with a discriminating reason (ANS-02, revised):
+ * - no_seeds_matched — the question's tokens matched no node at all
+ * - seeds_disconnected — seeds matched but their neighborhood has no triples
+ * - empty_subgraph — fallback (e.g. budget trimmed everything away)
+ */
 function abstainEmpty(pack: SubgraphPack): GroundedAnswer {
+  let reason: string = GSD_GRAPH_REASON.EMPTY_SUBGRAPH;
+  if (pack.seeds.length === 0) {
+    reason = GSD_GRAPH_REASON.NO_SEEDS_MATCHED;
+  } else if (pack.trimmed === null) {
+    reason = GSD_GRAPH_REASON.SEEDS_DISCONNECTED;
+  }
+  const suggestions = (pack.seed_suggestions ?? []).map(
+    (s) => `${s.label} (${s.id})`,
+  );
   return {
     pack,
     answer_markdown: '',
     mode: 'abstain',
     abstained: true,
-    abstain_reason: GSD_GRAPH_REASON.EMPTY_SUBGRAPH,
+    abstain_reason: reason,
+    ...(suggestions.length > 0 ? { suggestions } : {}),
   };
+}
+
+/**
+ * Overview-shaped questions: the corpus-level asks a brownfield user opens
+ * with. When such a question packs empty (or global is forced), community
+ * themes answer instead of an abstain (GraphRAG-style global search).
+ */
+export const OVERVIEW_QUESTION_RE =
+  /(overview|overall|high[- ]?level|architecture|structure|main\s+(?:areas|themes|topics|parts|components|concepts)|key\s+(?:areas|themes|topics|concepts)|themes|what\s+(?:is|are)\s+(?:this|the)\s+(?:project|repo|repository|codebase)\s*(?:about)?|about\s+this\s+(?:project|repo|repository|codebase))/i;
+
+/** Max communities rendered in a global answer. */
+const GLOBAL_ANSWER_TOP_K = 5;
+
+/** Representative internal triples cited per community. */
+const GLOBAL_ANSWER_CITES_PER_COMMUNITY = 2;
+
+function distinctSources(t: Triple): number {
+  const seen = new Set<string>();
+  for (const e of t.provenance ?? []) {
+    if (!e.source_path) continue;
+    seen.add(`${e.source_path}\0${e.span?.start_line ?? ''}`);
+  }
+  return seen.size;
+}
+
+function citationOf(t: Triple): PackCitation {
+  const cite: PackCitation = {
+    triple_id: t.id,
+    s: t.s,
+    p: t.p,
+    o: t.o,
+    confidence: t.confidence,
+    source_count: distinctSources(t),
+  };
+  const first = (t.provenance ?? []).find(
+    (e) => e.source_path !== undefined && e.source_path.length > 0,
+  );
+  if (first !== undefined) {
+    cite.source_path = first.source_path;
+    if (first.span?.start_line !== undefined) {
+      cite.start_line = first.span.start_line;
+    }
+    cite.sources = (t.provenance ?? [])
+      .filter((e) => e.source_path)
+      .map((e) => ({
+        source_path: e.source_path,
+        ...(e.extractor !== undefined ? { extractor: e.extractor } : {}),
+        ...(e.span?.start_line !== undefined
+          ? { start_line: e.span.start_line }
+          : {}),
+        ...(e.span?.end_line !== undefined ? { end_line: e.span.end_line } : {}),
+      }));
+  }
+  return cite;
+}
+
+/**
+ * Corpus-level theme answer from community detection (mode 'global').
+ * Returns null when the graph yields no communities — caller abstains.
+ */
+function globalAnswer(
+  graph: GraphV1Document,
+  emptyPackShape: SubgraphPack,
+): GroundedAnswer | null {
+  const det = detectCommunities({ graph, write: false });
+  if (det.communities.length === 0) return null;
+
+  const top: Community[] = [...det.communities]
+    .sort((a, b) => b.size - a.size || a.id.localeCompare(b.id))
+    .slice(0, GLOBAL_ANSWER_TOP_K);
+
+  // Bucket internal triples per community for representative citations.
+  const nodeCommunity = new Map<string, string>();
+  for (const c of top) {
+    for (const m of c.members) nodeCommunity.set(m, c.id);
+  }
+  const byCommunity = new Map<string, Triple[]>();
+  for (const t of graph.triples) {
+    const cs = nodeCommunity.get(t.s);
+    if (cs === undefined || nodeCommunity.get(t.o) !== cs) continue;
+    let list = byCommunity.get(cs);
+    if (!list) {
+      list = [];
+      byCommunity.set(cs, list);
+    }
+    list.push(t);
+  }
+
+  const labelOf = (id: string): string => {
+    const n = graph.nodes.find((x) => x.id === id);
+    return n !== undefined && n.label.length > 0 ? n.label : id;
+  };
+
+  const lines: string[] = ['## Themes', ''];
+  const citedTriples: Triple[] = [];
+  for (const c of top) {
+    lines.push(`### ${c.label} (${c.size} nodes)`);
+    const topNodes = c.top_nodes
+      .slice(0, 5)
+      .map((n) => n.label || n.id)
+      .join(', ');
+    if (topNodes.length > 0) lines.push(`- Key nodes: ${topNodes}`);
+    const preds = c.top_predicates
+      .slice(0, 3)
+      .map((p) => `${p.p} (${p.count})`)
+      .join(', ');
+    if (preds.length > 0) lines.push(`- Main relationships: ${preds}`);
+
+    const reps = (byCommunity.get(c.id) ?? [])
+      .sort(
+        (a, b) =>
+          distinctSources(b) - distinctSources(a) || a.id.localeCompare(b.id),
+      )
+      .slice(0, GLOBAL_ANSWER_CITES_PER_COMMUNITY);
+    for (const t of reps) {
+      lines.push(
+        `- e.g. ${labelOf(t.s)} —${t.p}→ ${labelOf(t.o)} (\`${t.id}\`)`,
+      );
+      citedTriples.push(t);
+    }
+    lines.push('');
+  }
+
+  const citations = citedTriples.map(citationOf);
+  lines.push('## Citations');
+  for (const c of citations) {
+    const tier = c.confidence !== undefined ? ` [${c.confidence}]` : '';
+    const loc =
+      c.source_path !== undefined
+        ? ` (${c.source_path}${c.start_line !== undefined ? `:${c.start_line}` : ''})`
+        : '';
+    lines.push(`- \`${c.triple_id}\`: ${c.s} —${c.p}→ ${c.o}${tier}${loc}`);
+  }
+  lines.push('');
+
+  const citedNodeIds = new Set<string>();
+  for (const t of citedTriples) {
+    citedNodeIds.add(t.s);
+    citedNodeIds.add(t.o);
+  }
+
+  const pack: SubgraphPack = {
+    ...emptyPackShape,
+    nodes: graph.nodes.filter((n) => citedNodeIds.has(n.id)),
+    triples: citedTriples,
+    citations,
+  };
+
+  return {
+    pack,
+    answer_markdown: lines.join('\n'),
+    mode: 'global',
+    abstained: false,
+  };
+}
+
+function loadAnswerGraph(opts: AnswerOptions): GraphV1Document {
+  if (opts.graph !== undefined) return opts.graph;
+  return loadGraphV1Cached(
+    resolveStoreRoot(opts.dir !== undefined ? { dir: opts.dir } : {}),
+  );
 }
 
 /**
  * Grounded answer over packSubgraph (ANS-01, ANS-02).
  *
  * Default: packSubgraph + deterministic markdown — no LLM / no fetch (D-01, D-05, D-10).
+ * Overview-shaped questions with an empty pack (or opts.global) answer from
+ * community themes (mode 'global') instead of abstaining.
  * Opt-in applyPromptResult: Ajv + citation gate → mode prompt_pending.
  * Opt-in llmMode http with in-memory promptResult: same gates → mode http.
  * For live HTTP fetch, use answerHttp() (async) — keeps default path sync and offline.
@@ -141,8 +343,22 @@ function abstainEmpty(pack: SubgraphPack): GroundedAnswer {
 export function answer(opts: AnswerOptions): GroundedAnswer {
   const pack = packSubgraph(opts);
 
-  if (pack.triples.length === 0) {
-    return abstainEmpty(pack);
+  if (opts.global === true || pack.triples.length === 0) {
+    const wantsGlobal =
+      opts.global === true || OVERVIEW_QUESTION_RE.test(opts.question);
+    if (wantsGlobal) {
+      const g = globalAnswer(loadAnswerGraph(opts), {
+        ...pack,
+        nodes: [],
+        triples: [],
+        paths: [],
+        citations: [],
+      });
+      if (g !== null) return g;
+    }
+    if (pack.triples.length === 0) {
+      return abstainEmpty(pack);
+    }
   }
 
   // Opt-in prompt file / in-memory apply (D-02, D-10).
@@ -188,6 +404,52 @@ export function answer(opts: AnswerOptions): GroundedAnswer {
   };
 }
 
+/**
+ * Async answer with the semantic seed fallback (opt-in): when the plain
+ * deterministic answer abstains with no_seeds_matched, consult the registered
+ * SeedScorer (or the embedding sidecar) and retry with its candidates as
+ * fallback seeds. Traversal, budget, and citations stay deterministic.
+ */
+export async function answerSemantic(
+  opts: AnswerOptions & {
+    fetchImpl?: typeof fetch;
+    env?: NodeJS.ProcessEnv;
+  },
+): Promise<GroundedAnswer> {
+  const first = answer(opts);
+  if (
+    !first.abstained ||
+    first.abstain_reason !== GSD_GRAPH_REASON.NO_SEEDS_MATCHED
+  ) {
+    return first;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const scorers = require('../embeddings/scorer') as
+    typeof import('../embeddings/scorer');
+  const scorer =
+    scorers.getSeedScorer() ??
+    scorers.embeddingSeedScorer({
+      ...(opts.dir !== undefined ? { dir: opts.dir } : {}),
+      ...(opts.fetchImpl !== undefined ? { fetchImpl: opts.fetchImpl } : {}),
+      ...(opts.env !== undefined ? { env: opts.env } : {}),
+    });
+
+  let candidates: Array<{ id: string; score: number }> = [];
+  try {
+    candidates = await scorer.score(
+      loadAnswerGraph(opts),
+      opts.question,
+      opts.kSeeds ?? 5,
+    );
+  } catch {
+    candidates = []; // semantic fallback is best-effort, never a new failure
+  }
+  if (candidates.length === 0) return first;
+
+  return answer({ ...opts, extraSeeds: candidates.map((c) => c.id) });
+}
+
 export interface AnswerHttpOptions extends AnswerOptions {
   /** System + user messages for chat completions. Built from pack when omitted. */
   messages?: Array<{ role: string; content: string }>;
@@ -207,15 +469,8 @@ export interface AnswerHttpOptions extends AnswerOptions {
 export async function answerHttp(
   opts: AnswerHttpOptions,
 ): Promise<GroundedAnswer> {
-  const mode = resolveLlmMode({
-    ...(opts.llmMode !== undefined ? { flagMode: opts.llmMode } : {}),
-  });
-  // Force http for this entry, but still require explicit opt-in via llmMode or call site.
-  if (mode !== 'http' && opts.llmMode !== 'http') {
-    // Library call to answerHttp is explicit opt-in; allow even if resolve says none
-    // when caller passed fetchImpl / http config — treat as http.
-  }
-
+  // Calling answerHttp() is itself the explicit http opt-in (D-01) — no extra
+  // mode resolution needed here; CLI callers resolve flags before dispatch.
   const pack = packSubgraph(opts);
   if (pack.triples.length === 0) {
     return abstainEmpty(pack);
@@ -233,10 +488,16 @@ export async function answerHttp(
     };
   }
 
+  const provider = opts.llmHttp?.provider ?? 'openai';
   const baseUrl = opts.httpBaseUrl ?? opts.llmHttp?.baseUrl;
-  const model = opts.httpModel ?? opts.llmHttp?.model ?? 'gpt-4o-mini';
+  const model =
+    opts.httpModel ??
+    opts.llmHttp?.model ??
+    (provider === 'anthropic' ? 'claude-sonnet-5' : 'gpt-4o-mini');
   const apiKeyEnv =
-    opts.httpApiKeyEnv ?? opts.llmHttp?.apiKeyEnv ?? 'OPENAI_API_KEY';
+    opts.httpApiKeyEnv ??
+    opts.llmHttp?.apiKeyEnv ??
+    (provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY');
 
   if (baseUrl === undefined || baseUrl.length === 0) {
     throw new GraphError(
@@ -261,13 +522,25 @@ export async function answerHttp(
     2,
   );
 
+  // System prompt: prompts/answer.md template (store override → shipped
+  // default) + the non-negotiable wire contract.
+  let answerTemplate = '';
+  try {
+    answerTemplate = loadPromptTemplate('answer', {
+      ...(opts.dir !== undefined ? { dir: opts.dir } : {}),
+    }).text.trim();
+  } catch {
+    // contract line below is self-sufficient
+  }
   const messages =
     opts.messages ??
     ([
       {
         role: 'system',
-        content:
+        content: [
+          ...(answerTemplate.length > 0 ? [answerTemplate, ''] : []),
           'Return JSON only matching prompt-answer-result schema: { answer_markdown, cited_triple_ids }. cited_triple_ids must be subset of pack triple ids.',
+        ].join('\n'),
       },
       {
         role: 'user',
@@ -280,6 +553,7 @@ export async function answerHttp(
     model,
     messages,
     apiKeyEnv,
+    provider,
     ...(opts.fetchImpl !== undefined ? { fetchImpl: opts.fetchImpl } : {}),
     ...(opts.env !== undefined ? { env: opts.env } : {}),
   });

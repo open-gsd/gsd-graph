@@ -137,8 +137,27 @@ describe('cli-commands core ops (CLI-01)', () => {
     assert.ok(body.node_count > 0);
     assert.ok(body.store_dir.length > 0);
 
-    // D-08: --llm must not be registered
+    // --llm prompt writes an extract request file for the host agent (D-01:
+    // still offline — no network without explicit `--llm http`).
     const llm = run([
+      '--dir',
+      dir,
+      'build',
+      '--corpus',
+      fixturesCorpus,
+      '--llm',
+      'prompt',
+    ]);
+    assert.equal(llm.code, 0, llm.stderr);
+    const llmBody = llm.json as {
+      llm_extract?: { mode: string; request_path: string; sources: number };
+    };
+    assert.ok(llmBody.llm_extract);
+    assert.equal(llmBody.llm_extract!.mode, 'prompt');
+    assert.ok(fs.existsSync(llmBody.llm_extract!.request_path));
+
+    // Invalid --llm value resolves to mode none — build still succeeds, no stage.
+    const noneMode = run([
       '--dir',
       dir,
       'build',
@@ -147,10 +166,9 @@ describe('cli-commands core ops (CLI-01)', () => {
       '--llm',
       'openai',
     ]);
-    assert.equal(llm.code, 1);
-    const err = JSON.parse(llm.stderr) as { ok: false; reason: string };
-    assert.equal(err.ok, false);
-    assert.equal(err.reason, 'usage');
+    assert.equal(noneMode.code, 0, noneMode.stderr);
+    const noneBody = noneMode.json as { llm_extract?: unknown };
+    assert.equal(noneBody.llm_extract, undefined);
   });
 
   it('status returns JSON for built store', () => {

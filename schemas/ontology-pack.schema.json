@@ -16,6 +16,11 @@
       "type": "string",
       "minLength": 1
     },
+    "extends": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Base pack id or path (single level — the base may not itself extend)"
+    },
     "version": {
       "type": "string",
       "minLength": 1

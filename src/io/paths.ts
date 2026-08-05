@@ -78,6 +78,14 @@ export function confineUnderRoot(rootReal: string, candidate: string): string {
     );
   }
 
+  // When the root itself does not exist yet, nothing below it can exist or be
+  // a symlink — the relative-path check above is the whole guard. Walking up
+  // to an ancestor ABOVE the missing root would misreport a first-run lookup
+  // (e.g. `ask` before `enable`) as PATH_ESCAPE.
+  if (!fs.existsSync(rootResolved)) {
+    return absCandidate;
+  }
+
   // If candidate (or intermediate) exists, realpath and re-check prefix
   if (fs.existsSync(absCandidate)) {
     const resolved = fs.realpathSync.native(absCandidate);

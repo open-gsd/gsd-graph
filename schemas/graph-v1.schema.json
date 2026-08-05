@@ -103,6 +103,20 @@
             "minimum": 0,
             "maximum": 1
           },
+          "supersedes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^t_[0-9a-f]{16}$"
+            }
+          },
+          "superseded_by": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^t_[0-9a-f]{16}$"
+            }
+          },
           "provenance": {
             "type": "array",
             "minItems": 1,
@@ -131,6 +145,17 @@
                 },
                 "score": {
                   "type": "number"
+                },
+                "first_seen": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "last_seen": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "prompt_version": {
+                  "type": "string"
                 },
                 "span": {
                   "type": "object",

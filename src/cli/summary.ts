@@ -156,6 +156,17 @@ function appendSyncStats(
         : pc.green('0 pending'),
     ),
   );
+  // A silently growing queue degrades graph quality — nudge triage.
+  if (b.review_pending >= 25) {
+    lines.push(
+      line(
+        '',
+        pc.yellow(
+          `triage: gsd-graph review summary · batch: gsd-graph review accept --all --kind <kind>`,
+        ),
+      ),
+    );
+  }
   if (b.diagnostics.length > 0) {
     lines.push(
       line(

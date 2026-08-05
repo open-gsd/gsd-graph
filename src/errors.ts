@@ -6,11 +6,14 @@
  */
 export const GSD_GRAPH_REASON = Object.freeze({
   OK: 'ok',
+  STORE_NOT_FOUND: 'store_not_found',
   BUILD_LOCKED: 'build_locked',
   BUILD_FAILED: 'build_failed',
   SCHEMA_INVALID: 'schema_invalid',
   ONTOLOGY_INVALID: 'ontology_invalid',
   EMPTY_SUBGRAPH: 'empty_subgraph',
+  NO_SEEDS_MATCHED: 'no_seeds_matched',
+  SEEDS_DISCONNECTED: 'seeds_disconnected',
   PROMPT_RESULT_INVALID: 'prompt_result_invalid',
   CORPUS_NOT_FOUND: 'corpus_not_found',
   PATH_ESCAPE: 'path_escape',

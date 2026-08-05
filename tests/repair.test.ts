@@ -182,7 +182,7 @@ describe('repair projection from v1 only (REP-01, D-09, D-10)', () => {
     assert.ok(!edgeIds.includes('t_inventeddeadbeef01'));
   });
 
-  it('missing graph.v1 throws SCHEMA_INVALID; never invents graph from projection', () => {
+  it('missing graph.v1 throws STORE_NOT_FOUND; never invents graph from projection', () => {
     const store = tempDir('gsd-rep-nov1-s-');
     mod.ensureStoreRoot(store);
     // Only a fake projection — no graph.v1
@@ -210,7 +210,7 @@ describe('repair projection from v1 only (REP-01, D-09, D-10)', () => {
         assert.ok(err instanceof mod.GraphError);
         assert.equal(
           (err as { reason: string }).reason,
-          mod.GSD_GRAPH_REASON.SCHEMA_INVALID,
+          mod.GSD_GRAPH_REASON.STORE_NOT_FOUND,
         );
         return true;
       },

@@ -5,14 +5,28 @@ import pc from 'picocolors';
 import { GSD_GRAPH_REASON, GraphError } from './errors';
 import { resolveStoreRoot } from './io/paths';
 import { loadOntologyPack } from './ontology/load-pack';
+import { ontologyEject } from './ontology/eject';
 import { promptApply } from './llm/apply';
 import { resolveLlmMode } from './llm/provider';
 import {
   readPromptResult,
   requirePromptFileStage,
 } from './llm/prompt-files';
-import { answer } from './pipeline/answer';
-import { build } from './pipeline/build';
+import { answer, answerHttp, answerSemantic } from './pipeline/answer';
+import {
+  buildEmbeddingSidecar,
+  loadEmbeddingSidecar,
+  readEmbeddingsConfig,
+} from './embeddings/sidecar';
+import { build, mergeCandidates } from './pipeline/build';
+import {
+  collectLlmSources,
+  extractPromptVersion,
+  llmExtractHttp,
+  sanitizeExtractCandidates,
+  writeExtractPromptRequest,
+} from './llm/extract';
+import { defaultApiKeyEnv, type LlmHttpProvider } from './llm/http-client';
 import {
   detectCommunities,
   writeCommunityReports,
@@ -39,12 +53,24 @@ import { packSubgraph } from './pipeline/pack';
 import { query } from './pipeline/query';
 import { writeGraphReport } from './pipeline/report';
 import { repair } from './pipeline/repair';
-import { loadReviewQueue, reviewResolve } from './pipeline/review';
+import { exportGraph, isExportFormat } from './pipeline/export';
+import { why } from './pipeline/why';
+import {
+  loadReviewQueue,
+  reviewResolve,
+  reviewResolveBatch,
+} from './pipeline/review';
 import {
   snapshotList,
   snapshotRestore,
   snapshotSave,
 } from './pipeline/snapshot';
+import { supersede } from './pipeline/supersede';
+import { assertFact, retractFact } from './pipeline/assert';
+import { runEval } from './pipeline/eval';
+import { topNodes } from './pipeline/top';
+import { watchCorpus } from './pipeline/watch';
+import { installGitPostCommitHook } from './pipeline/git-hook';
 import { status } from './pipeline/status';
 
 export interface CliErrorBody {
@@ -135,6 +161,129 @@ function writeOkHumanCommand(payload: unknown): void {
   writeOk(payload);
 }
 
+/**
+ * Read commands with a human-first payload (ask/why/status/query): render
+ * markdown/text on an interactive TTY, JSON when piped / --json / CI —
+ * the same precedent enable/sync set in v0.2.10.
+ */
+function writeHumanReadable(payload: unknown, render: () => string): void {
+  if (shouldEmitJsonForHumanCommand()) {
+    writeOk(payload);
+    return;
+  }
+  process.stdout.write(`${render()}\n`);
+}
+
+function renderAnswerHuman(result: {
+  abstained: boolean;
+  abstain_reason?: string;
+  suggestions?: string[];
+  answer_markdown: string;
+  mode: string;
+}): string {
+  if (result.abstained) {
+    const lines = [
+      pc.yellow(`No grounded answer (${result.abstain_reason ?? 'empty'}).`),
+    ];
+    if (result.suggestions !== undefined && result.suggestions.length > 0) {
+      lines.push('', 'Did you mean:');
+      for (const s of result.suggestions) lines.push(`  - ${s}`);
+    } else {
+      lines.push(
+        pc.dim('Try: gsd-graph query <term> · gsd-graph sync (refresh graph)'),
+      );
+    }
+    return lines.join('\n');
+  }
+  return result.answer_markdown;
+}
+
+function renderWhyHuman(result: {
+  found: boolean;
+  reason: string | null;
+  explanation_markdown: string;
+}): string {
+  if (!result.found) {
+    return pc.yellow(`No path: ${result.reason ?? 'unknown'}`);
+  }
+  return result.explanation_markdown;
+}
+
+function renderStatusHuman(result: import('./types').StatusResult): string {
+  if (!result.exists) {
+    return pc.yellow(
+      'No graph store found — run `gsd-graph enable` to build one.',
+    );
+  }
+  const lines = [
+    `${pc.bold('gsd-graph store')} ${result.store_dir}`,
+    `  nodes ${result.node_count ?? 0} · triples ${result.triple_count ?? 0} · ontology ${result.ontology_pack_id ?? '?'}`,
+    `  last build ${result.last_build ?? '?'}${result.age_hours !== undefined ? ` (${result.age_hours.toFixed(1)}h ago)` : ''}`,
+  ];
+  const hints: string[] = [];
+  if (result.stale === true) {
+    hints.push('sources changed → gsd-graph sync');
+  }
+  if ((result.review_queue_count ?? 0) > 0) {
+    hints.push(
+      `${result.review_queue_count} review item(s) → gsd-graph review summary`,
+    );
+  }
+  if (result.build_in_progress === true) {
+    hints.push('build in progress (lock held)');
+  }
+  if (hints.length > 0) {
+    lines.push('', pc.bold('  Next'));
+    for (const h of hints) lines.push(`    ${pc.cyan(h)}`);
+  } else {
+    lines.push(`  ${pc.green('healthy — no action needed')}`);
+  }
+  return lines.join('\n');
+}
+
+function renderQueryHuman(result: {
+  seeds: string[];
+  nodes: Array<{ id: string; label: string }>;
+  triples: Array<{ s: string; p: string; o: string }>;
+  trimmed: string | null;
+}): string {
+  const lines = [
+    `${pc.bold('seeds')} ${result.seeds.join(', ') || '(none)'}`,
+    `${pc.bold('nodes')} ${result.nodes.length} · ${pc.bold('triples')} ${result.triples.length}`,
+  ];
+  const cap = 30;
+  for (const t of result.triples.slice(0, cap)) {
+    lines.push(`  ${t.s} —${t.p}→ ${t.o}`);
+  }
+  if (result.triples.length > cap) {
+    lines.push(pc.dim(`  … ${result.triples.length - cap} more (use --json)`));
+  }
+  if (result.trimmed !== null) {
+    lines.push(pc.dim(`  trimmed: ${result.trimmed}`));
+  }
+  return lines.join('\n');
+}
+
+/** Open a file with the OS default handler (export --open). Best-effort. */
+function openInDefaultApp(filePath: string): void {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { spawn } = require('node:child_process') as
+    typeof import('node:child_process');
+  const cmd =
+    process.platform === 'darwin'
+      ? 'open'
+      : process.platform === 'win32'
+        ? 'cmd'
+        : 'xdg-open';
+  const args =
+    process.platform === 'win32' ? ['/c', 'start', '', filePath] : [filePath];
+  try {
+    spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref();
+  } catch {
+    // Non-fatal: the path is in the JSON output anyway.
+  }
+}
+
 function writeErrorJson(body: CliErrorBody): void {
   let line = formatJson(body);
   if (process.stderr.isTTY) {
@@ -167,6 +316,157 @@ function withDir<T extends object>(
   return { ...base, dir };
 }
 
+/** HTTP LLM settings resolved from store config.json `llm.http` + defaults. */
+interface ResolvedLlmHttp {
+  baseUrl: string;
+  model: string;
+  apiKeyEnv: string;
+  provider: LlmHttpProvider;
+}
+
+/** Default endpoints per provider — used only after explicit `--llm http`. */
+function defaultLlmBaseUrl(provider: LlmHttpProvider): string {
+  return provider === 'anthropic'
+    ? 'https://api.anthropic.com'
+    : 'https://api.openai.com';
+}
+
+function defaultLlmModel(provider: LlmHttpProvider): string {
+  return provider === 'anthropic' ? 'claude-sonnet-5' : 'gpt-4o-mini';
+}
+
+/** Read store config.json `llm.http` section (all fields optional). */
+function readStoreLlmHttp(dir: string | undefined): ResolvedLlmHttp {
+  let raw: {
+    provider?: unknown;
+    base_url?: unknown;
+    model?: unknown;
+    api_key_env?: unknown;
+  } = {};
+  try {
+    const storeRoot = resolveStoreRoot(dir !== undefined ? { dir } : {});
+    const configPath = require('node:path').join(storeRoot, 'config.json');
+    const fs = require('node:fs') as typeof import('node:fs');
+    if (fs.existsSync(configPath)) {
+      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
+        llm?: { http?: typeof raw };
+      };
+      raw = parsed.llm?.http ?? {};
+    }
+  } catch {
+    raw = {};
+  }
+  const provider: LlmHttpProvider =
+    raw.provider === 'anthropic' ? 'anthropic' : 'openai';
+  return {
+    provider,
+    baseUrl:
+      typeof raw.base_url === 'string' && raw.base_url.length > 0
+        ? raw.base_url
+        : defaultLlmBaseUrl(provider),
+    model:
+      typeof raw.model === 'string' && raw.model.length > 0
+        ? raw.model
+        : defaultLlmModel(provider),
+    apiKeyEnv:
+      typeof raw.api_key_env === 'string' && raw.api_key_env.length > 0
+        ? raw.api_key_env
+        : defaultApiKeyEnv(provider),
+  };
+}
+
+/** Load the active ontology allowlists for LLM extract prompts. */
+function loadLlmAllowlists(dir: string | undefined): {
+  types: string[];
+  predicates: string[];
+} {
+  let packId = 'general';
+  try {
+    const storeRoot = resolveStoreRoot(dir !== undefined ? { dir } : {});
+    const fs = require('node:fs') as typeof import('node:fs');
+    const configPath = require('node:path').join(storeRoot, 'config.json');
+    if (fs.existsSync(configPath)) {
+      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
+        ontology?: unknown;
+      };
+      if (typeof parsed.ontology === 'string' && parsed.ontology.length > 0) {
+        packId = parsed.ontology;
+      }
+    }
+  } catch {
+    packId = 'general';
+  }
+  const loaded = loadOntologyPack({ packIdOrPath: packId });
+  return {
+    types: [...loaded.pack.node_types],
+    predicates: loaded.pack.predicates.map((p) => p.id),
+  };
+}
+
+/**
+ * LLM extract stage shared by build/sync (D-01: only on explicit --llm):
+ * - prompt → write `.prompt-extract.json`; host agent replies, then
+ *   `gsd-graph prompt apply extract` merges.
+ * - http → live completion per source, merge INFERRED candidates now.
+ * Returns a JSON-safe summary for the command result (null when mode none).
+ */
+function runLlmExtractStage(
+  mode: import('./types').LlmMode,
+  corpus: string | string[],
+  dir: string | undefined,
+): object | Promise<object> | null {
+  if (mode === 'none') return null;
+  const allow = loadLlmAllowlists(dir);
+
+  if (mode === 'prompt') {
+    const out = writeExtractPromptRequest({
+      ...(dir !== undefined ? { dir } : {}),
+      corpus,
+      allowedTypes: allow.types,
+      allowedPredicates: allow.predicates,
+    });
+    return {
+      mode: 'prompt',
+      request_path: out.request.path,
+      sources: out.sources,
+      skipped: out.skipped,
+      next: 'write .prompt-extract-result.json, then: gsd-graph prompt apply extract',
+    };
+  }
+
+  // http — async live extraction + merge
+  const http = readStoreLlmHttp(dir);
+  const { files, skipped } = collectLlmSources(corpus);
+  return llmExtractHttp(files, {
+    baseUrl: http.baseUrl,
+    model: http.model,
+    provider: http.provider,
+    apiKeyEnv: http.apiKeyEnv,
+    allowedTypes: allow.types,
+    allowedPredicates: allow.predicates,
+    ...(dir !== undefined ? { dir } : {}),
+  }).then((extracted) => {
+    const merged = mergeCandidates({
+      ...(dir !== undefined ? { dir } : {}),
+      nodes: extracted.nodes,
+      triples: extracted.triples,
+    });
+    return {
+      mode: 'http',
+      provider: http.provider,
+      model: http.model,
+      sources_extracted: extracted.sources_extracted,
+      candidate_nodes: extracted.nodes.length,
+      candidate_triples: extracted.triples.length,
+      node_count: merged.node_count,
+      triple_count: merged.triple_count,
+      review_pending: merged.review_pending,
+      failures: extracted.failures,
+      skipped_sources: skipped,
+    };
+  });
+}
+
 /** Parent command groups: bare `gsd-graph <group>` prints that group's help. */
 function defaultGroupHelp(cmd: Command): Command {
   return cmd.action(function (this: Command) {
@@ -185,8 +485,12 @@ Quick start:
   gsd-graph mcp doctor       verify MCP registration
 
 Also useful:
+  gsd-graph why <a> <b>      how A connects to B (cited prose)
+  gsd-graph export --format html   interactive viewer (mermaid|graphml|cypher too)
+  gsd-graph sync --llm       LLM-assisted extraction (prompt file or --llm http)
   gsd-graph query <term>     seed-expand search
   gsd-graph review list      pending ontology / merge items
+  gsd-graph review accept --all --kind <kind>   batch resolve
   gsd-graph --version        package version (JSON)
   gsd-graph --update         install latest from npm
 
@@ -378,7 +682,7 @@ function buildProgram(): Command {
                     `  ${h.ok ? '✔' : '✖'} ${h.host}: ${h.message}`,
                 )
                 .join('\n') +
-              `\n\n  Next: restart Claude / Codex / Cursor\n  Then: gsd-graph mcp doctor\n\n`,
+              `\n\n  Next: restart Claude / Codex / Cursor\n  Then: gsd-graph mcp doctor\n  Tools: graph_answer · graph_why · graph_query · graph_communities (agents: use these before re-reading docs)\n\n`,
           );
         }
         writeOk(result);
@@ -412,16 +716,21 @@ function buildProgram(): Command {
   program
     .command('init')
     .description('Create store layout and append gitignore entry when present')
-    .option('--ontology <idOrPath>', 'ontology pack id or path', 'general')
+    .option(
+      '--ontology <idOrPath>',
+      'ontology pack id or path (default: general; persisted to config.json)',
+    )
     .action((opts: { ontology?: string }, cmd: Command) => {
       const dir = globalDir(cmd);
       const initOpts: {
         cwd: string;
-        ontology: string;
+        ontology?: string;
         dir?: string;
       } = {
         cwd: process.cwd(),
-        ontology: opts.ontology ?? 'general',
+        // Only pass when explicit so re-init without the flag never rewrites
+        // an existing persisted choice.
+        ...(opts.ontology !== undefined ? { ontology: opts.ontology } : {}),
       };
       if (dir !== undefined) {
         initOpts.dir = dir;
@@ -448,6 +757,14 @@ function buildProgram(): Command {
     )
     .option('--communities', 'run communities detect after build')
     .option('--report', 'write GRAPH_REPORT.md after build')
+    .option(
+      '--ontology <idOrPath>',
+      'ontology pack id or path (default: config.json ontology, else general)',
+    )
+    .option(
+      '--llm [mode]',
+      'LLM-assisted extraction: omit/prompt → request file; http → live endpoint',
+    )
     .action(
       (
         opts: {
@@ -455,9 +772,11 @@ function buildProgram(): Command {
           corpus?: string[];
           communities?: boolean;
           report?: boolean;
+          ontology?: string;
+          llm?: string | boolean;
         },
         cmd: Command,
-      ) => {
+      ): void | Promise<void> => {
         const dir = globalDir(cmd);
         const result = withSpinner(
           opts.full === true ? 'Full project sync…' : 'Project sync…',
@@ -471,13 +790,106 @@ function buildProgram(): Command {
                 : {}),
               ...(opts.communities === true ? { communities: true } : {}),
               ...(opts.report === true ? { report: true } : {}),
+              ...(opts.ontology !== undefined
+                ? { ontology: opts.ontology }
+                : {}),
               onProgress: report,
             }),
         );
+        const flagMode = parseLlmFlag(opts.llm);
+        const mode = resolveLlmMode(
+          flagMode === undefined ? {} : { flagMode },
+        );
+        const stage = runLlmExtractStage(mode, result.corpus, dir);
+        if (stage !== null && typeof (stage as Promise<object>).then === 'function') {
+          return (stage as Promise<object>).then((llm) => {
+            printSyncWrapup(result);
+            writeOkHumanCommand({ ...result, llm_extract: llm });
+          });
+        }
         printSyncWrapup(result);
-        writeOkHumanCommand(result);
+        writeOkHumanCommand(
+          stage === null ? result : { ...result, llm_extract: stage },
+        );
       },
     );
+
+  // Continuous freshness for any editor: fs.watch + plain git hook
+  program
+    .command('watch')
+    .description(
+      'Watch corpus roots and run incremental sync on changes (Ctrl-C to stop)',
+    )
+    .option('--debounce <ms>', 'debounce window (default 2000)', parseIntOpt)
+    .option(
+      '--corpus <path>',
+      'corpus root override (repeatable)',
+      (val: string, prev: string[]) => {
+        prev.push(val);
+        return prev;
+      },
+      [] as string[],
+    )
+    .action(
+      (
+        opts: { debounce?: number; corpus?: string[] },
+        cmd: Command,
+      ): Promise<void> => {
+        const dir = globalDir(cmd);
+        const log = (msg: string): void => {
+          process.stderr.write(`${msg}\n`);
+        };
+        const handle = watchCorpus({
+          cwd: process.cwd(),
+          ...(dir !== undefined ? { dir } : {}),
+          ...(opts.debounce !== undefined ? { debounceMs: opts.debounce } : {}),
+          ...(opts.corpus !== undefined && opts.corpus.length > 0
+            ? { corpus: opts.corpus }
+            : {}),
+          onSync: (r) =>
+            log(
+              pc.green(
+                `✔ synced — ${r.build.node_count} nodes · ${r.build.triple_count} triples (${r.build.sources_extracted} extracted)`,
+              ),
+            ),
+          onError: (err) =>
+            log(pc.yellow(`watch: ${err instanceof Error ? err.message : String(err)}`)),
+        });
+        log(
+          `${pc.bold('gsd-graph watch')} — ${handle.roots.length} corpus root(s):\n` +
+            handle.roots.map((r) => `  ${r}`).join('\n'),
+        );
+        return new Promise<void>((resolveDone) => {
+          const stop = (): void => {
+            handle.close();
+            log(pc.dim('watch stopped'));
+            resolveDone();
+          };
+          process.once('SIGINT', stop);
+          process.once('SIGTERM', stop);
+        });
+      },
+    );
+
+  const hook = defaultGroupHelp(
+    program
+      .command('hook')
+      .description('Editor-agnostic freshness hooks (plain git)'),
+  );
+
+  hook
+    .command('install-git')
+    .description(
+      'Install a .git/hooks/post-commit block running incremental sync (never blocks commits)',
+    )
+    .option('--remove', 'remove the gsd-graph block instead')
+    .action((opts: { remove?: boolean }) => {
+      const result = installGitPostCommitHook({
+        cwd: process.cwd(),
+        ...(opts.remove === true ? { remove: true } : {}),
+      });
+      writeOk(result);
+    });
 
   // Core ops — thin adapters over library (CLI-01, D-02, D-06, D-08)
   program
@@ -485,18 +897,50 @@ function buildProgram(): Command {
     .description('Offline extract/normalize/publish from a corpus root')
     .requiredOption('--corpus <path>', 'corpus root directory to discover')
     .option('--full', 're-extract all sources (ignore fresh hashes)')
-    .action((opts: { corpus: string; full?: boolean }, cmd: Command) => {
-      const result = build(
-        withDir(
-          {
-            corpus: opts.corpus,
-            ...(opts.full === true ? { full: true } : {}),
-          },
-          globalDir(cmd),
-        ),
-      );
-      writeOk(result);
-    });
+    .option(
+      '--ontology <idOrPath>',
+      'ontology pack id or path (default: config.json ontology, else general)',
+    )
+    .option(
+      '--llm [mode]',
+      'LLM-assisted extraction: omit/prompt → request file; http → live endpoint',
+    )
+    .action(
+      (
+        opts: {
+          corpus: string;
+          full?: boolean;
+          ontology?: string;
+          llm?: string | boolean;
+        },
+        cmd: Command,
+      ): void | Promise<void> => {
+        const dir = globalDir(cmd);
+        const result = build(
+          withDir(
+            {
+              corpus: opts.corpus,
+              ...(opts.full === true ? { full: true } : {}),
+              ...(opts.ontology !== undefined
+                ? { ontology: opts.ontology }
+                : {}),
+            },
+            dir,
+          ),
+        );
+        const flagMode = parseLlmFlag(opts.llm);
+        const mode = resolveLlmMode(
+          flagMode === undefined ? {} : { flagMode },
+        );
+        const stage = runLlmExtractStage(mode, opts.corpus, dir);
+        if (stage !== null && typeof (stage as Promise<object>).then === 'function') {
+          return (stage as Promise<object>).then((llm) => {
+            writeOk({ ...result, llm_extract: llm });
+          });
+        }
+        writeOk(stage === null ? result : { ...result, llm_extract: stage });
+      },
+    );
 
   program
     .command('query')
@@ -520,7 +964,7 @@ function buildProgram(): Command {
             globalDir(cmd),
           ),
         );
-        writeOk(result);
+        writeHumanReadable(result, () => renderQueryHuman(result));
       },
     );
 
@@ -547,11 +991,119 @@ function buildProgram(): Command {
     });
 
   program
+    .command('why')
+    .description('Explain how two concepts connect — path + cited prose')
+    .argument('<from>', 'source term (label, alias, or node id)')
+    .argument('<to>', 'target term (label, alias, or node id)')
+    .option('--depth <n>', 'max path depth', parseIntOpt)
+    .option('--k <n>', 'total routes (k-1 alternatives shown)', parseIntOpt)
+    .action(
+      (
+        from: string,
+        to: string,
+        opts: { depth?: number; k?: number },
+        cmd: Command,
+      ) => {
+        const result = why(
+          withDir(
+            {
+              from,
+              to,
+              ...(opts.depth !== undefined ? { maxDepth: opts.depth } : {}),
+              ...(opts.k !== undefined ? { k: opts.k } : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        writeHumanReadable(result, () => renderWhyHuman(result));
+      },
+    );
+
+  program
+    .command('top')
+    .description('Most central nodes by PageRank or degree (pure TS)')
+    .option('--k <n>', 'rows (default 20)', parseIntOpt)
+    .option('--metric <m>', 'pagerank | degree (default pagerank)')
+    .action(
+      (opts: { k?: number; metric?: string }, cmd: Command) => {
+        const metric: 'degree' | 'pagerank' | undefined =
+          opts.metric === 'degree'
+            ? 'degree'
+            : opts.metric === 'pagerank'
+              ? 'pagerank'
+              : undefined;
+        const result = topNodes(
+          withDir(
+            {
+              ...(opts.k !== undefined ? { k: opts.k } : {}),
+              ...(metric !== undefined ? { metric } : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        writeHumanReadable(result, () =>
+          [
+            `${pc.bold('top nodes')} (${result.metric}) · ${result.node_count} nodes · ${result.triple_count} triples`,
+            ...result.nodes.map(
+              (n2, i) =>
+                `  ${String(i + 1).padStart(2)}. ${n2.label || n2.id} ${pc.dim(`(${n2.id})`)} — degree ${n2.degree} · pr ${n2.pagerank.toFixed(4)}`,
+            ),
+          ].join('\n'),
+        );
+      },
+    );
+
+  program
+    .command('export')
+    .description('Export graph to mermaid | graphml | cypher | html viewer')
+    .requiredOption(
+      '--format <fmt>',
+      'output format: mermaid | graphml | cypher | html',
+    )
+    .option('--out <path>', 'output file (default <store>/exports/graph.<ext>)')
+    .option('--max-triples <n>', 'cap exported triples (default 5000)', parseIntOpt)
+    .option('--open', 'open the exported file (html viewer) in your default app')
+    .action(
+      (
+        opts: {
+          format: string;
+          out?: string;
+          maxTriples?: number;
+          open?: boolean;
+        },
+        cmd: Command,
+      ) => {
+        if (!isExportFormat(opts.format)) {
+          throw new GraphError(
+            GSD_GRAPH_REASON.SCHEMA_INVALID,
+            `unknown export format: ${opts.format} (mermaid | graphml | cypher | html)`,
+          );
+        }
+        const result = exportGraph(
+          withDir(
+            {
+              format: opts.format,
+              ...(opts.out !== undefined ? { out: opts.out } : {}),
+              ...(opts.maxTriples !== undefined
+                ? { maxTriples: opts.maxTriples }
+                : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        if (opts.open === true) {
+          openInDefaultApp((result as { path: string }).path);
+        }
+        writeOk(result);
+      },
+    );
+
+  program
     .command('status')
     .description('Read store status (never uses projection as SoT)')
     .action((_opts: unknown, cmd: Command) => {
       const result = status(withDir({}, globalDir(cmd)));
-      writeOk(result);
+      writeHumanReadable(result, () => renderStatusHuman(result));
     });
 
   program
@@ -630,55 +1182,317 @@ function buildProgram(): Command {
   review
     .command('list')
     .description('List pending review-queue items')
+    .option(
+      '--kind <kind>',
+      'filter: entity_merge | predicate_unknown | type_unknown | schema_drift | conflict',
+    )
+    .option('--limit <n>', 'cap listed items (default: all)', parseIntOpt)
+    .action(
+      (opts: { kind?: string; limit?: number }, cmd: Command) => {
+        const storeRoot = resolveStoreRoot(
+          withDir({}, globalDir(cmd)) as { dir?: string },
+        );
+        const queue = loadReviewQueue(storeRoot);
+        let pending = queue.items.filter((i) => i.status === 'pending');
+        if (opts.kind !== undefined) {
+          pending = pending.filter((i) => i.kind === opts.kind);
+        }
+        const total = pending.length;
+        if (opts.limit !== undefined && opts.limit >= 0) {
+          pending = pending.slice(0, opts.limit);
+        }
+        writeOk({
+          schema_version: queue.schema_version,
+          items: pending,
+          decisions_count: queue.decisions.length,
+          pending_count: total,
+          listed_count: pending.length,
+          ...(opts.kind !== undefined ? { kind: opts.kind } : {}),
+        });
+      },
+    );
+
+  review
+    .command('summary')
+    .description('Pending counts by kind with triage hints')
     .action((_opts: unknown, cmd: Command) => {
       const storeRoot = resolveStoreRoot(
         withDir({}, globalDir(cmd)) as { dir?: string },
       );
       const queue = loadReviewQueue(storeRoot);
       const pending = queue.items.filter((i) => i.status === 'pending');
+      const byKind: Record<string, number> = {};
+      for (const i of pending) {
+        byKind[i.kind] = (byKind[i.kind] ?? 0) + 1;
+      }
+      // Most common proposed predicates — the usual bulk of the queue.
+      const predCounts = new Map<string, number>();
+      for (const i of pending) {
+        if (i.kind !== 'predicate_unknown') continue;
+        const p = String(i.payload.proposed_p ?? '');
+        if (p.length > 0) predCounts.set(p, (predCounts.get(p) ?? 0) + 1);
+      }
+      const topPredicates = [...predCounts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 10)
+        .map(([p, count]) => ({ p, count }));
+
+      const hints: string[] = [];
+      for (const { p, count } of topPredicates.slice(0, 3)) {
+        hints.push(
+          `accept all "${p}" (${count}): gsd-graph review accept --all --predicate ${p} --extend-ontology`,
+        );
+      }
+      if ((byKind.entity_merge ?? 0) > 0) {
+        hints.push(
+          'inspect merges: gsd-graph review list --kind entity_merge --limit 10',
+        );
+      }
+      if ((byKind.conflict ?? 0) > 0) {
+        hints.push(
+          'conflicts: gsd-graph review list --kind conflict, then gsd-graph supersede <winner> <loser>',
+        );
+      }
       writeOk({
-        schema_version: queue.schema_version,
-        items: pending,
-        decisions_count: queue.decisions.length,
         pending_count: pending.length,
+        by_kind: byKind,
+        top_predicates: topPredicates,
+        decisions_count: queue.decisions.length,
+        hints,
       });
     });
 
+  const reviewBatchAction = (
+    action: 'accept' | 'reject',
+    id: string | undefined,
+    opts: {
+      extendOntology?: boolean;
+      all?: boolean;
+      kind?: string;
+      predicate?: string;
+    },
+    cmd: Command,
+  ): void => {
+    const storeRoot = resolveStoreRoot(
+      withDir({}, globalDir(cmd)) as { dir?: string },
+    );
+    const hasFilters =
+      opts.all === true ||
+      opts.kind !== undefined ||
+      opts.predicate !== undefined;
+
+    if (id !== undefined && !hasFilters) {
+      reviewResolve({
+        storeRoot,
+        id,
+        action,
+        ...(opts.extendOntology === true ? { extendOntology: true } : {}),
+      });
+      writeOk({ ok: true, id, action });
+      return;
+    }
+    if (!hasFilters) {
+      throw new GraphError(
+        GSD_GRAPH_REASON.SCHEMA_INVALID,
+        `review ${action} requires an item id, or --all / --kind / --predicate for batch resolve`,
+      );
+    }
+    const result = reviewResolveBatch({
+      storeRoot,
+      action,
+      ...(opts.all === true ? { all: true } : {}),
+      ...(opts.kind !== undefined
+        ? { kind: opts.kind as import('./types').ReviewKind }
+        : {}),
+      ...(opts.predicate !== undefined ? { predicate: opts.predicate } : {}),
+      ...(id !== undefined ? { ids: [id] } : {}),
+      ...(opts.extendOntology === true ? { extendOntology: true } : {}),
+    });
+    writeOk({
+      ok: true,
+      action,
+      resolved: result.resolved,
+      resolved_count: result.resolved.length,
+      skipped: result.skipped,
+    });
+  };
+
   review
     .command('accept')
-    .description('Accept a pending review item')
-    .argument('<id>', 'review item id')
+    .description('Accept pending review item(s) — single id or batch filters')
+    .argument('[id]', 'review item id (omit when using batch filters)')
     .option(
       '--extend-ontology',
       'allow ontology.lock extend on unknown type/predicate accept',
     )
+    .option('--all', 'accept every pending item (respects --kind/--predicate)')
+    .option(
+      '--kind <kind>',
+      'batch filter: entity_merge | predicate_unknown | type_unknown | schema_drift',
+    )
+    .option(
+      '--predicate <p>',
+      'batch filter: predicate_unknown items proposing this predicate',
+    )
     .action(
-      (id: string, opts: { extendOntology?: boolean }, cmd: Command) => {
-        const storeRoot = resolveStoreRoot(
-          withDir({}, globalDir(cmd)) as { dir?: string },
-        );
-        reviewResolve({
-          storeRoot,
-          id,
-          action: 'accept',
-          ...(opts.extendOntology === true
-            ? { extendOntology: true }
-            : {}),
-        });
-        writeOk({ ok: true, id, action: 'accept' });
+      (
+        id: string | undefined,
+        opts: {
+          extendOntology?: boolean;
+          all?: boolean;
+          kind?: string;
+          predicate?: string;
+        },
+        cmd: Command,
+      ) => {
+        reviewBatchAction('accept', id, opts, cmd);
       },
     );
 
   review
     .command('reject')
-    .description('Reject a pending review item')
-    .argument('<id>', 'review item id')
-    .action((id: string, _opts: unknown, cmd: Command) => {
-      const storeRoot = resolveStoreRoot(
-        withDir({}, globalDir(cmd)) as { dir?: string },
+    .description('Reject pending review item(s) — single id or batch filters')
+    .argument('[id]', 'review item id (omit when using batch filters)')
+    .option('--all', 'reject every pending item (respects --kind/--predicate)')
+    .option(
+      '--kind <kind>',
+      'batch filter: entity_merge | predicate_unknown | type_unknown | schema_drift',
+    )
+    .option(
+      '--predicate <p>',
+      'batch filter: predicate_unknown items proposing this predicate',
+    )
+    .action(
+      (
+        id: string | undefined,
+        opts: { all?: boolean; kind?: string; predicate?: string },
+        cmd: Command,
+      ) => {
+        reviewBatchAction('reject', id, opts, cmd);
+      },
+    );
+
+  program
+    .command('eval')
+    .description(
+      'Run the answer-quality QA set (seed recall, citation validity, pass/fail)',
+    )
+    .option('--file <path>', 'QA file (default evals/gsd-graph.json)')
+    .action((opts: { file?: string }, cmd: Command) => {
+      const result = runEval(
+        withDir(
+          {
+            cwd: process.cwd(),
+            ...(opts.file !== undefined ? { file: opts.file } : {}),
+          },
+          globalDir(cmd),
+        ),
       );
-      reviewResolve({ storeRoot, id, action: 'reject' });
-      writeOk({ ok: true, id, action: 'reject' });
+      writeOk(result);
+      if (result.failed > 0) {
+        throw new GraphError(
+          GSD_GRAPH_REASON.BUILD_FAILED,
+          `${result.failed}/${result.total} eval case(s) failed`,
+        );
+      }
+    });
+
+  program
+    .command('assert')
+    .description(
+      'Assert a fact into the graph (ontology-gated; recorded in episodes.jsonl)',
+    )
+    .argument('<subject>', 'subject node id, label, or alias')
+    .argument('<predicate>', 'predicate id (unknown → review queue)')
+    .argument('<object>', 'object node id, label, or alias')
+    .option('--type-s <type>', 'node type when creating the subject (default Concept)')
+    .option('--type-o <type>', 'node type when creating the object (default Concept)')
+    .option(
+      '--confidence <tier>',
+      'EXTRACTED | INFERRED | AMBIGUOUS (default INFERRED)',
+    )
+    .option('--note <text>', 'evidence note recorded in the episode log')
+    .option('--supersedes <tripleId>', 'triple this assertion supersedes')
+    .option('--actor <tag>', 'who asserts (default user/assert)')
+    .action(
+      (
+        s: string,
+        p: string,
+        o: string,
+        opts: {
+          typeS?: string;
+          typeO?: string;
+          confidence?: string;
+          note?: string;
+          supersedes?: string;
+          actor?: string;
+        },
+        cmd: Command,
+      ) => {
+        const conf =
+          opts.confidence === 'EXTRACTED' ||
+          opts.confidence === 'INFERRED' ||
+          opts.confidence === 'AMBIGUOUS'
+            ? opts.confidence
+            : undefined;
+        const result = assertFact(
+          withDir(
+            {
+              s,
+              p,
+              o,
+              ...(opts.typeS !== undefined ? { sType: opts.typeS } : {}),
+              ...(opts.typeO !== undefined ? { oType: opts.typeO } : {}),
+              ...(conf !== undefined ? { confidence: conf } : {}),
+              ...(opts.note !== undefined ? { note: opts.note } : {}),
+              ...(opts.supersedes !== undefined
+                ? { supersedes: opts.supersedes }
+                : {}),
+              ...(opts.actor !== undefined ? { actor: opts.actor } : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        writeOk({ ok: true, ...result });
+      },
+    );
+
+  program
+    .command('retract')
+    .description('Retract a triple by id (recorded in episodes.jsonl)')
+    .argument('<tripleId>', 'triple id to retract')
+    .option('--note <text>', 'reason recorded in the episode log')
+    .option('--actor <tag>', 'who retracts (default user/retract)')
+    .action(
+      (
+        tripleId: string,
+        opts: { note?: string; actor?: string },
+        cmd: Command,
+      ) => {
+        const result = retractFact(
+          withDir(
+            {
+              tripleId,
+              ...(opts.note !== undefined ? { note: opts.note } : {}),
+              ...(opts.actor !== undefined ? { actor: opts.actor } : {}),
+            },
+            globalDir(cmd),
+          ),
+        );
+        writeOk({ ok: true, ...result });
+      },
+    );
+
+  program
+    .command('supersede')
+    .description(
+      'Record that one triple supersedes another (decision reversal verdict)',
+    )
+    .argument('<winner>', 'triple id that wins (current fact)')
+    .argument('<loser>', 'triple id that is superseded (stale fact)')
+    .action((winner: string, loser: string, _opts: unknown, cmd: Command) => {
+      const result = supersede(withDir({ winner, loser }, globalDir(cmd)));
+      writeOk({ ok: true, ...result });
     });
 
   const ontology = defaultGroupHelp(
@@ -705,6 +1519,25 @@ function buildProgram(): Command {
         strict: loaded.pack.strict,
         packHash: loaded.packHash,
       });
+    });
+
+  ontology
+    .command('eject')
+    .description(
+      'Materialize the active pack + accepted lock extensions as a committable project-local pack',
+    )
+    .option('--out <dir>', 'output directory (default ontology-packs/<id>-local)')
+    .action((opts: { out?: string }, cmd: Command) => {
+      const result = ontologyEject(
+        withDir(
+          {
+            cwd: process.cwd(),
+            ...(opts.out !== undefined ? { out: opts.out } : {}),
+          },
+          globalDir(cmd),
+        ),
+      );
+      writeOk({ ok: true, ...result });
     });
 
   ontology
@@ -803,36 +1636,124 @@ function buildProgram(): Command {
       writeOk(result);
     });
 
+  // Opt-in embedding sidecar (semantic seed fallback)
+  const embeddings = defaultGroupHelp(
+    program
+      .command('embeddings')
+      .description('Opt-in embedding sidecar for semantic seed fallback'),
+  );
+
+  embeddings
+    .command('build')
+    .description(
+      'Embed node labels/aliases via llm.embeddings config into embeddings.v1.json',
+    )
+    .action((_opts: unknown, cmd: Command): Promise<void> => {
+      const dir = globalDir(cmd);
+      return buildEmbeddingSidecar(withDir({}, dir)).then((result) => {
+        writeOk({ ok: true, ...result });
+      });
+    });
+
+  embeddings
+    .command('status')
+    .description('Show embedding sidecar freshness and coverage')
+    .action((_opts: unknown, cmd: Command) => {
+      const storeRoot = resolveStoreRoot(
+        withDir({}, globalDir(cmd)) as { dir?: string },
+      );
+      const sidecar = loadEmbeddingSidecar(storeRoot);
+      const config = readEmbeddingsConfig(storeRoot);
+      writeOk({
+        configured: config !== null,
+        exists: sidecar !== null,
+        ...(sidecar !== null
+          ? {
+              model: sidecar.model,
+              entries: sidecar.entries.length,
+              built_at: sidecar.built_at,
+              graph_built_at: sidecar.graph_built_at,
+            }
+          : {}),
+      });
+    });
+
   const answerAction = (
     question: string,
     opts: {
       budget?: number;
       applyPromptResult?: boolean;
       llm?: string | boolean;
+      global?: boolean;
+      semantic?: boolean;
     },
     cmd: Command,
-  ) => {
+  ): void | Promise<void> => {
     const flagMode = parseLlmFlag(opts.llm);
     const mode = resolveLlmMode(flagMode === undefined ? {} : { flagMode });
+    const dir = globalDir(cmd);
+
+    // Live http answer — explicit --llm http only (D-01). Config supplies
+    // provider/endpoint; abstention still happens before any network call.
+    if (mode === 'http' && opts.applyPromptResult !== true) {
+      const http = readStoreLlmHttp(dir);
+      return answerHttp(
+        withDir(
+          {
+            question,
+            ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
+            llmMode: 'http' as const,
+            llmHttp: {
+              baseUrl: http.baseUrl,
+              model: http.model,
+              apiKeyEnv: http.apiKeyEnv,
+              provider: http.provider,
+            },
+          },
+          dir,
+        ),
+      ).then((result) => {
+        writeOk(result);
+      });
+    }
+
+    // Semantic seed fallback (async, opt-in): retries a no_seeds_matched
+    // abstain with embedding-sidecar candidates as fallback seeds.
+    if (opts.semantic === true && opts.applyPromptResult !== true) {
+      return answerSemantic(
+        withDir(
+          {
+            question,
+            ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
+            ...(opts.global === true ? { global: true } : {}),
+          },
+          dir,
+        ),
+      ).then((result) => {
+        writeHumanReadable(result, () => renderAnswerHuman(result));
+      });
+    }
+
     const result = answer(
       withDir(
         {
           question,
           ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
+          ...(opts.global === true ? { global: true } : {}),
           ...(opts.applyPromptResult === true
             ? {
                 applyPromptResult: true,
                 promptResult: readPromptResult(
-                  withDir({ stage: 'answer' as const }, globalDir(cmd)),
+                  withDir({ stage: 'answer' as const }, dir),
                 ),
               }
             : {}),
           ...(mode !== 'none' ? { llmMode: mode } : {}),
         },
-        globalDir(cmd),
+        dir,
       ),
     );
-    writeOk(result);
+    writeHumanReadable(result, () => renderAnswerHuman(result));
   };
 
   program
@@ -840,6 +1761,8 @@ function buildProgram(): Command {
     .description('Deterministic grounded answer with triple citations')
     .argument('<question>', 'question text')
     .option('--budget <n>', 'token budget', parseIntOpt)
+    .option('--global', 'corpus-level theme answer from communities')
+    .option('--semantic', 'retry no-seed abstains with embedding-sidecar seeds (async)')
     .option(
       '--apply-prompt-result',
       'apply store .prompt-answer-result.json (Ajv + citation gate)',
@@ -856,6 +1779,8 @@ function buildProgram(): Command {
     .description('Alias for answer — grounded multi-hop Q&A with citations')
     .argument('<question>', 'question text')
     .option('--budget <n>', 'token budget', parseIntOpt)
+    .option('--global', 'corpus-level theme answer from communities')
+    .option('--semantic', 'retry no-seed abstains with embedding-sidecar seeds (async)')
     .option(
       '--apply-prompt-result',
       'apply store .prompt-answer-result.json (Ajv + citation gate)',
@@ -932,6 +1857,40 @@ function buildProgram(): Command {
         }
 
         const applied = promptApply({ stage, result: resultObj });
+
+        // Extract results now merge into the store: sanitize to INFERRED
+        // llm/prompt provenance, then run the normalize/review/publish path.
+        if (applied.stage === 'extract') {
+          const sanitized = sanitizeExtractCandidates(applied, {
+            extractorTag: 'llm/prompt',
+            ...(extractPromptVersion(
+              dir !== undefined ? { dir } : {},
+            ) !== ''
+              ? {
+                  promptVersion: extractPromptVersion(
+                    dir !== undefined ? { dir } : {},
+                  ),
+                }
+              : {}),
+          });
+          const merged = mergeCandidates(
+            withDir(
+              { nodes: sanitized.nodes, triples: sanitized.triples },
+              dir,
+            ),
+          );
+          writeOk({
+            stage: 'extract',
+            candidate_nodes: sanitized.nodes.length,
+            candidate_triples: sanitized.triples.length,
+            node_count: merged.node_count,
+            triple_count: merged.triple_count,
+            review_pending: merged.review_pending,
+            store_dir: merged.store_dir,
+          });
+          return;
+        }
+
         writeOk(applied);
       },
     );
@@ -1001,52 +1960,82 @@ function handleTopLevelMetaFlags(argv: string[]): number | null {
   return null;
 }
 
-/**
- * CLI entry used by bin/gsd-graph.js and tests (D-11).
- * Returns process exit code; does not call process.exit.
- */
-export function main(argv: string[]): number {
-  const metaCode = handleTopLevelMetaFlags(argv);
-  if (metaCode !== null) return metaCode;
-
-  const program = buildProgram();
-  try {
-    program.parse(argv);
-    return 0;
-  } catch (err) {
-    if (err instanceof GraphError) {
-      writeErrorJson({
-        ok: false,
-        reason: err.reason,
-        message: err.message,
-      });
-      return mapCliError(err);
-    }
-    if (err instanceof CommanderError) {
-      // -h / --help / `help` already printed human text via writeOut
-      if (
-        err.code === 'commander.helpDisplayed' ||
-        err.code === 'commander.help'
-      ) {
-        return 0;
-      }
-      writeErrorJson({
-        ok: false,
-        reason: 'usage',
-        message: errorMessage(err),
-      });
-      return 1;
+/** Shared exit-code + JSON mapping for main() errors (sync and async paths). */
+function handleMainError(err: unknown): number {
+  if (err instanceof GraphError) {
+    writeErrorJson({
+      ok: false,
+      reason: err.reason,
+      message: err.message,
+    });
+    return mapCliError(err);
+  }
+  if (err instanceof CommanderError) {
+    // -h / --help / `help` already printed human text via writeOut
+    if (
+      err.code === 'commander.helpDisplayed' ||
+      err.code === 'commander.help'
+    ) {
+      return 0;
     }
     writeErrorJson({
       ok: false,
       reason: 'usage',
       message: errorMessage(err),
     });
-    return mapCliError(err);
+    return 1;
+  }
+  writeErrorJson({
+    ok: false,
+    reason: 'usage',
+    message: errorMessage(err),
+  });
+  return mapCliError(err);
+}
+
+/** True when argv requests network work (`--llm http`, `--semantic`, embeddings build). */
+export function argvNeedsAsync(argv: string[]): boolean {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (a === '--llm' && argv[i + 1] === 'http') return true;
+    if (a === '--llm=http') return true;
+    if (a === '--semantic') return true;
+    if (a === 'embeddings' && argv[i + 1] === 'build') return true;
+    if (a === 'watch') return true;
+  }
+  return false;
+}
+
+/**
+ * CLI entry used by bin/gsd-graph.js and tests (D-11).
+ * Returns process exit code; does not call process.exit.
+ * Commands that hit the network (`--llm http`) return a Promise<number>;
+ * everything else stays synchronous (D-01: offline by default).
+ */
+export function main(argv: string[]): number | Promise<number> {
+  const metaCode = handleTopLevelMetaFlags(argv);
+  if (metaCode !== null) return metaCode;
+
+  const program = buildProgram();
+
+  if (argvNeedsAsync(argv)) {
+    return program
+      .parseAsync(argv)
+      .then(() => 0)
+      .catch((err: unknown) => handleMainError(err));
+  }
+
+  try {
+    program.parse(argv);
+    return 0;
+  } catch (err) {
+    return handleMainError(err);
   }
 }
 
 // Local debug: node dist/cli.js … (published bin always calls main explicitly)
 if (require.main === module) {
-  process.exitCode = main(process.argv);
+  Promise.resolve(main(process.argv)).then((code) => {
+    process.exitCode = code;
+  });
 }

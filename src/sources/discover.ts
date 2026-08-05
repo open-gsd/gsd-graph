@@ -8,13 +8,17 @@ import type { ExtractDiagnostic } from '../types';
 /** Default max file size: 8 MiB (T-02-03). */
 export const DEFAULT_MAX_BYTES = 8 * 1024 * 1024;
 
-const DEFAULT_EXTENSIONS = new Set([
-  '.md',
-  '.txt',
-  '.markdown',
-  '.json',
-  '.jsonl',
-]);
+// Default extension set derives from the extractor registry, so registering a
+// new extractor makes discovery pick its files up automatically. Lazy require
+// avoids a static cycle (pipeline/extractors → sources/* → this module never
+// happens, but keep the seam one-directional at load time anyway).
+function defaultExtensions(): Set<string> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const reg = require('../pipeline/extractors') as {
+    registeredExtensions: () => string[];
+  };
+  return new Set(reg.registeredExtensions());
+}
 
 export interface DiscoverSourcesOptions {
   /**
@@ -180,8 +184,8 @@ function buildExtensionFilter(
   globs?: string[],
 ): (filePath: string) => boolean {
   if (!globs || globs.length === 0) {
-    return (filePath: string) =>
-      DEFAULT_EXTENSIONS.has(path.extname(filePath).toLowerCase());
+    const exts = defaultExtensions();
+    return (filePath: string) => exts.has(path.extname(filePath).toLowerCase());
   }
 
   const exts = new Set<string>();

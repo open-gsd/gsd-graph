@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "example-answer",
+      "question": "why does the auth service cause the outage?",
+      "expect_seeds": ["Concept:auth-service"],
+      "expect_answer_contains": ["causes"]
+    },
+    {
+      "id": "example-abstain",
+      "question": "what about a topic that is not in the corpus at all?",
+      "expect_abstain": true
+    },
+    {
+      "id": "example-overview",
+      "question": "what are the main areas of this project?",
+      "expect_mode": "global"
+    },
+    {
+      "id": "example-why",
+      "why": {
+        "from": "auth service",
+        "to": "billing",
+        "expect_found": true
+      }
+    }
+  ]
+}

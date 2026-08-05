@@ -76,6 +76,12 @@ export type { LoadOntologyPackOptions } from './ontology/load-pack';
 
 export { applyUnknownPolicy } from './ontology/policy';
 
+export { ontologyEject } from './ontology/eject';
+export type {
+  OntologyEjectOptions,
+  OntologyEjectResult,
+} from './ontology/eject';
+
 export type {
   UnknownPolicy,
   OntologyPredicate,
@@ -102,6 +108,19 @@ export {
 export type { PublishPlan } from './io/atomic-publish';
 
 export { loadGraphV1 } from './io/load-graph';
+
+export {
+  CURRENT_GRAPH_SCHEMA_VERSION,
+  registerGraphMigration,
+  listGraphMigrations,
+  migrateGraphDocument,
+} from './io/migrations';
+export type { GraphMigration, MigrateGraphResult } from './io/migrations';
+
+export { loadGraphV1Cached, clearGraphV1Cache } from './io/graph-cache';
+
+export { GsdGraph } from './facade';
+export type { GsdGraphOpenOptions } from './facade';
 
 export { acquireBuildLock, STALE_MS } from './io/lock';
 export type {
@@ -142,8 +161,29 @@ export type { AdjacencyEdge, AdjacencyMap } from './pipeline/query';
 export { fingerprintFile } from './sources/fingerprint';
 export { extractMarkdown } from './sources/markdown';
 export { extractJsonl } from './sources/jsonl';
+export {
+  extractYaml,
+  parseFlatYaml,
+  splitFrontmatter,
+  YAML_RELATIONAL_KEYS,
+} from './sources/yaml';
+export type {
+  FlatYamlEntry,
+  ParseFlatYamlResult,
+  YamlExtractOptions,
+} from './sources/yaml';
 export { extractByPath } from './pipeline/extract';
 export type { ExtractByPathOptions } from './pipeline/extract';
+export {
+  registerExtractor,
+  extractorForExtension,
+  listExtractors,
+  registeredExtensions,
+} from './pipeline/extractors';
+export type {
+  Extractor,
+  RegisterExtractorOptions,
+} from './pipeline/extractors';
 export { redactSecrets } from './sources/redact';
 export { discoverSources, DEFAULT_MAX_BYTES } from './sources/discover';
 export type {
@@ -152,7 +192,36 @@ export type {
 } from './sources/discover';
 
 // Normalize + review (02-03)
-export { normalize } from './pipeline/normalize';
+export { normalize, DIRECTIONAL_PREDICATES } from './pipeline/normalize';
+export { supersede } from './pipeline/supersede';
+export type { SupersedeOptions, SupersedeResult } from './pipeline/supersede';
+
+// Answer-quality eval harness
+export { runEval } from './pipeline/eval';
+export type {
+  EvalCase,
+  EvalWhyCase,
+  EvalFileDocument,
+  EvalCaseResult,
+  EvalRunResult,
+  RunEvalOptions,
+} from './pipeline/eval';
+
+// Agent/user write path — assert/retract + episode replay
+export {
+  assertFact,
+  retractFact,
+  loadEpisodeCandidates,
+  EPISODES_BASENAME,
+} from './pipeline/assert';
+export type {
+  AssertFactOptions,
+  AssertFactResult,
+  RetractFactOptions,
+  RetractFactResult,
+  EpisodeRecord,
+  EpisodeCandidates,
+} from './pipeline/assert';
 export type {
   NormalizeInput,
   NormalizeOutput,
@@ -163,11 +232,26 @@ export {
   loadReviewQueue,
   mergeReviewItems,
   reviewResolve,
+  reviewResolveBatch,
 } from './pipeline/review';
-export type { ReviewResolveOptions } from './pipeline/review';
+export type {
+  ReviewResolveOptions,
+  ReviewResolveBatchOptions,
+  ReviewResolveBatchResult,
+} from './pipeline/review';
 
 // Build orchestrator + status (02-04)
-export { build, assertGraphCaps, MAX_NODES, MAX_TRIPLES } from './pipeline/build';
+export {
+  build,
+  mergeCandidates,
+  assertGraphCaps,
+  MAX_NODES,
+  MAX_TRIPLES,
+} from './pipeline/build';
+export type {
+  MergeCandidatesOptions,
+  MergeCandidatesResult,
+} from './pipeline/build';
 export { status } from './pipeline/status';
 
 // Project sync — brownfield + continuous update
@@ -249,14 +333,97 @@ export { diff, resolveBaseline } from './pipeline/diff';
 // Repair (03-04 / REP-01)
 export { repair } from './pipeline/repair';
 
+// Export projections + why explanations (disposable, never SoT)
+export {
+  exportGraph,
+  isExportFormat,
+  renderMermaid,
+  renderGraphml,
+  renderCypher,
+  renderHtml,
+} from './pipeline/export';
+export type {
+  ExportFormat,
+  ExportOptions,
+  ExportResult,
+} from './pipeline/export';
+
+export { why, resolveNodeTerm } from './pipeline/why';
+
+// Watch mode + plain git hook (editor-agnostic freshness)
+export { watchCorpus } from './pipeline/watch';
+export type { WatchCorpusOptions, WatchHandle } from './pipeline/watch';
+export { installGitPostCommitHook } from './pipeline/git-hook';
+export type {
+  GitHookInstallOptions,
+  GitHookInstallResult,
+} from './pipeline/git-hook';
+
+// Centrality analytics (pure TS)
+export {
+  topNodes,
+  pagerank,
+  degreeCounts,
+  PAGERANK_DAMPING,
+  PAGERANK_MAX_ITERATIONS,
+} from './pipeline/top';
+export type {
+  TopNodesOptions,
+  TopNodesResult,
+  TopNodeEntry,
+} from './pipeline/top';
+export type { WhyOptions, WhyResult, WhyCitation } from './pipeline/why';
+
 // Init (04-01 / CLI-03)
 export { init } from './pipeline/init';
 
 // Pack / grounded subgraph (05-01 / PACK-01)
-export { packSubgraph, PACK_STOPWORDS, tokenizeQuestion, scoreSeeds } from './pipeline/pack';
+export {
+  packSubgraph,
+  PACK_STOPWORDS,
+  tokenizeQuestion,
+  scoreSeeds,
+  singularizeToken,
+  tokenVariants,
+  suggestSeeds,
+  packRelevanceScore,
+} from './pipeline/pack';
 
 // Deterministic grounded answer (05-02 / ANS-01 / ANS-02)
-export { answer, answerHttp, formatDeterministicMarkdown } from './pipeline/answer';
+export {
+  answer,
+  answerHttp,
+  answerSemantic,
+  formatDeterministicMarkdown,
+  OVERVIEW_QUESTION_RE,
+} from './pipeline/answer';
+
+// Opt-in embedding sidecar + SeedScorer seam
+export {
+  buildEmbeddingSidecar,
+  loadEmbeddingSidecar,
+  semanticSeedCandidates,
+  readEmbeddingsConfig,
+  cosineSimilarity,
+  EMBEDDINGS_BASENAME,
+  EMBEDDINGS_MAX_NODES,
+  SEMANTIC_SEED_MIN_SIMILARITY,
+} from './embeddings/sidecar';
+export type {
+  EmbeddingsConfig,
+  EmbeddingEntry,
+  EmbeddingSidecarDocument,
+  SemanticSeedCandidate,
+  SemanticSeedOptions,
+  BuildEmbeddingSidecarOptions,
+  BuildEmbeddingSidecarResult,
+} from './embeddings/sidecar';
+export {
+  setSeedScorer,
+  getSeedScorer,
+  embeddingSeedScorer,
+} from './embeddings/scorer';
+export type { SeedScorer, SeedScorerCandidate } from './embeddings/scorer';
 export type { AnswerHttpOptions } from './pipeline/answer';
 
 // Minimal GRAPH_REPORT from published v1 (06-03 / RPT-01 / D-08)
@@ -307,11 +474,39 @@ export type { ResolveLlmModeInput } from './llm/provider';
 export {
   httpChatCompletion,
   parseHttpPromptResultJson,
+  defaultApiKeyEnv,
 } from './llm/http-client';
 export type {
   HttpChatCompletionOptions,
   HttpChatCompletionResult,
+  LlmHttpProvider,
 } from './llm/http-client';
+
+export {
+  collectLlmSources,
+  sanitizeExtractCandidates,
+  llmExtractHttp,
+  writeExtractPromptRequest,
+  buildExtractSystemPrompt,
+  extractPromptVersion,
+  LLM_EXTRACT_MAX_SOURCES,
+  LLM_EXTRACT_MAX_SOURCE_BYTES,
+} from './llm/extract';
+
+export { loadPromptTemplate } from './llm/prompt-templates';
+export type {
+  LoadedPromptTemplate,
+  LoadPromptTemplateOptions,
+} from './llm/prompt-templates';
+export type {
+  LlmSourceFile,
+  CollectLlmSourcesResult,
+  SanitizedCandidates,
+  LlmExtractHttpOptions,
+  LlmExtractHttpResult,
+  WriteExtractRequestOptions,
+  WriteExtractRequestOutput,
+} from './llm/extract';
 
 export {
   writePromptRequest,

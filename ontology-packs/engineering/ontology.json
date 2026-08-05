@@ -13,15 +13,20 @@
     "Change",
     "Document",
     "Concept",
-    "Event"
+    "Event",
+    "Topic"
   ],
   "predicates": [
     { "id": "related_to", "domain": ["*"], "range": ["*"] },
-    {
-      "id": "depends_on",
-      "domain": ["Service", "API", "Change"],
-      "range": ["Service", "API"]
-    },
+    { "id": "mentions", "domain": ["*"], "range": ["*"] },
+    { "id": "depends_on", "domain": ["*"], "range": ["*"] },
+    { "id": "blocked_by", "domain": ["*"], "range": ["*"] },
+    { "id": "requires", "domain": ["*"], "range": ["*"] },
+    { "id": "uses", "domain": ["*"], "range": ["*"] },
+    { "id": "implements", "domain": ["*"], "range": ["*"] },
+    { "id": "delivers", "domain": ["*"], "range": ["*"] },
+    { "id": "precedes", "domain": ["*"], "range": ["*"] },
+    { "id": "supports", "domain": ["*"], "range": ["*"] },
     {
       "id": "owns",
       "domain": ["Person", "Organization"],

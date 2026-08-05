@@ -214,6 +214,142 @@ export function reviewResolve(opts: ReviewResolveOptions): void {
   }
 }
 
+export interface ReviewResolveBatchOptions {
+  storeRoot: string;
+  action: 'accept' | 'reject';
+  /** Resolve every pending item (subject to kind/predicate filters). */
+  all?: boolean;
+  /** Only items of this kind. */
+  kind?: ReviewItem['kind'];
+  /** Only predicate_unknown items proposing this predicate. */
+  predicate?: string;
+  /** Explicit ids to resolve (combined with filters when both given). */
+  ids?: string[];
+  /** See ReviewResolveOptions.extendOntology. */
+  extendOntology?: boolean;
+  /** Optional fixed clock for tests. */
+  now?: string;
+  writeProjection?: boolean;
+}
+
+export interface ReviewResolveBatchResult {
+  resolved: string[];
+  skipped: Array<{ id: string; reason: string }>;
+}
+
+/**
+ * Resolve many pending review items under a single build lock + publish.
+ *
+ * Selection: pending items ∩ (ids when given) ∩ (kind when given) ∩
+ * (predicate when given, predicate_unknown only). `all` with no filters
+ * selects every pending item. Individual apply failures are recorded in
+ * `skipped` and never abort the batch.
+ */
+export function reviewResolveBatch(
+  opts: ReviewResolveBatchOptions,
+): ReviewResolveBatchResult {
+  const storeRoot = ensureStoreRoot(opts.storeRoot);
+  const lock = acquireBuildLock(storeRoot, 'lib');
+  try {
+    const now = opts.now ?? new Date().toISOString();
+    const queue = loadReviewQueue(storeRoot);
+    const graph = loadGraphV1(storeRoot);
+    let ontologyLock = loadOntologyLock(storeRoot);
+
+    const idFilter = opts.ids !== undefined ? new Set(opts.ids) : null;
+    const selected = queue.items.filter((item) => {
+      if (item.status !== 'pending') return false;
+      if (idFilter !== null && !idFilter.has(item.id)) return false;
+      if (opts.kind !== undefined && item.kind !== opts.kind) return false;
+      if (opts.predicate !== undefined) {
+        if (item.kind !== 'predicate_unknown') return false;
+        if (String(item.payload.proposed_p ?? '') !== opts.predicate) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (
+      selected.length === 0 ||
+      (idFilter === null &&
+        opts.all !== true &&
+        opts.kind === undefined &&
+        opts.predicate === undefined)
+    ) {
+      return { resolved: [], skipped: [] };
+    }
+
+    const resolved: string[] = [];
+    const skipped: Array<{ id: string; reason: string }> = [];
+    const extend = opts.extendOntology === true;
+
+    for (const item of selected) {
+      if (opts.action === 'reject') {
+        item.status = 'rejected';
+        item.updated_at = now;
+        item.decision = { action: 'reject', at: now };
+        queue.decisions.push({ id: item.id, action: 'reject', at: now });
+        resolved.push(item.id);
+        continue;
+      }
+      try {
+        applyAccept(item, graph, {
+          extendOntology: extend,
+          now,
+          ontologyLock,
+          setOntologyLock: (next) => {
+            ontologyLock = next;
+          },
+        });
+      } catch (err) {
+        skipped.push({
+          id: item.id,
+          reason: err instanceof Error ? err.message : String(err),
+        });
+        continue;
+      }
+      item.status = 'accepted';
+      item.updated_at = now;
+      item.decision = {
+        action: 'accept',
+        at: now,
+        ...(extend ? { extend_ontology: true } : {}),
+      };
+      queue.decisions.push({
+        id: item.id,
+        action: 'accept',
+        at: now,
+        ...(extend ? { extend_ontology: true } : {}),
+      });
+      resolved.push(item.id);
+    }
+
+    graph.stats = {
+      node_count: graph.nodes.length,
+      triple_count: graph.triples.length,
+    };
+
+    const sidecars: Record<string, object> = {
+      [QUEUE_BASENAME]: queue,
+    };
+    if (ontologyLock) {
+      sidecars[ONTOLOGY_LOCK_BASENAME] = ontologyLock;
+    }
+
+    publishGraphFiles({
+      storeRoot,
+      graphV1: graph,
+      writeProjection: opts.writeProjection === true,
+      sidecars,
+    });
+
+    return { resolved, skipped };
+  } finally {
+    lock.release();
+  }
+}
+
 interface OntologyLockDoc {
   pack_id?: string;
   pack_version?: string;
@@ -256,6 +392,10 @@ function applyAccept(
       return;
     case 'schema_drift':
       // Record-only accept (DESIGN table)
+      return;
+    case 'conflict':
+      // Record-only: acknowledging a conflict never mutates the graph.
+      // Deciding which side wins is `gsd-graph supersede <winner> <loser>`.
       return;
     default: {
       const _exhaustive: never = item.kind;

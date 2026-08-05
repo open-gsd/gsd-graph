@@ -579,6 +579,9 @@ export function mcpDoctor(opts?: {
     next.push('gsd-graph mcp install');
   }
   next.push('Restart Claude / Codex / Cursor after install');
+  next.push(
+    'Agents: prefer graph_answer / graph_why over re-reading planning docs (graph-first routing)',
+  );
 
   return {
     ok: coreOk,

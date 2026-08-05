@@ -195,10 +195,14 @@ describe('MCP full read tool matrix + default-off writes (MCP-01, D-06)', () => 
     'graph_query',
     'graph_pack',
     'graph_answer',
+    'graph_why',
+    'graph_resolve',
+    'graph_diff',
+    'graph_communities',
     'graph_review_list',
   ];
 
-  it('default tool list is exactly the five read tools (D-06)', () => {
+  it('default tool list is exactly the read tools (D-06)', () => {
     const names = mcp.listToolNames();
     assert.deepEqual([...names].sort(), [...DEFAULT_EXACT].sort());
   });
