@@ -20,6 +20,7 @@ import {
 import { diff } from './pipeline/diff';
 import { init } from './pipeline/init';
 import { withSpinner } from './cli/spinner';
+import { printEnableWrapup, printSyncWrapup } from './cli/summary';
 import { enable } from './pipeline/enable';
 import { projectSync } from './pipeline/project-sync';
 import { packSubgraph } from './pipeline/pack';
@@ -136,6 +137,7 @@ function buildProgram(): Command {
             onProgress: report,
           }),
         );
+        printEnableWrapup(result);
         writeOk(result);
       },
     );
@@ -205,6 +207,7 @@ function buildProgram(): Command {
               onProgress: report,
             }),
         );
+        printSyncWrapup(result);
         writeOk(result);
       },
     );

@@ -193,6 +193,7 @@ export {
 // CLI progress helper (library-safe; no-op without TTY)
 export { createCliSpinner, withSpinner } from './cli/spinner';
 export type { CliSpinner, ProgressReporter } from './cli/spinner';
+export { printEnableWrapup, printSyncWrapup } from './cli/summary';
 
 // Maintain invalidation (03-02 / MNT-01)
 export {
