@@ -86,7 +86,9 @@ export function extractJsonl(
       diagnostics.push({
         path: sourcePath,
         code: 'RECORD_INVALID',
-        message: `Record at line ${lineHint} missing required type or label`,
+        message:
+          `Record at line ${lineHint} missing required type or label ` +
+          `(expected field-map {type,label,edges?}; plain OpenAPI/config JSON is skipped)`,
       });
       continue;
     }
@@ -165,6 +167,9 @@ interface ParsedRecord {
   line: number;
 }
 
+/** Cap per-file line diagnostics so pretty-printed OpenAPI dumps don't flood CLI. */
+const MAX_JSONL_LINE_DIAGNOSTICS = 8;
+
 function parseRecords(
   sourcePath: string,
   content: string,
@@ -195,9 +200,23 @@ function parseRecords(
     }
   }
 
+  // Pretty-printed or compact single JSON object document (OpenAPI, config, etc.)
+  // Prefer whole-document parse so we never emit one diagnostic per brace line.
+  if (trimmed.startsWith('{')) {
+    try {
+      const value = JSON.parse(content) as unknown;
+      return [{ value, line: 1 }];
+    } catch {
+      // Fall through to JSONL when the file is multi-record JSONL that
+      // happens to start with `{` on the first line but is not one document.
+    }
+  }
+
   // JSONL: one object per line
   const lines = content.split(/\r?\n/);
   const out: ParsedRecord[] = [];
+  let lineDiagCount = 0;
+  let suppressed = 0;
   for (let i = 0; i < lines.length; i++) {
     const lineNum = i + 1;
     const line = lines[i] ?? '';
@@ -205,12 +224,28 @@ function parseRecords(
     try {
       out.push({ value: JSON.parse(line), line: lineNum });
     } catch (err) {
-      diagnostics.push({
-        path: sourcePath,
-        code: 'JSON_LINE_INVALID',
-        message: `Invalid JSON on line ${lineNum}: ${err instanceof Error ? err.message : String(err)}`,
-      });
+      if (lineDiagCount < MAX_JSONL_LINE_DIAGNOSTICS) {
+        diagnostics.push({
+          path: sourcePath,
+          code: 'JSON_LINE_INVALID',
+          message: `Invalid JSON on line ${lineNum}: ${err instanceof Error ? err.message : String(err)}`,
+        });
+        lineDiagCount += 1;
+      } else {
+        suppressed += 1;
+      }
     }
+  }
+  if (suppressed > 0) {
+    diagnostics.push({
+      path: sourcePath,
+      code: 'JSON_LINE_INVALID_TRUNCATED',
+      message: `Suppressed ${suppressed} additional JSON_LINE_INVALID diagnostics (cap ${MAX_JSONL_LINE_DIAGNOSTICS} per file). File is likely pretty-printed JSON, not JSONL field-map records.`,
+    });
+  }
+  // No valid records and we only saw parse failures → one clear skip note when empty out
+  if (out.length === 0 && lineDiagCount > 0 && suppressed === 0) {
+    // already have line diagnostics; nothing extra
   }
   return out;
 }

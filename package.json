@@ -1,6 +1,6 @@
 {
   "name": "@opengsd/gsd-graph",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Graph Engineering toolkit — extract, normalize, store, query, ground knowledge graphs, and discover global themes via community detection",
   "license": "MIT",
   "author": "Jeremy McSpadden <jeremy@fluxlabs.net>",

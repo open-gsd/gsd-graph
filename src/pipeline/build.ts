@@ -410,11 +410,28 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
     sources_total: discovered.files.length,
     sources_extracted,
     sources_skipped_fresh,
-    diagnostics,
+    diagnostics: capDiagnostics(diagnostics),
     engine: 'gsd-graph',
     engine_version,
     built_at,
   };
+}
+
+/** Keep CLI/enable JSON readable when corpora contain noisy non-field-map JSON. */
+const MAX_BUILD_DIAGNOSTICS = 40;
+
+function capDiagnostics(
+  diagnostics: ExtractDiagnostic[],
+): ExtractDiagnostic[] {
+  if (diagnostics.length <= MAX_BUILD_DIAGNOSTICS) return diagnostics;
+  const head = diagnostics.slice(0, MAX_BUILD_DIAGNOSTICS);
+  const suppressed = diagnostics.length - MAX_BUILD_DIAGNOSTICS;
+  head.push({
+    path: '(build)',
+    code: 'DIAGNOSTICS_TRUNCATED',
+    message: `Suppressed ${suppressed} additional diagnostics (showing first ${MAX_BUILD_DIAGNOSTICS}). Common cause: large pretty-printed .json under docs/ is not field-map JSONL.`,
+  });
+  return head;
 }
 
 /**

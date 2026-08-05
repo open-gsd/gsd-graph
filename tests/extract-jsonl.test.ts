@@ -171,6 +171,56 @@ describe('extractJsonl (EXT-02 / D-03)', () => {
     assert.equal(result.triples[0]!.o, 'Concept:beta');
   });
 
+  it('pretty-printed single JSON object does not flood JSON_LINE_INVALID', () => {
+    // OpenAPI-style dumps under docs/ were parsed line-by-line as JSONL.
+    const content = `{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Demo API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "ok"
+      }
+    }
+  }
+}
+`;
+    const result = mod.extractJsonl(
+      'mem://live-postgrest-openapi.json',
+      content,
+      'sha256:openapi',
+    );
+    assert.equal(result.nodes.length, 0);
+    assert.equal(result.triples.length, 0);
+    const lineInvalid = result.diagnostics.filter(
+      (d) => d.code === 'JSON_LINE_INVALID',
+    );
+    assert.equal(
+      lineInvalid.length,
+      0,
+      `expected 0 JSON_LINE_INVALID, got ${lineInvalid.length}`,
+    );
+    assert.ok(
+      result.diagnostics.some((d) => d.code === 'RECORD_INVALID'),
+      'one RECORD_INVALID for non-field-map object',
+    );
+    assert.ok(result.diagnostics.length <= 3, 'diagnostics stay small');
+  });
+
+  it('JSONL still parses when first line starts with {', () => {
+    const content = [
+      '{"type":"Concept","label":"One"}',
+      '{"type":"Concept","label":"Two"}',
+    ].join('\n');
+    const result = mod.extractJsonl('mem://two.jsonl', content, 'sha256:two');
+    // Whole-document parse of multi-line JSONL fails; fall through to JSONL.
+    // Compact single-line multi-record is two lines each starting with {
+    assert.equal(result.nodes.length, 2);
+  });
+
   it('JSON array file produces same nodes/triples as equivalent JSONL', () => {
     const records = [
       {
