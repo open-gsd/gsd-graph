@@ -21,6 +21,13 @@ import { diff } from './pipeline/diff';
 import { init } from './pipeline/init';
 import { withSpinner } from './cli/spinner';
 import { printEnableWrapup, printSyncWrapup } from './cli/summary';
+import {
+  argvWantsUpdate,
+  argvWantsVersion,
+  getVersionInfo,
+  isSelfMetaArgv,
+  selfUpdate,
+} from './cli/self-update';
 import { enable } from './pipeline/enable';
 import { projectSync } from './pipeline/project-sync';
 import { packSubgraph } from './pipeline/pack';
@@ -144,6 +151,8 @@ function buildProgram(): Command {
       '--compact',
       'single-line JSON on stdout (default when piped / non-TTY)',
     )
+    .option('-V, --version', 'show package version (JSON)')
+    .option('-U, --update', 'update @opengsd/gsd-graph to latest from npm')
     .hook('preAction', (thisCommand) => {
       const o = thisCommand.optsWithGlobals() as {
         pretty?: boolean;
@@ -153,6 +162,30 @@ function buildProgram(): Command {
       jsonPrettyOverride = undefined;
       if (o.compact === true) jsonPrettyOverride = false;
       else if (o.pretty === true) jsonPrettyOverride = true;
+    });
+
+  program
+    .command('version')
+    .description('Show package version as JSON (also: -V, --version)')
+    .option('--check', 'also query npm for latest version')
+    .action((opts: { check?: boolean }) => {
+      writeOk(
+        getVersionInfo({
+          checkLatest: opts.check === true,
+        }),
+      );
+    });
+
+  program
+    .command('update')
+    .description(
+      'Update @opengsd/gsd-graph to latest via npm (also: -U, --update)',
+    )
+    .action(() => {
+      const result = withSpinner('Updating gsd-graph…', (report) =>
+        selfUpdate({ cwd: process.cwd(), onProgress: report }),
+      );
+      writeOk(result);
     });
 
   // One-shot enable — skill + hooks + config + full brownfield sync
@@ -728,10 +761,60 @@ function parseLlmFlag(
 }
 
 /**
+ * Handle top-level -V/--version and -U/--update without a subcommand.
+ * Commander subcommands still work: `gsd-graph version`, `gsd-graph update`.
+ */
+function handleTopLevelMetaFlags(argv: string[]): number | null {
+  // Apply pretty/compact flags for meta output
+  if (argv.includes('--compact')) jsonPrettyOverride = false;
+  else if (argv.includes('--pretty')) jsonPrettyOverride = true;
+  else jsonPrettyOverride = undefined;
+
+  if (!isSelfMetaArgv(argv)) return null;
+
+  const wantsUpdate = argvWantsUpdate(argv);
+  const wantsVersion = argvWantsVersion(argv);
+
+  try {
+    if (wantsUpdate) {
+      // update implies showing result; if both flags, update then report new version
+      const result = withSpinner('Updating gsd-graph…', (report) =>
+        selfUpdate({ cwd: process.cwd(), onProgress: report }),
+      );
+      writeOk(result);
+      return 0;
+    }
+    if (wantsVersion) {
+      writeOk(getVersionInfo({ checkLatest: argv.includes('--check') }));
+      return 0;
+    }
+  } catch (err) {
+    if (err instanceof GraphError) {
+      writeErrorJson({
+        ok: false,
+        reason: err.reason,
+        message: err.message,
+      });
+      return mapCliError(err);
+    }
+    writeErrorJson({
+      ok: false,
+      reason: 'usage',
+      message: errorMessage(err),
+    });
+    return 1;
+  }
+  return null;
+}
+
+/**
  * CLI entry used by bin/gsd-graph.js and tests (D-11).
  * Returns process exit code; does not call process.exit.
  */
 export function main(argv: string[]): number {
+  const metaCode = handleTopLevelMetaFlags(argv);
+  if (metaCode !== null) return metaCode;
+
   const program = buildProgram();
   try {
     program.parse(argv);

@@ -112,12 +112,16 @@ gsd-graph ask  "how does A connect to B?"   # cited markdown
 ## Common flags
 
 ```bash
+gsd-graph --version              # package version JSON
+gsd-graph --update               # npm update to latest (global or local)
 gsd-graph enable --skip-sync     # install only
 gsd-graph sync --full --report   # re-extract everything + GRAPH_REPORT
 gsd-graph --dir ./my-store status
+gsd-graph --pretty status        # force multi-line JSON
+gsd-graph --compact status       # single-line JSON
 ```
 
-Stdout is **JSON** (machine contract). Errors are JSON on stderr.
+Stdout is **JSON** (pretty on TTY, compact when piped). Errors are JSON on stderr.
 
 ---
 

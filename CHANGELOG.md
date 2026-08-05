@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.9] - 2026-08-05
+
+### Added
+
+- `gsd-graph --version` / `-V` / `version` — package version JSON (`--check` for npm latest)
+- `gsd-graph --update` / `-U` / `update` — install latest from npm (global or project-local)
+
 ## [0.2.8] - 2026-08-05
 
 ### Added

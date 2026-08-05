@@ -16,6 +16,7 @@ export const GSD_GRAPH_REASON = Object.freeze({
   PATH_ESCAPE: 'path_escape',
   LIMIT_EXCEEDED: 'limit_exceeded',
   NO_BASELINE: 'no_baseline',
+  UPDATE_FAILED: 'update_failed',
 } as const);
 
 export type GraphReasonCode =

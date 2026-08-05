@@ -194,6 +194,19 @@ export {
 export { createCliSpinner, withSpinner } from './cli/spinner';
 export type { CliSpinner, ProgressReporter } from './cli/spinner';
 export { printEnableWrapup, printSyncWrapup } from './cli/summary';
+export {
+  readPackageMeta,
+  getVersionInfo,
+  selfUpdate,
+  detectInstallKind,
+  fetchLatestVersion,
+} from './cli/self-update';
+export type {
+  PackageMeta,
+  VersionInfo,
+  UpdateResult,
+  InstallKind,
+} from './cli/self-update';
 
 // Maintain invalidation (03-02 / MNT-01)
 export {
