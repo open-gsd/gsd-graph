@@ -10,6 +10,8 @@
 
 import { readFileSync } from 'node:fs';
 import { GSD_GRAPH_REASON, GraphError } from '../errors';
+import { loadGraphV1Cached } from '../io/graph-cache';
+import { resolveStoreRoot } from '../io/paths';
 import { promptApplyAnswer } from '../llm/apply';
 import {
   httpChatCompletion,
@@ -17,12 +19,15 @@ import {
 } from '../llm/http-client';
 import type {
   AnswerOptions,
+  Community,
+  GraphV1Document,
   GroundedAnswer,
   PackCitation,
   QueryPath,
   SubgraphPack,
   Triple,
 } from '../types';
+import { detectCommunities } from './communities';
 import { packSubgraph } from './pack';
 
 function renderRelationship(t: Triple): string {
@@ -162,9 +167,172 @@ function abstainEmpty(pack: SubgraphPack): GroundedAnswer {
 }
 
 /**
+ * Overview-shaped questions: the corpus-level asks a brownfield user opens
+ * with. When such a question packs empty (or global is forced), community
+ * themes answer instead of an abstain (GraphRAG-style global search).
+ */
+export const OVERVIEW_QUESTION_RE =
+  /(overview|overall|high[- ]?level|architecture|structure|main\s+(?:areas|themes|topics|parts|components|concepts)|key\s+(?:areas|themes|topics|concepts)|themes|what\s+(?:is|are)\s+(?:this|the)\s+(?:project|repo|repository|codebase)\s*(?:about)?|about\s+this\s+(?:project|repo|repository|codebase))/i;
+
+/** Max communities rendered in a global answer. */
+const GLOBAL_ANSWER_TOP_K = 5;
+
+/** Representative internal triples cited per community. */
+const GLOBAL_ANSWER_CITES_PER_COMMUNITY = 2;
+
+function distinctSources(t: Triple): number {
+  const seen = new Set<string>();
+  for (const e of t.provenance ?? []) {
+    if (!e.source_path) continue;
+    seen.add(`${e.source_path}\0${e.span?.start_line ?? ''}`);
+  }
+  return seen.size;
+}
+
+function citationOf(t: Triple): PackCitation {
+  const cite: PackCitation = {
+    triple_id: t.id,
+    s: t.s,
+    p: t.p,
+    o: t.o,
+    confidence: t.confidence,
+    source_count: distinctSources(t),
+  };
+  const first = (t.provenance ?? []).find(
+    (e) => e.source_path !== undefined && e.source_path.length > 0,
+  );
+  if (first !== undefined) {
+    cite.source_path = first.source_path;
+    if (first.span?.start_line !== undefined) {
+      cite.start_line = first.span.start_line;
+    }
+    cite.sources = (t.provenance ?? [])
+      .filter((e) => e.source_path)
+      .map((e) => ({
+        source_path: e.source_path,
+        ...(e.extractor !== undefined ? { extractor: e.extractor } : {}),
+        ...(e.span?.start_line !== undefined
+          ? { start_line: e.span.start_line }
+          : {}),
+        ...(e.span?.end_line !== undefined ? { end_line: e.span.end_line } : {}),
+      }));
+  }
+  return cite;
+}
+
+/**
+ * Corpus-level theme answer from community detection (mode 'global').
+ * Returns null when the graph yields no communities — caller abstains.
+ */
+function globalAnswer(
+  graph: GraphV1Document,
+  emptyPackShape: SubgraphPack,
+): GroundedAnswer | null {
+  const det = detectCommunities({ graph, write: false });
+  if (det.communities.length === 0) return null;
+
+  const top: Community[] = [...det.communities]
+    .sort((a, b) => b.size - a.size || a.id.localeCompare(b.id))
+    .slice(0, GLOBAL_ANSWER_TOP_K);
+
+  // Bucket internal triples per community for representative citations.
+  const nodeCommunity = new Map<string, string>();
+  for (const c of top) {
+    for (const m of c.members) nodeCommunity.set(m, c.id);
+  }
+  const byCommunity = new Map<string, Triple[]>();
+  for (const t of graph.triples) {
+    const cs = nodeCommunity.get(t.s);
+    if (cs === undefined || nodeCommunity.get(t.o) !== cs) continue;
+    let list = byCommunity.get(cs);
+    if (!list) {
+      list = [];
+      byCommunity.set(cs, list);
+    }
+    list.push(t);
+  }
+
+  const labelOf = (id: string): string => {
+    const n = graph.nodes.find((x) => x.id === id);
+    return n !== undefined && n.label.length > 0 ? n.label : id;
+  };
+
+  const lines: string[] = ['## Themes', ''];
+  const citedTriples: Triple[] = [];
+  for (const c of top) {
+    lines.push(`### ${c.label} (${c.size} nodes)`);
+    const topNodes = c.top_nodes
+      .slice(0, 5)
+      .map((n) => n.label || n.id)
+      .join(', ');
+    if (topNodes.length > 0) lines.push(`- Key nodes: ${topNodes}`);
+    const preds = c.top_predicates
+      .slice(0, 3)
+      .map((p) => `${p.p} (${p.count})`)
+      .join(', ');
+    if (preds.length > 0) lines.push(`- Main relationships: ${preds}`);
+
+    const reps = (byCommunity.get(c.id) ?? [])
+      .sort(
+        (a, b) =>
+          distinctSources(b) - distinctSources(a) || a.id.localeCompare(b.id),
+      )
+      .slice(0, GLOBAL_ANSWER_CITES_PER_COMMUNITY);
+    for (const t of reps) {
+      lines.push(
+        `- e.g. ${labelOf(t.s)} —${t.p}→ ${labelOf(t.o)} (\`${t.id}\`)`,
+      );
+      citedTriples.push(t);
+    }
+    lines.push('');
+  }
+
+  const citations = citedTriples.map(citationOf);
+  lines.push('## Citations');
+  for (const c of citations) {
+    const tier = c.confidence !== undefined ? ` [${c.confidence}]` : '';
+    const loc =
+      c.source_path !== undefined
+        ? ` (${c.source_path}${c.start_line !== undefined ? `:${c.start_line}` : ''})`
+        : '';
+    lines.push(`- \`${c.triple_id}\`: ${c.s} —${c.p}→ ${c.o}${tier}${loc}`);
+  }
+  lines.push('');
+
+  const citedNodeIds = new Set<string>();
+  for (const t of citedTriples) {
+    citedNodeIds.add(t.s);
+    citedNodeIds.add(t.o);
+  }
+
+  const pack: SubgraphPack = {
+    ...emptyPackShape,
+    nodes: graph.nodes.filter((n) => citedNodeIds.has(n.id)),
+    triples: citedTriples,
+    citations,
+  };
+
+  return {
+    pack,
+    answer_markdown: lines.join('\n'),
+    mode: 'global',
+    abstained: false,
+  };
+}
+
+function loadAnswerGraph(opts: AnswerOptions): GraphV1Document {
+  if (opts.graph !== undefined) return opts.graph;
+  return loadGraphV1Cached(
+    resolveStoreRoot(opts.dir !== undefined ? { dir: opts.dir } : {}),
+  );
+}
+
+/**
  * Grounded answer over packSubgraph (ANS-01, ANS-02).
  *
  * Default: packSubgraph + deterministic markdown — no LLM / no fetch (D-01, D-05, D-10).
+ * Overview-shaped questions with an empty pack (or opts.global) answer from
+ * community themes (mode 'global') instead of abstaining.
  * Opt-in applyPromptResult: Ajv + citation gate → mode prompt_pending.
  * Opt-in llmMode http with in-memory promptResult: same gates → mode http.
  * For live HTTP fetch, use answerHttp() (async) — keeps default path sync and offline.
@@ -172,8 +340,22 @@ function abstainEmpty(pack: SubgraphPack): GroundedAnswer {
 export function answer(opts: AnswerOptions): GroundedAnswer {
   const pack = packSubgraph(opts);
 
-  if (pack.triples.length === 0) {
-    return abstainEmpty(pack);
+  if (opts.global === true || pack.triples.length === 0) {
+    const wantsGlobal =
+      opts.global === true || OVERVIEW_QUESTION_RE.test(opts.question);
+    if (wantsGlobal) {
+      const g = globalAnswer(loadAnswerGraph(opts), {
+        ...pack,
+        nodes: [],
+        triples: [],
+        paths: [],
+        citations: [],
+      });
+      if (g !== null) return g;
+    }
+    if (pack.triples.length === 0) {
+      return abstainEmpty(pack);
+    }
   }
 
   // Opt-in prompt file / in-memory apply (D-02, D-10).

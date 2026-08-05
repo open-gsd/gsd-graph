@@ -624,9 +624,11 @@ export interface GroundedAnswer {
   answer_markdown: string;
   /**
    * Answer production mode.
-   * Phase 5: 'deterministic' | 'abstain' only; 'prompt_pending' | 'http' for Phase 6 (D-05).
+   * 'deterministic' | 'abstain' (Phase 5); 'prompt_pending' | 'http' (Phase 6);
+   * 'global' — corpus-level theme answer from community detection when the
+   * question is overview-shaped or matched no seeds.
    */
-  mode: 'deterministic' | 'prompt_pending' | 'http' | 'abstain';
+  mode: 'deterministic' | 'prompt_pending' | 'http' | 'abstain' | 'global';
   /** True when pack has no triples — no fabricated relationships (ANS-02, D-04). */
   abstained: boolean;
   /** Machine-readable reason when abstained (e.g. GSD_GRAPH_REASON.EMPTY_SUBGRAPH). */
@@ -643,6 +645,12 @@ export interface GroundedAnswer {
  * Loads graph only via packSubgraph (opts.graph or loadGraphV1) (D-10).
  */
 export interface AnswerOptions extends PackOptions {
+  /**
+   * Force the corpus-level community/theme answer (mode 'global') regardless
+   * of seed matches. Default: automatic fallback for overview-shaped
+   * questions that produced an empty pack.
+   */
+  global?: boolean;
   /**
    * When true, apply a validated prompt answer result (in-memory or file) after pack.
    * Empty pack still abstains before apply (ANS-02).

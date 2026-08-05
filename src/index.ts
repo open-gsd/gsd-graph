@@ -332,7 +332,12 @@ export {
 } from './pipeline/pack';
 
 // Deterministic grounded answer (05-02 / ANS-01 / ANS-02)
-export { answer, answerHttp, formatDeterministicMarkdown } from './pipeline/answer';
+export {
+  answer,
+  answerHttp,
+  formatDeterministicMarkdown,
+  OVERVIEW_QUESTION_RE,
+} from './pipeline/answer';
 export type { AnswerHttpOptions } from './pipeline/answer';
 
 // Minimal GRAPH_REPORT from published v1 (06-03 / RPT-01 / D-08)

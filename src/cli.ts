@@ -1170,6 +1170,7 @@ function buildProgram(): Command {
       budget?: number;
       applyPromptResult?: boolean;
       llm?: string | boolean;
+      global?: boolean;
     },
     cmd: Command,
   ): void | Promise<void> => {
@@ -1206,6 +1207,7 @@ function buildProgram(): Command {
         {
           question,
           ...(opts.budget !== undefined ? { budget: opts.budget } : {}),
+          ...(opts.global === true ? { global: true } : {}),
           ...(opts.applyPromptResult === true
             ? {
                 applyPromptResult: true,
@@ -1227,6 +1229,7 @@ function buildProgram(): Command {
     .description('Deterministic grounded answer with triple citations')
     .argument('<question>', 'question text')
     .option('--budget <n>', 'token budget', parseIntOpt)
+    .option('--global', 'corpus-level theme answer from communities')
     .option(
       '--apply-prompt-result',
       'apply store .prompt-answer-result.json (Ajv + citation gate)',
@@ -1243,6 +1246,7 @@ function buildProgram(): Command {
     .description('Alias for answer — grounded multi-hop Q&A with citations')
     .argument('<question>', 'question text')
     .option('--budget <n>', 'token budget', parseIntOpt)
+    .option('--global', 'corpus-level theme answer from communities')
     .option(
       '--apply-prompt-result',
       'apply store .prompt-answer-result.json (Ajv + citation gate)',
