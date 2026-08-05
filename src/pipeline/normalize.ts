@@ -24,6 +24,8 @@ export interface NormalizeInput {
   triples: Triple[];
   /** Optional fixed timestamp for stable review item created_at in tests. */
   now?: string;
+  /** Progress callback for long normalizes (CLI spinner). */
+  onProgress?: (message: string) => void;
 }
 
 export interface NormalizeOutput {
@@ -43,6 +45,7 @@ export interface NormalizeOutput {
 export function normalize(input: NormalizeInput): NormalizeOutput {
   const { ontology } = input;
   const now = input.now ?? new Date().toISOString();
+  const progress = input.onProgress;
   const diagnostics: ExtractDiagnostic[] = [];
   const reviewItems: ReviewItem[] = [];
   const reviewSeen = new Set<string>();
@@ -51,16 +54,26 @@ export function normalize(input: NormalizeInput): NormalizeOutput {
   // Collision on canonical slug for distinct keepers uses numeric suffixes -2, -3
   // only when forced unique ids are required (same type+slug, different identity
   // intent without alias match — Task 2 merge handles true alias cases first).
+  progress?.(
+    `Normalizing: canonicalize ${input.nodes.length.toLocaleString('en-US')} nodes…`,
+  );
   const canonicalNodes = canonicalizeNodes(input.nodes);
 
   // 2. Exact same-type id + alias merge (Task 2 expands; Task 1 merges identical ids)
+  progress?.(
+    `Normalizing: merge aliases (${canonicalNodes.length.toLocaleString('en-US')} nodes)…`,
+  );
   const { nodes: mergedNodes, idRewrite } = mergeExactSameType(canonicalNodes, {
     now,
     reviewItems,
     reviewSeen,
+    ...(progress !== undefined ? { onProgress: progress } : {}),
   });
 
   // Rewrite triple endpoints through merge map
+  progress?.(
+    `Normalizing: rewrite ${input.triples.length.toLocaleString('en-US')} triple endpoints…`,
+  );
   const rewrittenTriples = input.triples.map((t) => ({
     ...t,
     s: idRewrite.get(t.s) ?? t.s,
@@ -70,8 +83,17 @@ export function normalize(input: NormalizeInput): NormalizeOutput {
   // 3–6. Policy gate + multiset dedup
   const nodeById = new Map(mergedNodes.map((n) => [n.id, n]));
   const tripleMap = new Map<string, Triple>();
+  const totalTriples = rewrittenTriples.length;
+  // Report often enough that a blocked event loop still looks alive.
+  const tripleStep = Math.max(50, Math.floor(totalTriples / 40) || 1);
 
-  for (const raw of rewrittenTriples) {
+  for (let ti = 0; ti < rewrittenTriples.length; ti++) {
+    const raw = rewrittenTriples[ti]!;
+    if (ti === 0 || (ti + 1) % tripleStep === 0 || ti + 1 === totalTriples) {
+      progress?.(
+        `Normalizing triples ${ti + 1}/${totalTriples.toLocaleString('en-US')}…`,
+      );
+    }
     let p = raw.p;
     let s = raw.s;
     let o = raw.o;
@@ -238,6 +260,7 @@ function mergeExactSameType(
     now: string;
     reviewItems: ReviewItem[];
     reviewSeen: Set<string>;
+    onProgress?: (message: string) => void;
   },
 ): { nodes: GraphNode[]; idRewrite: Map<string, string> } {
   const idRewrite = new Map<string, string>();
@@ -282,10 +305,18 @@ function mergeExactSameType(
   }
 
   // Pass 2: exact same-type alias / label slug matches against keeper id local part
+  // O(n²) over keepers — this is often the long pause after extract; report progress.
   const keepers = [...byId.values()];
   const dropped = new Set<string>();
+  const nKeepers = keepers.length;
+  const mergeStep = Math.max(1, Math.floor(nKeepers / 50) || 1);
 
   for (let i = 0; i < keepers.length; i++) {
+    if (i === 0 || (i + 1) % mergeStep === 0 || i + 1 === nKeepers) {
+      ctx.onProgress?.(
+        `Normalizing: alias merge ${i + 1}/${nKeepers.toLocaleString('en-US')}…`,
+      );
+    }
     const a = keepers[i]!;
     if (dropped.has(a.id)) continue;
     for (let j = i + 1; j < keepers.length; j++) {

@@ -25,7 +25,10 @@ function isInteractive(): boolean {
 
 /**
  * Create a spinner that writes **only to stderr** so stdout stays pure JSON (K22).
- * Non-TTY / CI: no-op updates (or plain line ticks if GSD_GRAPH_PROGRESS=1).
+ *
+ * Note: long sync CPU work blocks the event loop, so the interval may freeze.
+ * Callers should call `update()` often; each update advances the frame and
+ * refreshes elapsed time even when setInterval cannot fire.
  */
 export function createCliSpinner(initial?: string): CliSpinner {
   const interactive = isInteractive();
@@ -38,6 +41,13 @@ export function createCliSpinner(initial?: string): CliSpinner {
   let frame = 0;
   let timer: ReturnType<typeof setInterval> | null = null;
   let active = false;
+  const startedAt = Date.now();
+  let lastPlainAt = 0;
+
+  const elapsedLabel = (): string => {
+    const s = (Date.now() - startedAt) / 1000;
+    return s < 10 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`;
+  };
 
   const clearLine = (): void => {
     if (!interactive) return;
@@ -48,7 +58,7 @@ export function createCliSpinner(initial?: string): CliSpinner {
     if (!interactive || !active) return;
     const glyph = FRAMES[frame % FRAMES.length]!;
     frame += 1;
-    const line = pc.cyan(`${glyph} ${message}`);
+    const line = `${pc.cyan(`${glyph} ${message}`)} ${pc.dim(`· ${elapsedLabel()}`)}`;
     process.stderr.write(`\r\x1b[K${line}`);
   };
 
@@ -56,8 +66,8 @@ export function createCliSpinner(initial?: string): CliSpinner {
     if (active) return;
     active = true;
     if (interactive) {
+      // Keep animating when the event loop is free (I/O gaps).
       timer = setInterval(render, 80);
-      // Prevent timer from keeping process alive if something forgets stop()
       if (typeof timer === 'object' && 'unref' in timer) {
         timer.unref();
       }
@@ -69,11 +79,17 @@ export function createCliSpinner(initial?: string): CliSpinner {
     message = msg;
     if (!active) start();
     if (interactive) {
+      // Always repaint + advance frame on progress (survives event-loop block).
       render();
       return;
     }
     if (plain) {
-      process.stderr.write(`[gsd-graph] ${message}\n`);
+      // Throttle plain logs to avoid flooding non-TTY pipes.
+      const now = Date.now();
+      if (now - lastPlainAt >= 500 || lastPlainAt === 0) {
+        lastPlainAt = now;
+        process.stderr.write(`[gsd-graph] ${message} · ${elapsedLabel()}\n`);
+      }
     }
   };
 
@@ -91,9 +107,11 @@ export function createCliSpinner(initial?: string): CliSpinner {
     if (!interactive && !plain) return;
     const text = msg ?? message;
     if (interactive) {
-      process.stderr.write(pc.green(`✔ ${text}\n`));
+      process.stderr.write(
+        pc.green(`✔ ${text}`) + pc.dim(` · ${elapsedLabel()}`) + '\n',
+      );
     } else if (plain) {
-      process.stderr.write(`[gsd-graph] done: ${text}\n`);
+      process.stderr.write(`[gsd-graph] done: ${text} · ${elapsedLabel()}\n`);
     }
   };
 
@@ -102,9 +120,11 @@ export function createCliSpinner(initial?: string): CliSpinner {
     if (!interactive && !plain) return;
     const text = msg ?? message;
     if (interactive) {
-      process.stderr.write(pc.red(`✖ ${text}\n`));
+      process.stderr.write(
+        pc.red(`✖ ${text}`) + pc.dim(` · ${elapsedLabel()}`) + '\n',
+      );
     } else if (plain) {
-      process.stderr.write(`[gsd-graph] failed: ${text}\n`);
+      process.stderr.write(`[gsd-graph] failed: ${text} · ${elapsedLabel()}\n`);
     }
   };
 

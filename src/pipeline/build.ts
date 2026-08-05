@@ -331,12 +331,15 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
     };
   }
 
-  progress?.('Normalizing nodes and triples…');
+  progress?.(
+    `Normalizing ${workingNodes.length.toLocaleString('en-US')} nodes · ${workingTriples.length.toLocaleString('en-US')} triples…`,
+  );
   let normalized = normalize({
     ontology,
     nodes: workingNodes,
     triples: workingTriples,
     now: built_at,
+    ...(progress !== undefined ? { onProgress: progress } : {}),
   });
   diagnostics.push(...normalized.diagnostics);
 
