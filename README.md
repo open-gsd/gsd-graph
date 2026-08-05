@@ -80,12 +80,23 @@ After a local install, `npx gsd-graph …` also works via `node_modules/.bin`.
 | `gsd-graph enable --mcp` | First time in a repo (+ register MCP hosts) |
 | `gsd-graph sync` | After docs / planning change (incremental) |
 | `gsd-graph sync --llm` | Also extract relationships from prose via your agent (or `--llm http`) |
-| `gsd-graph ask "…"` | Grounded multi-hop answer |
-| `gsd-graph why <a> <b>` | How A connects to B — cited prose chain |
-| `gsd-graph export --format html` | Interactive graph viewer (also mermaid / graphml / cypher) |
-| `gsd-graph status` | Counts / freshness |
+| `gsd-graph ask "…"` | Grounded multi-hop answer (overview questions get community themes) |
+| `gsd-graph ask "…" --semantic` | Retry no-seed abstains via the opt-in embedding sidecar |
+| `gsd-graph why <a> <b> [--k 3]` | How A connects to B — cited prose (+ alternative routes) |
+| `gsd-graph top` | Most central nodes (PageRank / degree) |
+| `gsd-graph assert <s> <p> <o>` | Record a learned fact (episode-logged; survives rebuilds) |
+| `gsd-graph retract <tripleId>` | Remove a wrong fact (episode-logged) |
+| `gsd-graph supersede <winner> <loser>` | Record a decision reversal |
+| `gsd-graph export --format html --open` | Interactive graph viewer (also mermaid / graphml / cypher) |
+| `gsd-graph status` | Counts / freshness / next steps |
 | `gsd-graph query <term>` | Seed-expand search |
+| `gsd-graph watch` | Debounced incremental sync on file changes (any editor) |
+| `gsd-graph hook install-git` | Plain `.git/hooks/post-commit` sync hook |
+| `gsd-graph eval` | Answer-quality QA set (seed recall, citation validity) |
+| `gsd-graph review summary` | Review-queue triage (counts by kind + hints) |
 | `gsd-graph review accept --all --kind predicate_unknown` | Batch-resolve review queue |
+| `gsd-graph ontology eject` | Materialize active pack + accepted extensions as a local pack |
+| `gsd-graph embeddings build` | Opt-in embedding sidecar for semantic seed fallback |
 | `gsd-graph mcp install` | Wire Claude / Codex / Cursor + project `.mcp.json` |
 | `gsd-graph mcp doctor` | Check store + MCP registration |
 

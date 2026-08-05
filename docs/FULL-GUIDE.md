@@ -603,15 +603,24 @@ npx -y -p @opengsd/gsd-graph@0.2.11 gsd-graph-mcp
 | `graph_status` | `status` |
 | `graph_query` | query / path / neighborhood / filter IR |
 | `graph_pack` | `packSubgraph` |
-| `graph_answer` | `answer` |
+| `graph_answer` | `answer` (overview questions → community themes; `global` flag) |
+| `graph_why` | `why` — cited path prose |
+| `graph_resolve` | term → node id (did-you-mean on miss) |
+| `graph_diff` | `diff` vs snapshot / last-build baseline |
+| `graph_communities` | community detection (read-only unless `write`) |
 | `graph_review_list` | review queue list |
+
+Resources: `gsd-graph://report` (GRAPH_REPORT.md) and
+`gsd-graph://communities` (theme reports) for session-start briefings.
 
 ### Privileged (off by default)
 
 | Tool | Enable |
 |------|--------|
 | `graph_build` | `--allow-build` / `mcp.allow_build` |
+| `graph_sync` | `--allow-build` / `mcp.allow_build` |
 | `graph_review_resolve` | `--allow-review-write` / `mcp.allow_review_write` |
+| `graph_assert` / `graph_retract` | `--allow-assert` / `mcp.allow_assert` |
 
 Manual MCP client config (prefer `gsd-graph mcp install` instead):
 
