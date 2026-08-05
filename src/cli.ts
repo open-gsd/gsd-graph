@@ -69,6 +69,8 @@ import { supersede } from './pipeline/supersede';
 import { assertFact, retractFact } from './pipeline/assert';
 import { runEval } from './pipeline/eval';
 import { topNodes } from './pipeline/top';
+import { watchCorpus } from './pipeline/watch';
+import { installGitPostCommitHook } from './pipeline/git-hook';
 import { status } from './pipeline/status';
 
 export interface CliErrorBody {
@@ -811,6 +813,83 @@ function buildProgram(): Command {
         );
       },
     );
+
+  // Continuous freshness for any editor: fs.watch + plain git hook
+  program
+    .command('watch')
+    .description(
+      'Watch corpus roots and run incremental sync on changes (Ctrl-C to stop)',
+    )
+    .option('--debounce <ms>', 'debounce window (default 2000)', parseIntOpt)
+    .option(
+      '--corpus <path>',
+      'corpus root override (repeatable)',
+      (val: string, prev: string[]) => {
+        prev.push(val);
+        return prev;
+      },
+      [] as string[],
+    )
+    .action(
+      (
+        opts: { debounce?: number; corpus?: string[] },
+        cmd: Command,
+      ): Promise<void> => {
+        const dir = globalDir(cmd);
+        const log = (msg: string): void => {
+          process.stderr.write(`${msg}\n`);
+        };
+        const handle = watchCorpus({
+          cwd: process.cwd(),
+          ...(dir !== undefined ? { dir } : {}),
+          ...(opts.debounce !== undefined ? { debounceMs: opts.debounce } : {}),
+          ...(opts.corpus !== undefined && opts.corpus.length > 0
+            ? { corpus: opts.corpus }
+            : {}),
+          onSync: (r) =>
+            log(
+              pc.green(
+                `✔ synced — ${r.build.node_count} nodes · ${r.build.triple_count} triples (${r.build.sources_extracted} extracted)`,
+              ),
+            ),
+          onError: (err) =>
+            log(pc.yellow(`watch: ${err instanceof Error ? err.message : String(err)}`)),
+        });
+        log(
+          `${pc.bold('gsd-graph watch')} — ${handle.roots.length} corpus root(s):\n` +
+            handle.roots.map((r) => `  ${r}`).join('\n'),
+        );
+        return new Promise<void>((resolveDone) => {
+          const stop = (): void => {
+            handle.close();
+            log(pc.dim('watch stopped'));
+            resolveDone();
+          };
+          process.once('SIGINT', stop);
+          process.once('SIGTERM', stop);
+        });
+      },
+    );
+
+  const hook = defaultGroupHelp(
+    program
+      .command('hook')
+      .description('Editor-agnostic freshness hooks (plain git)'),
+  );
+
+  hook
+    .command('install-git')
+    .description(
+      'Install a .git/hooks/post-commit block running incremental sync (never blocks commits)',
+    )
+    .option('--remove', 'remove the gsd-graph block instead')
+    .action((opts: { remove?: boolean }) => {
+      const result = installGitPostCommitHook({
+        cwd: process.cwd(),
+        ...(opts.remove === true ? { remove: true } : {}),
+      });
+      writeOk(result);
+    });
 
   // Core ops — thin adapters over library (CLI-01, D-02, D-06, D-08)
   program
@@ -1922,6 +2001,7 @@ export function argvNeedsAsync(argv: string[]): boolean {
     if (a === '--llm=http') return true;
     if (a === '--semantic') return true;
     if (a === 'embeddings' && argv[i + 1] === 'build') return true;
+    if (a === 'watch') return true;
   }
   return false;
 }

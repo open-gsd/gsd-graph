@@ -350,6 +350,15 @@ export type {
 
 export { why, resolveNodeTerm } from './pipeline/why';
 
+// Watch mode + plain git hook (editor-agnostic freshness)
+export { watchCorpus } from './pipeline/watch';
+export type { WatchCorpusOptions, WatchHandle } from './pipeline/watch';
+export { installGitPostCommitHook } from './pipeline/git-hook';
+export type {
+  GitHookInstallOptions,
+  GitHookInstallResult,
+} from './pipeline/git-hook';
+
 // Centrality analytics (pure TS)
 export {
   topNodes,
