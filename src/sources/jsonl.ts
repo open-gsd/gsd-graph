@@ -39,6 +39,21 @@ interface FieldMapRecord {
   edges?: unknown;
 }
 
+/** How to interpret a `.json` / `.jsonl` source file. */
+export type JsonExtractFormat = 'auto' | 'json-document' | 'jsonl';
+
+export interface ExtractJsonlOptions {
+  /**
+   * - `json-document` — whole-file JSON only (use for `.json`; never line-by-line)
+   * - `jsonl` — one JSON value per line (use for `.jsonl`)
+   * - `auto` — document parse first, then JSONL fallback (tests / legacy)
+   */
+  format?: JsonExtractFormat;
+}
+
+/** Cap noisy per-record diagnostics (OpenAPI arrays, vendor dumps, etc.). */
+const MAX_RECORD_DIAGNOSTICS = 8;
+
 /**
  * Parse JSON array documents or line-delimited JSONL into EXTRACTED candidates.
  */
@@ -46,10 +61,12 @@ export function extractJsonl(
   sourcePath: string,
   content: string,
   contentHash: string,
+  opts?: ExtractJsonlOptions,
 ): ExtractResult {
   const nodesById = new Map<string, GraphNode>();
   const triples: Triple[] = [];
   const diagnostics: ExtractDiagnostic[] = [];
+  const format: JsonExtractFormat = opts?.format ?? 'auto';
 
   if (content == null || content.length === 0) {
     diagnostics.push({
@@ -60,7 +77,18 @@ export function extractJsonl(
     return { nodes: [], triples: [], diagnostics };
   }
 
-  const records = parseRecords(sourcePath, content, diagnostics);
+  const records = parseRecords(sourcePath, content, diagnostics, format);
+  let recordDiagCount = 0;
+  let recordDiagSuppressed = 0;
+
+  const pushRecordDiag = (d: ExtractDiagnostic): void => {
+    if (recordDiagCount < MAX_RECORD_DIAGNOSTICS) {
+      diagnostics.push(d);
+      recordDiagCount += 1;
+    } else {
+      recordDiagSuppressed += 1;
+    }
+  };
 
   for (let i = 0; i < records.length; i++) {
     const rec = records[i]!;
@@ -68,7 +96,7 @@ export function extractJsonl(
     const raw = rec.value;
 
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-      diagnostics.push({
+      pushRecordDiag({
         path: sourcePath,
         code: 'RECORD_INVALID',
         message: `Record at line ${lineHint} is not a JSON object`,
@@ -83,12 +111,12 @@ export function extractJsonl(
       typeof record.label === 'string' ? record.label : '';
 
     if (!type || !labelRaw.trim()) {
-      diagnostics.push({
+      pushRecordDiag({
         path: sourcePath,
         code: 'RECORD_INVALID',
         message:
           `Record at line ${lineHint} missing required type or label ` +
-          `(expected field-map {type,label,edges?}; plain OpenAPI/config JSON is skipped)`,
+          `(expected field-map {type,label,edges?}; plain OpenAPI/config/vendor JSON is skipped)`,
       });
       continue;
     }
@@ -117,7 +145,7 @@ export function extractJsonl(
         typeof edgeRaw !== 'object' ||
         Array.isArray(edgeRaw)
       ) {
-        diagnostics.push({
+        pushRecordDiag({
           path: sourcePath,
           code: 'EDGE_INVALID',
           message: `Edge on record line ${lineHint} is not an object`,
@@ -128,7 +156,7 @@ export function extractJsonl(
       const p =
         typeof edgeRaw.p === 'string' ? edgeRaw.p.trim() : '';
       if (!p) {
-        diagnostics.push({
+        pushRecordDiag({
           path: sourcePath,
           code: 'EDGE_INVALID',
           message: `Edge on record line ${lineHint} missing predicate p`,
@@ -155,6 +183,14 @@ export function extractJsonl(
     }
   }
 
+  if (recordDiagSuppressed > 0) {
+    diagnostics.push({
+      path: sourcePath,
+      code: 'RECORD_DIAGNOSTICS_TRUNCATED',
+      message: `Suppressed ${recordDiagSuppressed} additional record diagnostics (cap ${MAX_RECORD_DIAGNOSTICS} per file). File is likely not field-map graph data.`,
+    });
+  }
+
   return {
     nodes: [...nodesById.values()],
     triples,
@@ -167,52 +203,35 @@ interface ParsedRecord {
   line: number;
 }
 
-/** Cap per-file line diagnostics so pretty-printed OpenAPI dumps don't flood CLI. */
+/** Cap per-file line diagnostics so pretty-printed dumps don't flood CLI. */
 const MAX_JSONL_LINE_DIAGNOSTICS = 8;
 
-function parseRecords(
+function parseJsonDocument(
   sourcePath: string,
   content: string,
   diagnostics: ExtractDiagnostic[],
 ): ParsedRecord[] {
-  const trimmed = content.trimStart();
-
-  // JSON array document (pretty-printed or compact)
-  if (trimmed.startsWith('[')) {
-    try {
-      const arr = JSON.parse(content) as unknown;
-      if (!Array.isArray(arr)) {
-        diagnostics.push({
-          path: sourcePath,
-          code: 'JSON_INVALID',
-          message: 'Top-level JSON is not an array',
-        });
-        return [];
-      }
-      return arr.map((value, i) => ({ value, line: i + 1 }));
-    } catch (err) {
-      diagnostics.push({
-        path: sourcePath,
-        code: 'JSON_INVALID',
-        message: `Failed to parse JSON array: ${err instanceof Error ? err.message : String(err)}`,
-      });
-      return [];
+  try {
+    const value = JSON.parse(content) as unknown;
+    if (Array.isArray(value)) {
+      return value.map((v, i) => ({ value: v, line: i + 1 }));
     }
+    return [{ value, line: 1 }];
+  } catch (err) {
+    diagnostics.push({
+      path: sourcePath,
+      code: 'JSON_INVALID',
+      message: `Failed to parse JSON document (not field-map data; skipped): ${err instanceof Error ? err.message : String(err)}`,
+    });
+    return [];
   }
+}
 
-  // Pretty-printed or compact single JSON object document (OpenAPI, config, etc.)
-  // Prefer whole-document parse so we never emit one diagnostic per brace line.
-  if (trimmed.startsWith('{')) {
-    try {
-      const value = JSON.parse(content) as unknown;
-      return [{ value, line: 1 }];
-    } catch {
-      // Fall through to JSONL when the file is multi-record JSONL that
-      // happens to start with `{` on the first line but is not one document.
-    }
-  }
-
-  // JSONL: one object per line
+function parseJsonlLines(
+  sourcePath: string,
+  content: string,
+  diagnostics: ExtractDiagnostic[],
+): ParsedRecord[] {
   const lines = content.split(/\r?\n/);
   const out: ParsedRecord[] = [];
   let lineDiagCount = 0;
@@ -243,11 +262,40 @@ function parseRecords(
       message: `Suppressed ${suppressed} additional JSON_LINE_INVALID diagnostics (cap ${MAX_JSONL_LINE_DIAGNOSTICS} per file). File is likely pretty-printed JSON, not JSONL field-map records.`,
     });
   }
-  // No valid records and we only saw parse failures → one clear skip note when empty out
-  if (out.length === 0 && lineDiagCount > 0 && suppressed === 0) {
-    // already have line diagnostics; nothing extra
-  }
   return out;
+}
+
+function parseRecords(
+  sourcePath: string,
+  content: string,
+  diagnostics: ExtractDiagnostic[],
+  format: JsonExtractFormat,
+): ParsedRecord[] {
+  // `.json` files: whole-document only — never emit per-line spam.
+  if (format === 'json-document') {
+    return parseJsonDocument(sourcePath, content, diagnostics);
+  }
+
+  // `.jsonl` files: strict line mode.
+  if (format === 'jsonl') {
+    return parseJsonlLines(sourcePath, content, diagnostics);
+  }
+
+  // auto: document parse for array/object documents, else JSONL.
+  const trimmed = content.trimStart();
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+    try {
+      const value = JSON.parse(content) as unknown;
+      if (Array.isArray(value)) {
+        return value.map((v, i) => ({ value: v, line: i + 1 }));
+      }
+      return [{ value, line: 1 }];
+    } catch {
+      // Fall through to JSONL only when whole-document parse fails
+      // (true multi-line JSONL of compact objects).
+    }
+  }
+  return parseJsonlLines(sourcePath, content, diagnostics);
 }
 
 function normalizeAliases(raw: unknown): string[] | undefined {

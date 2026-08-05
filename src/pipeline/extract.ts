@@ -20,7 +20,8 @@ export interface ExtractByPathOptions {
 /**
  * Read a local file, fingerprint if needed, and extract by extension:
  * - .md / .markdown / .txt → extractMarkdown
- * - .json / .jsonl → extractJsonl
+ * - .json → whole-document JSON field-map only (never line-by-line JSONL)
+ * - .jsonl → one JSON value per line
  * - other → empty result + UNSUPPORTED_EXTENSION diagnostic
  */
 export function extractByPath(
@@ -37,8 +38,12 @@ export function extractByPath(
     case '.txt':
       return extractMarkdown(absPath, content, contentHash);
     case '.json':
+      // Never treat pretty-printed OpenAPI/vendor dumps as JSONL.
+      return extractJsonl(absPath, content, contentHash, {
+        format: 'json-document',
+      });
     case '.jsonl':
-      return extractJsonl(absPath, content, contentHash);
+      return extractJsonl(absPath, content, contentHash, { format: 'jsonl' });
     default:
       return {
         nodes: [],

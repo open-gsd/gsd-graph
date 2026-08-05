@@ -14,6 +14,7 @@ const mod = require(path.join(root, 'dist', 'index.js')) as {
     sourcePath: string,
     content: string,
     contentHash: string,
+    opts?: { format?: 'auto' | 'json-document' | 'jsonl' },
   ) => {
     nodes: Array<{
       id: string;
@@ -192,6 +193,7 @@ describe('extractJsonl (EXT-02 / D-03)', () => {
       'mem://live-postgrest-openapi.json',
       content,
       'sha256:openapi',
+      { format: 'json-document' },
     );
     assert.equal(result.nodes.length, 0);
     assert.equal(result.triples.length, 0);
@@ -210,14 +212,44 @@ describe('extractJsonl (EXT-02 / D-03)', () => {
     assert.ok(result.diagnostics.length <= 3, 'diagnostics stay small');
   });
 
+  it('json-document mode never emits JSON_LINE_INVALID even if parse fails', () => {
+    const content = '{\n  "broken":\n';
+    const result = mod.extractJsonl('mem://broken.json', content, 'sha256:b', {
+      format: 'json-document',
+    });
+    assert.equal(result.nodes.length, 0);
+    assert.equal(
+      result.diagnostics.filter((d) => d.code === 'JSON_LINE_INVALID').length,
+      0,
+    );
+    assert.ok(result.diagnostics.some((d) => d.code === 'JSON_INVALID'));
+  });
+
+  it('extractByPath routes .json as json-document (no line spam)', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-json-'));
+    const file = path.join(dir, 'vendor-state-raw.json');
+    fs.writeFileSync(
+      file,
+      '{\n  "vendors": [\n    { "id": 1 },\n    { "id": 2 }\n  ]\n}\n',
+      'utf8',
+    );
+    const result = mod.extractByPath(file);
+    assert.equal(
+      result.diagnostics.filter((d) => d.code === 'JSON_LINE_INVALID').length,
+      0,
+    );
+    assert.ok(result.diagnostics.length <= 2);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   it('JSONL still parses when first line starts with {', () => {
     const content = [
       '{"type":"Concept","label":"One"}',
       '{"type":"Concept","label":"Two"}',
     ].join('\n');
-    const result = mod.extractJsonl('mem://two.jsonl', content, 'sha256:two');
-    // Whole-document parse of multi-line JSONL fails; fall through to JSONL.
-    // Compact single-line multi-record is two lines each starting with {
+    const result = mod.extractJsonl('mem://two.jsonl', content, 'sha256:two', {
+      format: 'jsonl',
+    });
     assert.equal(result.nodes.length, 2);
   });
 

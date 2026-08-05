@@ -41,9 +41,9 @@ describe('package identity (PKG-01, PKG-02)', () => {
     assert.match(nodeEngine as string, />=\s*22/);
   });
 
-  it('package version is 0.2.2 (JSON extract noise fix)', () => {
+  it('package version is 0.2.3 (json-document mode for .json)', () => {
     const pkg = readPackageJson();
-    assert.equal(pkg.version, '0.2.2');
+    assert.equal(pkg.version, '0.2.3');
   });
 
   it('description positions Graph Engineering toolkit', () => {
