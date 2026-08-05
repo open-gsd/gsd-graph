@@ -1,5 +1,4 @@
 // gsd-graph — export graph.v1 to mermaid / graphml / cypher / html viewer
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Read-only projections of the published graph for humans and other tools.

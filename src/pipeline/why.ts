@@ -1,5 +1,4 @@
 // gsd-graph — why: label-friendly path finding with prose explanation
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * `gsd-graph why <a> <b>` — resolve two human terms to nodes, find the

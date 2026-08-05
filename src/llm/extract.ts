@@ -1,5 +1,4 @@
 // gsd-graph — LLM-assisted extraction: corpus → INFERRED triple candidates
-// Copyright (c) 2026 Jeremy McSpadden <jeremy@fluxlabs.net>
 
 /**
  * Turns prose the deterministic extractor cannot read into candidate triples,
