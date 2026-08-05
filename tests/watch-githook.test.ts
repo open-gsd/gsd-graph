@@ -51,14 +51,17 @@ describe('watchCorpus', () => {
     });
     try {
       assert.deepEqual(handle.roots, [corpus]);
-      fs.writeFileSync(
-        path.join(corpus, 'a.md'),
-        '# Doc\n\n[[Alpha]] --causes--> [[Beta]]\n',
-        'utf8',
-      );
-      const deadline = Date.now() + 8000;
+      // FSEvents may miss writes made immediately after watch start —
+      // keep re-writing until an event lands (each write appends fresh bytes).
+      const deadline = Date.now() + 15000;
+      let writes = 0;
       while (synced.length === 0 && Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 100));
+        fs.writeFileSync(
+          path.join(corpus, 'a.md'),
+          `# Doc\n\n[[Alpha]] --causes--> [[Beta]]\n\ntick ${writes++}\n`,
+          'utf8',
+        );
+        await new Promise((r) => setTimeout(r, 400));
       }
       assert.ok(synced.length >= 1, 'sync fired from watch event');
       assert.ok(synced[0]!.build.triple_count >= 1);
