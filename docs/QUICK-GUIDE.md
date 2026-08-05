@@ -117,6 +117,7 @@ gsd-graph --update               # npm update to latest (global or local)
 gsd-graph enable --skip-sync     # install only
 gsd-graph sync --full --report   # re-extract everything + GRAPH_REPORT
 gsd-graph --dir ./my-store status
+gsd-graph --json enable           # full JSON after enable/sync
 gsd-graph --pretty status        # force multi-line JSON
 gsd-graph --compact status       # single-line JSON
 ```

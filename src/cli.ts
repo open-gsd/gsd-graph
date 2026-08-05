@@ -68,6 +68,8 @@ export function mapCliError(err: unknown): number {
  * - --compact / GSD_GRAPH_JSON_COMPACT=1
  */
 let jsonPrettyOverride: boolean | undefined;
+/** When true, force JSON emit for human-facing commands (enable/sync). */
+let forceJsonEmit: boolean | undefined;
 
 function preferPrettyJson(): boolean {
   if (jsonPrettyOverride === true) return true;
@@ -95,6 +97,37 @@ function formatJson(payload: unknown): string {
 
 function writeOk(payload: unknown): void {
   process.stdout.write(formatJson(payload));
+}
+
+/**
+ * For enable/sync: interactive TTY → wrap-up only (no JSON dump).
+ * Piped / CI / --json / --pretty / --compact → emit JSON on stdout.
+ */
+function shouldEmitJsonForHumanCommand(): boolean {
+  if (forceJsonEmit === true) return true;
+  if (forceJsonEmit === false) return false;
+  if (
+    process.env.GSD_GRAPH_JSON === '1' ||
+    process.env.GSD_GRAPH_JSON === 'true'
+  ) {
+    return true;
+  }
+  if (
+    process.env.GSD_GRAPH_NO_JSON === '1' ||
+    process.env.GSD_GRAPH_NO_JSON === 'true'
+  ) {
+    return false;
+  }
+  if (process.env.CI === 'true' || process.env.CI === '1') return true;
+  // Non-TTY (pipes/scripts): always JSON
+  if (!process.stdout.isTTY) return true;
+  // Interactive human default: summary only
+  return false;
+}
+
+function writeOkHumanCommand(payload: unknown): void {
+  if (!shouldEmitJsonForHumanCommand()) return;
+  writeOk(payload);
 }
 
 function writeErrorJson(body: CliErrorBody): void {
@@ -151,17 +184,27 @@ function buildProgram(): Command {
       '--compact',
       'single-line JSON on stdout (default when piped / non-TTY)',
     )
+    .option(
+      '--json',
+      'emit full JSON on stdout for enable/sync (default when piped)',
+    )
     .option('-V, --version', 'show package version (JSON)')
     .option('-U, --update', 'update @opengsd/gsd-graph to latest from npm')
     .hook('preAction', (thisCommand) => {
       const o = thisCommand.optsWithGlobals() as {
         pretty?: boolean;
         compact?: boolean;
+        json?: boolean;
       };
       // Reset each invocation so flags don't leak across main() test calls.
       jsonPrettyOverride = undefined;
+      forceJsonEmit = undefined;
       if (o.compact === true) jsonPrettyOverride = false;
       else if (o.pretty === true) jsonPrettyOverride = true;
+      // --json / --pretty / --compact all imply JSON emission for enable/sync
+      if (o.json === true || o.pretty === true || o.compact === true) {
+        forceJsonEmit = true;
+      }
     });
 
   program
@@ -221,7 +264,7 @@ function buildProgram(): Command {
           }),
         );
         printEnableWrapup(result);
-        writeOk(result);
+        writeOkHumanCommand(result);
       },
     );
 
@@ -291,7 +334,7 @@ function buildProgram(): Command {
             }),
         );
         printSyncWrapup(result);
-        writeOk(result);
+        writeOkHumanCommand(result);
       },
     );
 
