@@ -54,12 +54,44 @@ export function mapCliError(err: unknown): number {
   return 1;
 }
 
+/**
+ * JSON pretty-print control for stdout (K22 still applies — valid JSON only).
+ * - auto: pretty on TTY, compact when piped
+ * - --pretty / GSD_GRAPH_JSON_PRETTY=1
+ * - --compact / GSD_GRAPH_JSON_COMPACT=1
+ */
+let jsonPrettyOverride: boolean | undefined;
+
+function preferPrettyJson(): boolean {
+  if (jsonPrettyOverride === true) return true;
+  if (jsonPrettyOverride === false) return false;
+  if (
+    process.env.GSD_GRAPH_JSON_COMPACT === '1' ||
+    process.env.GSD_GRAPH_JSON_COMPACT === 'true'
+  ) {
+    return false;
+  }
+  if (
+    process.env.GSD_GRAPH_JSON_PRETTY === '1' ||
+    process.env.GSD_GRAPH_JSON_PRETTY === 'true'
+  ) {
+    return true;
+  }
+  return Boolean(process.stdout.isTTY);
+}
+
+function formatJson(payload: unknown): string {
+  return preferPrettyJson()
+    ? JSON.stringify(payload, null, 2) + '\n'
+    : JSON.stringify(payload) + '\n';
+}
+
 function writeOk(payload: unknown): void {
-  process.stdout.write(JSON.stringify(payload) + '\n');
+  process.stdout.write(formatJson(payload));
 }
 
 function writeErrorJson(body: CliErrorBody): void {
-  let line = JSON.stringify(body) + '\n';
+  let line = formatJson(body);
   if (process.stderr.isTTY) {
     // Optional color on stderr only — never color stdout JSON (D-09)
     line = pc.red(line);
@@ -103,7 +135,25 @@ function buildProgram(): Command {
       writeOut: () => {},
       writeErr: () => {},
     })
-    .option('--dir <path>', 'store directory override');
+    .option('--dir <path>', 'store directory override')
+    .option(
+      '--pretty',
+      'pretty-print JSON on stdout (default when stdout is a TTY)',
+    )
+    .option(
+      '--compact',
+      'single-line JSON on stdout (default when piped / non-TTY)',
+    )
+    .hook('preAction', (thisCommand) => {
+      const o = thisCommand.optsWithGlobals() as {
+        pretty?: boolean;
+        compact?: boolean;
+      };
+      // Reset each invocation so flags don't leak across main() test calls.
+      jsonPrettyOverride = undefined;
+      if (o.compact === true) jsonPrettyOverride = false;
+      else if (o.pretty === true) jsonPrettyOverride = true;
+    });
 
   // One-shot enable — skill + hooks + config + full brownfield sync
   program
