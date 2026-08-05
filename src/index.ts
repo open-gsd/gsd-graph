@@ -76,6 +76,12 @@ export type { LoadOntologyPackOptions } from './ontology/load-pack';
 
 export { applyUnknownPolicy } from './ontology/policy';
 
+export { ontologyEject } from './ontology/eject';
+export type {
+  OntologyEjectOptions,
+  OntologyEjectResult,
+} from './ontology/eject';
+
 export type {
   UnknownPolicy,
   OntologyPredicate,

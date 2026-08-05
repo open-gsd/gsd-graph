@@ -1,0 +1,13 @@
+{
+  "id": "general-plus",
+  "version": "1",
+  "title": "General plus incident escalation",
+  "extends": "general",
+  "node_types": ["Runbook"],
+  "predicates": [
+    { "id": "escalates_to", "domain": ["*"], "range": ["*"] }
+  ],
+  "strict": true,
+  "unknown_predicate_policy": "review",
+  "unknown_type_policy": "review"
+}

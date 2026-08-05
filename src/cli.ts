@@ -5,6 +5,7 @@ import pc from 'picocolors';
 import { GSD_GRAPH_REASON, GraphError } from './errors';
 import { resolveStoreRoot } from './io/paths';
 import { loadOntologyPack } from './ontology/load-pack';
+import { ontologyEject } from './ontology/eject';
 import { promptApply } from './llm/apply';
 import { resolveLlmMode } from './llm/provider';
 import {
@@ -1194,6 +1195,25 @@ function buildProgram(): Command {
         strict: loaded.pack.strict,
         packHash: loaded.packHash,
       });
+    });
+
+  ontology
+    .command('eject')
+    .description(
+      'Materialize the active pack + accepted lock extensions as a committable project-local pack',
+    )
+    .option('--out <dir>', 'output directory (default ontology-packs/<id>-local)')
+    .action((opts: { out?: string }, cmd: Command) => {
+      const result = ontologyEject(
+        withDir(
+          {
+            cwd: process.cwd(),
+            ...(opts.out !== undefined ? { out: opts.out } : {}),
+          },
+          globalDir(cmd),
+        ),
+      );
+      writeOk({ ok: true, ...result });
     });
 
   ontology

@@ -41,7 +41,20 @@ function resolvePackFilePath(
     return resolve(baseDir, packIdOrPath);
   }
 
-  // Pack id → package-shipped ontology-packs/<id>/ontology.json (not cwd store).
+  // Pack id → project-local ontology-packs/<id>/ontology.json wins, then the
+  // package-shipped pack. A project can therefore fork or add packs without
+  // touching node_modules.
+  const projectPack = join(
+    baseDir,
+    'ontology-packs',
+    packIdOrPath,
+    'ontology.json',
+  );
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require('node:fs') as typeof import('node:fs');
+  if (fs.existsSync(projectPack)) {
+    return projectPack;
+  }
   return join(packageRoot, 'ontology-packs', packIdOrPath, 'ontology.json');
 }
 
@@ -136,16 +149,6 @@ export function loadOntologyPack(
     );
   }
 
-  // ONT-03 / D-05: replace-only — reject pack composition before schema pass.
-  // Covers extends as string or array (or any other value); no merge API in v0.1.
-  if (Object.prototype.hasOwnProperty.call(parsed, 'extends')) {
-    throw new GraphError(
-      GSD_GRAPH_REASON.ONTOLOGY_INVALID,
-      'ontology pack composition via extends is not supported in v0.1 (replace-only); copy the pack and load the copy by path',
-      { path: filePath, extends: parsed.extends },
-    );
-  }
-
   const valid = validateOntologyPack(parsed);
   if (!valid) {
     throw new GraphError(
@@ -155,7 +158,97 @@ export function loadOntologyPack(
     );
   }
 
-  const pack = Object.freeze(toOntologyPack(parsed));
+  let effective: Record<string, unknown> = parsed;
+  let effectiveHash = packHash;
+
+  // Single-level extends (collision-error semantics): the child adds node
+  // types (deduped) and predicates (duplicate ids are an error, never a
+  // silent shadow); child id/version/title/strict/policies win. The base may
+  // not itself extend.
+  if (Object.prototype.hasOwnProperty.call(parsed, 'extends')) {
+    const ext = parsed.extends;
+    if (typeof ext !== 'string' || ext.length === 0) {
+      throw new GraphError(
+        GSD_GRAPH_REASON.ONTOLOGY_INVALID,
+        'extends must be a base pack id or path string',
+        { path: filePath, extends: ext },
+      );
+    }
+    const basePath = resolvePackFilePath(ext, baseDir, packageRoot);
+    let baseBytes: Buffer;
+    try {
+      baseBytes = readFileSync(basePath);
+    } catch (err) {
+      throw new GraphError(
+        GSD_GRAPH_REASON.ONTOLOGY_INVALID,
+        `failed to read base pack for extends "${ext}": ${basePath}`,
+        { cause: err, path: basePath },
+      );
+    }
+    let baseParsed: unknown;
+    try {
+      baseParsed = JSON.parse(baseBytes.toString('utf8')) as unknown;
+    } catch (err) {
+      throw new GraphError(
+        GSD_GRAPH_REASON.ONTOLOGY_INVALID,
+        `base pack is not valid JSON: ${basePath}`,
+        { cause: err, path: basePath },
+      );
+    }
+    if (!isRecord(baseParsed)) {
+      throw new GraphError(
+        GSD_GRAPH_REASON.ONTOLOGY_INVALID,
+        `base pack must be a JSON object: ${basePath}`,
+        { path: basePath },
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(baseParsed, 'extends')) {
+      throw new GraphError(
+        GSD_GRAPH_REASON.ONTOLOGY_INVALID,
+        `extends is single-level: base pack "${ext}" may not itself extend`,
+        { path: basePath },
+      );
+    }
+    if (!validateOntologyPack(baseParsed)) {
+      throw new GraphError(
+        GSD_GRAPH_REASON.ONTOLOGY_INVALID,
+        `base pack failed schema validation: ${formatAjvErrors(validateOntologyPack.errors)}`,
+        { path: basePath, errors: validateOntologyPack.errors },
+      );
+    }
+
+    const basePreds = baseParsed.predicates as OntologyPredicate[];
+    const childPreds = parsed.predicates as OntologyPredicate[];
+    const baseIds = new Set(basePreds.map((p) => p.id));
+    for (const p of childPreds) {
+      if (baseIds.has(p.id)) {
+        throw new GraphError(
+          GSD_GRAPH_REASON.ONTOLOGY_INVALID,
+          `extends collision: predicate "${p.id}" already defined by base pack "${ext}" — rename or remove it from the extending pack`,
+          { path: filePath, predicate: p.id },
+        );
+      }
+    }
+
+    effective = {
+      ...parsed,
+      node_types: [
+        ...new Set([
+          ...(baseParsed.node_types as string[]),
+          ...(parsed.node_types as string[]),
+        ]),
+      ],
+      predicates: [...basePreds, ...childPreds],
+    };
+    delete effective.extends;
+
+    const baseHash = createHash('sha256').update(baseBytes).digest('hex');
+    effectiveHash = createHash('sha256')
+      .update(packHash + baseHash, 'utf8')
+      .digest('hex');
+  }
+
+  const pack = Object.freeze(toOntologyPack(effective));
   const typeSet: ReadonlySet<string> = new Set(pack.node_types);
   const predicateSet: ReadonlySet<string> = new Set(
     pack.predicates.map((p) => p.id),
@@ -165,7 +258,7 @@ export function loadOntologyPack(
     pack,
     typeSet,
     predicateSet,
-    packHash,
+    packHash: effectiveHash,
   };
 }
 

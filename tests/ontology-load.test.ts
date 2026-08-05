@@ -134,8 +134,9 @@ describe('loadOntologyPack general (ONT-01)', () => {
   });
 });
 
-describe('loadOntologyPack replace-only (ONT-03)', () => {
-  it('rejects pack with extends string', () => {
+describe('loadOntologyPack single-level extends', () => {
+  it('rejects a predicate collision with the base pack', () => {
+    // Fixture extends general and re-declares related_to → collision error.
     const fixture = join(
       root,
       'tests',
@@ -148,13 +149,13 @@ describe('loadOntologyPack replace-only (ONT-03)', () => {
       (err: unknown) => {
         assert.ok(err instanceof mod.GraphError);
         assert.equal(err.reason, mod.GSD_GRAPH_REASON.ONTOLOGY_INVALID);
-        assert.match(err.message, /composition|extends|replace-only|not supported/i);
+        assert.match(err.message, /collision|extends/i);
         return true;
       },
     );
   });
 
-  it('rejects pack with extends array', () => {
+  it('rejects pack with extends array (schema: string only)', () => {
     const fixture = join(
       root,
       'tests',
@@ -167,10 +168,27 @@ describe('loadOntologyPack replace-only (ONT-03)', () => {
       (err: unknown) => {
         assert.ok(err instanceof mod.GraphError);
         assert.equal(err.reason, mod.GSD_GRAPH_REASON.ONTOLOGY_INVALID);
-        assert.match(err.message, /composition|extends|replace-only|not supported/i);
         return true;
       },
     );
+  });
+
+  it('merges a valid extending pack (new predicate, deduped types, child policy wins)', () => {
+    const fixture = join(
+      root,
+      'tests',
+      'fixtures',
+      'ontology',
+      'pack-extends-valid.json',
+    );
+    const loaded = mod.loadOntologyPack({ packIdOrPath: fixture });
+    assert.equal(loaded.pack.id, 'general-plus');
+    // Base vocabulary present
+    assert.equal(loaded.predicateSet.has('related_to'), true);
+    assert.equal(loaded.typeSet.has('Concept'), true);
+    // Child additions present
+    assert.equal(loaded.predicateSet.has('escalates_to'), true);
+    assert.equal(loaded.typeSet.has('Runbook'), true);
   });
 
   it('loads custom path pack without extends when schema-valid', () => {
@@ -179,13 +197,5 @@ describe('loadOntologyPack replace-only (ONT-03)', () => {
     assert.equal(loaded.pack.id, 'custom');
     assert.equal(loaded.typeSet.has('Entity'), true);
     assert.equal(loaded.predicateSet.has('related_to'), true);
-  });
-
-  it('public API has no mergeOntologyPacks / extends resolver', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const api = require(join(root, 'dist', 'index.js')) as Record<string, unknown>;
-    assert.equal('mergeOntologyPacks' in api, false);
-    assert.equal('resolvePackExtends' in api, false);
-    assert.equal(typeof api.loadOntologyPack, 'function');
   });
 });
