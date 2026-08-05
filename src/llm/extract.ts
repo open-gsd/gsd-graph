@@ -26,6 +26,7 @@ import {
   writePromptRequest,
   type WritePromptRequestResult,
 } from './prompt-files';
+import { loadPromptTemplate } from './prompt-templates';
 
 /** Per-source content cap sent to the LLM (bytes). */
 export const LLM_EXTRACT_MAX_SOURCE_BYTES = 64 * 1024;
@@ -101,7 +102,13 @@ export interface SanitizedCandidates {
  */
 export function sanitizeExtractCandidates(
   result: { nodes?: GraphNode[]; triples?: Triple[] },
-  opts: { extractorTag: string; sourcePath?: string; contentHash?: string },
+  opts: {
+    extractorTag: string;
+    sourcePath?: string;
+    contentHash?: string;
+    /** Template version recorded on every provenance entry (prompt_version). */
+    promptVersion?: string;
+  },
 ): SanitizedCandidates {
   const nodes = (result.nodes ?? []).map((n) => ({
     id: n.id,
@@ -129,6 +136,9 @@ export function sanitizeExtractCandidates(
       ...e,
       extractor: opts.extractorTag,
       confidence: 'INFERRED' as const,
+      ...(opts.promptVersion !== undefined
+        ? { prompt_version: opts.promptVersion }
+        : {}),
     }));
     return {
       ...t,
@@ -148,6 +158,8 @@ export interface LlmExtractHttpOptions {
   /** Ontology allowlists embedded in the system prompt. */
   allowedTypes: readonly string[];
   allowedPredicates: readonly string[];
+  /** Store dir for prompt-template override resolution. */
+  dir?: string;
   fetchImpl?: typeof fetch;
   env?: NodeJS.ProcessEnv;
   onProgress?: (message: string) => void;
@@ -158,19 +170,44 @@ export interface LlmExtractHttpResult extends SanitizedCandidates {
   failures: Array<{ path: string; reason: string }>;
 }
 
-/** System prompt for per-source extract completions. */
+/**
+ * System prompt for per-source extract completions: the prompts/extract.md
+ * template (store override → shipped default) plus the run's dynamic
+ * ontology allowlists and wire contract.
+ */
 export function buildExtractSystemPrompt(
   allowedTypes: readonly string[],
   allowedPredicates: readonly string[],
+  opts?: { dir?: string },
 ): string {
+  let template = '';
+  try {
+    template = loadPromptTemplate('extract', {
+      ...(opts?.dir !== undefined ? { dir: opts.dir } : {}),
+    }).text;
+  } catch {
+    // Template unreadable — dynamic contract below is self-sufficient.
+  }
   return [
-    'You extract knowledge-graph candidates for gsd-graph.',
+    ...(template.length > 0 ? [template.trim(), ''] : []),
+    '## Run constraints',
     'Return JSON only matching prompt-extract-result schema: { "nodes": [...], "triples": [...] }.',
     `Node id format "Type:kebab-slug". Allowed node types: ${allowedTypes.join(', ')}.`,
     `Allowed predicates: ${allowedPredicates.join(', ')}. Never invent other predicates.`,
     'Each triple: { "id": "t_x", "s": "<node id>", "p": "<predicate>", "o": "<node id>", "confidence": "INFERRED", "provenance": [{ "source_path": "<given>", "extractor": "llm/http", "content_hash": "<given>", "confidence": "INFERRED", "span": { "start_line": N } }] }.',
     'Only emit relationships the text actually states. If unsure, omit. Empty arrays are a valid answer.',
   ].join('\n');
+}
+
+/** Template version for the extract stage ('' when unreadable). */
+export function extractPromptVersion(opts?: { dir?: string }): string {
+  try {
+    return loadPromptTemplate('extract', {
+      ...(opts?.dir !== undefined ? { dir: opts.dir } : {}),
+    }).version;
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -183,10 +220,13 @@ export async function llmExtractHttp(
 ): Promise<LlmExtractHttpResult> {
   const provider = opts.provider ?? 'openai';
   const apiKeyEnv = opts.apiKeyEnv ?? defaultApiKeyEnv(provider);
+  const dirOpt = opts.dir !== undefined ? { dir: opts.dir } : {};
   const system = buildExtractSystemPrompt(
     opts.allowedTypes,
     opts.allowedPredicates,
+    dirOpt,
   );
+  const promptVersion = extractPromptVersion(dirOpt);
 
   const nodes: GraphNode[] = [];
   const triples: Triple[] = [];
@@ -221,6 +261,7 @@ export async function llmExtractHttp(
         extractorTag: 'llm/http',
         sourcePath: file.source_path,
         contentHash: file.content_hash,
+        ...(promptVersion !== '' ? { promptVersion } : {}),
       });
       nodes.push(...sanitized.nodes);
       triples.push(...sanitized.triples);
@@ -259,6 +300,7 @@ export function writeExtractPromptRequest(
   opts: WriteExtractRequestOptions,
 ): WriteExtractRequestOutput {
   const { files, skipped } = collectLlmSources(opts.corpus);
+  const dirOpt = opts.dir !== undefined ? { dir: opts.dir } : {};
   const request = writePromptRequest({
     stage: 'extract',
     ...(opts.dir !== undefined ? { dir: opts.dir } : {}),
@@ -267,7 +309,9 @@ export function writeExtractPromptRequest(
       instructions: buildExtractSystemPrompt(
         opts.allowedTypes,
         opts.allowedPredicates,
+        dirOpt,
       ),
+      prompt_version: extractPromptVersion(dirOpt),
       files,
       apply_with: 'gsd-graph prompt apply extract',
     },

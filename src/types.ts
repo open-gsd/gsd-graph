@@ -27,6 +27,8 @@ export interface ProvenanceEntry {
   first_seen?: string;
   /** ISO time this exact evidence was last re-observed. */
   last_seen?: string;
+  /** Version hash of the prompt template that produced this evidence (LLM stages). */
+  prompt_version?: string;
 }
 
 export interface GraphNode {

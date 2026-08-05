@@ -15,6 +15,7 @@ import { answer, answerHttp } from './pipeline/answer';
 import { build, mergeCandidates } from './pipeline/build';
 import {
   collectLlmSources,
+  extractPromptVersion,
   llmExtractHttp,
   sanitizeExtractCandidates,
   writeExtractPromptRequest,
@@ -311,6 +312,7 @@ function runLlmExtractStage(
     apiKeyEnv: http.apiKeyEnv,
     allowedTypes: allow.types,
     allowedPredicates: allow.predicates,
+    ...(dir !== undefined ? { dir } : {}),
   }).then((extracted) => {
     const merged = mergeCandidates({
       ...(dir !== undefined ? { dir } : {}),
@@ -1455,6 +1457,15 @@ function buildProgram(): Command {
         if (applied.stage === 'extract') {
           const sanitized = sanitizeExtractCandidates(applied, {
             extractorTag: 'llm/prompt',
+            ...(extractPromptVersion(
+              dir !== undefined ? { dir } : {},
+            ) !== ''
+              ? {
+                  promptVersion: extractPromptVersion(
+                    dir !== undefined ? { dir } : {},
+                  ),
+                }
+              : {}),
           });
           const merged = mergeCandidates(
             withDir(

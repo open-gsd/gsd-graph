@@ -431,9 +431,16 @@ export {
   llmExtractHttp,
   writeExtractPromptRequest,
   buildExtractSystemPrompt,
+  extractPromptVersion,
   LLM_EXTRACT_MAX_SOURCES,
   LLM_EXTRACT_MAX_SOURCE_BYTES,
 } from './llm/extract';
+
+export { loadPromptTemplate } from './llm/prompt-templates';
+export type {
+  LoadedPromptTemplate,
+  LoadPromptTemplateOptions,
+} from './llm/prompt-templates';
 export type {
   LlmSourceFile,
   CollectLlmSourcesResult,

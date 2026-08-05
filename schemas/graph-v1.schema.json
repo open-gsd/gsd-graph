@@ -154,6 +154,9 @@
                   "type": "string",
                   "format": "date-time"
                 },
+                "prompt_version": {
+                  "type": "string"
+                },
                 "span": {
                   "type": "object",
                   "additionalProperties": false,

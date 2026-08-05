@@ -13,6 +13,7 @@ import { GSD_GRAPH_REASON, GraphError } from '../errors';
 import { loadGraphV1Cached } from '../io/graph-cache';
 import { resolveStoreRoot } from '../io/paths';
 import { promptApplyAnswer } from '../llm/apply';
+import { loadPromptTemplate } from '../llm/prompt-templates';
 import {
   httpChatCompletion,
   parseHttpPromptResultJson,
@@ -475,13 +476,25 @@ export async function answerHttp(
     2,
   );
 
+  // System prompt: prompts/answer.md template (store override → shipped
+  // default) + the non-negotiable wire contract.
+  let answerTemplate = '';
+  try {
+    answerTemplate = loadPromptTemplate('answer', {
+      ...(opts.dir !== undefined ? { dir: opts.dir } : {}),
+    }).text.trim();
+  } catch {
+    // contract line below is self-sufficient
+  }
   const messages =
     opts.messages ??
     ([
       {
         role: 'system',
-        content:
+        content: [
+          ...(answerTemplate.length > 0 ? [answerTemplate, ''] : []),
           'Return JSON only matching prompt-answer-result schema: { answer_markdown, cited_triple_ids }. cited_triple_ids must be subset of pack triple ids.',
+        ].join('\n'),
       },
       {
         role: 'user',
