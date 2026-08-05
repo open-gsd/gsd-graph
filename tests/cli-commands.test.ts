@@ -638,13 +638,15 @@ describe('cli-commands communities detect (COM-01, D-06, D-10)', () => {
     assert.equal(err.reason, 'usage');
   });
 
-  it('communities without subcommand exits non-zero usage', () => {
+  it('communities without subcommand shows help and exits 0', () => {
     const dir = publishTwoCliquesStore();
-    const result = run(['--dir', dir, 'communities']);
-    assert.notEqual(result.code, 0);
-    const err = JSON.parse(result.stderr) as { ok: false; reason: string };
-    assert.equal(err.ok, false);
-    assert.equal(err.reason, 'usage');
+    // Human help on stdout (not JSON) — use captureIO, not run()
+    const result = captureIO(() =>
+      cli.main(['node', 'gsd-graph', '--dir', dir, 'communities']),
+    );
+    assert.equal(result.code, 0);
+    assert.match(result.stdout, /communities/i);
+    assert.match(result.stdout, /detect|report/i);
   });
 });
 

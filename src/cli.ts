@@ -167,19 +167,56 @@ function withDir<T extends object>(
   return { ...base, dir };
 }
 
+/** Parent command groups: bare `gsd-graph <group>` prints that group's help. */
+function defaultGroupHelp(cmd: Command): Command {
+  return cmd.action(function (this: Command) {
+    this.help();
+  });
+}
+
+/** Extra human help after commander’s command list (stdout). */
+const HELP_AFTER = `
+Quick start:
+  gsd-graph enable --mcp     skill + hooks + graph + MCP hosts
+  gsd-graph sync             incremental update after docs change
+  gsd-graph ask "…"          grounded multi-hop answer + citations
+  gsd-graph status           store health / counts
+  gsd-graph mcp install      wire Claude / Codex / Cursor
+  gsd-graph mcp doctor       verify MCP registration
+
+Also useful:
+  gsd-graph query <term>     seed-expand search
+  gsd-graph review list      pending ontology / merge items
+  gsd-graph --version        package version (JSON)
+  gsd-graph --update         install latest from npm
+
+Subcommand help:
+  gsd-graph help <command>
+  gsd-graph <command> --help
+
+Machine output: most commands print JSON on stdout (K22).
+enable/sync print a human wrap-up on TTY; use --json for full JSON.
+Docs: https://github.com/open-gsd/gsd-graph#readme
+`;
+
 function buildProgram(): Command {
   const program = new Command();
   program
     .name('gsd-graph')
-    .description('Graph Engineering toolkit CLI')
+    .description(
+      'Graph Engineering toolkit — local knowledge graph (triples + citations)',
+    )
     .showSuggestionAfterError()
     .exitOverride()
-    // Suppress commander's default human error/help streams — K22 writes
-    // structured JSON via writeErrorJson / writeOk only (D-03, D-04).
+    // Help is human text on stdout. Usage/errors still map to JSON on stderr (K22).
     .configureOutput({
-      writeOut: () => {},
+      writeOut: (str: string) => {
+        process.stdout.write(str);
+      },
       writeErr: () => {},
     })
+    .helpOption('-h, --help', 'show help')
+    .addHelpText('after', HELP_AFTER)
     .option('--dir <path>', 'store directory override')
     .option(
       '--pretty',
@@ -280,9 +317,13 @@ function buildProgram(): Command {
     );
 
   // MCP host registration
-  const mcpCmd = program
-    .command('mcp')
-    .description('Register or diagnose gsd-graph MCP for Claude / Codex / Cursor');
+  const mcpCmd = defaultGroupHelp(
+    program
+      .command('mcp')
+      .description(
+        'Register or diagnose gsd-graph MCP for Claude / Codex / Cursor',
+      ),
+  );
 
   mcpCmd
     .command('install')
@@ -548,9 +589,11 @@ function buildProgram(): Command {
     });
 
   // Nested lifecycle verbs — never use two-arg executable form (RESEARCH pitfall 3)
-  const snapshot = program
-    .command('snapshot')
-    .description('Save, list, or restore named graph.v1 snapshots');
+  const snapshot = defaultGroupHelp(
+    program
+      .command('snapshot')
+      .description('Save, list, or restore named graph.v1 snapshots'),
+  );
 
   snapshot
     .command('save')
@@ -578,9 +621,11 @@ function buildProgram(): Command {
       writeOk(result);
     });
 
-  const review = program
-    .command('review')
-    .description('List or resolve review-queue items');
+  const review = defaultGroupHelp(
+    program
+      .command('review')
+      .description('List or resolve review-queue items'),
+  );
 
   review
     .command('list')
@@ -636,9 +681,11 @@ function buildProgram(): Command {
       writeOk({ ok: true, id, action: 'reject' });
     });
 
-  const ontology = program
-    .command('ontology')
-    .description('Show or validate an ontology pack');
+  const ontology = defaultGroupHelp(
+    program
+      .command('ontology')
+      .description('Show or validate an ontology pack'),
+  );
 
   ontology
     .command('show')
@@ -676,9 +723,11 @@ function buildProgram(): Command {
     });
 
   // Phase 7 communities — nested detect|report over LPA library (COM-01, D-06)
-  const communities = program
-    .command('communities')
-    .description('Detect communities and write theme reports (non-SoT)');
+  const communities = defaultGroupHelp(
+    program
+      .command('communities')
+      .description('Detect communities and write theme reports (non-SoT)'),
+  );
 
   communities
     .command('detect')
@@ -818,9 +867,11 @@ function buildProgram(): Command {
     .action(answerAction);
 
   // Optional LLM prompt apply (LLM-01 / D-02 / D-03)
-  const promptCmd = program
-    .command('prompt')
-    .description('LLM prompt file-exchange helpers (opt-in; default offline)');
+  const promptCmd = defaultGroupHelp(
+    program
+      .command('prompt')
+      .description('LLM prompt file-exchange helpers (opt-in; default offline)'),
+  );
 
   promptCmd
     .command('apply')
@@ -972,6 +1023,13 @@ export function main(argv: string[]): number {
       return mapCliError(err);
     }
     if (err instanceof CommanderError) {
+      // -h / --help / `help` already printed human text via writeOut
+      if (
+        err.code === 'commander.helpDisplayed' ||
+        err.code === 'commander.help'
+      ) {
+        return 0;
+      }
       writeErrorJson({
         ok: false,
         reason: 'usage',
