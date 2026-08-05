@@ -60,6 +60,7 @@ import {
 } from './pipeline/snapshot';
 import { supersede } from './pipeline/supersede';
 import { assertFact, retractFact } from './pipeline/assert';
+import { runEval } from './pipeline/eval';
 import { status } from './pipeline/status';
 
 export interface CliErrorBody {
@@ -1043,6 +1044,31 @@ function buildProgram(): Command {
         reviewBatchAction('reject', id, opts, cmd);
       },
     );
+
+  program
+    .command('eval')
+    .description(
+      'Run the answer-quality QA set (seed recall, citation validity, pass/fail)',
+    )
+    .option('--file <path>', 'QA file (default evals/gsd-graph.json)')
+    .action((opts: { file?: string }, cmd: Command) => {
+      const result = runEval(
+        withDir(
+          {
+            cwd: process.cwd(),
+            ...(opts.file !== undefined ? { file: opts.file } : {}),
+          },
+          globalDir(cmd),
+        ),
+      );
+      writeOk(result);
+      if (result.failed > 0) {
+        throw new GraphError(
+          GSD_GRAPH_REASON.BUILD_FAILED,
+          `${result.failed}/${result.total} eval case(s) failed`,
+        );
+      }
+    });
 
   program
     .command('assert')

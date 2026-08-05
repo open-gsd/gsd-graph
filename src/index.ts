@@ -190,6 +190,17 @@ export { normalize, DIRECTIONAL_PREDICATES } from './pipeline/normalize';
 export { supersede } from './pipeline/supersede';
 export type { SupersedeOptions, SupersedeResult } from './pipeline/supersede';
 
+// Answer-quality eval harness
+export { runEval } from './pipeline/eval';
+export type {
+  EvalCase,
+  EvalWhyCase,
+  EvalFileDocument,
+  EvalCaseResult,
+  EvalRunResult,
+  RunEvalOptions,
+} from './pipeline/eval';
+
 // Agent/user write path — assert/retract + episode replay
 export {
   assertFact,
