@@ -123,6 +123,9 @@ export interface ReviewQueueDocument {
 // --- Build orchestrator + status (STAT-01 / EXT-03) ---
 
 /** Options for the offline build() orchestrator (D-09). */
+/** Optional human progress callback (CLI spinner; never writes stdout). */
+export type GraphProgress = (message: string) => void;
+
 export interface BuildOptions {
   /** Corpus root(s) to discover under. */
   corpus: string | string[];
@@ -145,6 +148,8 @@ export interface BuildOptions {
   writeReportOnBuild?: boolean;
   /** Optional discover globs (default md/txt/markdown/json/jsonl). */
   globs?: string[];
+  /** Progress updates for long builds (CLI spinner on stderr). */
+  onProgress?: GraphProgress;
   /**
    * Test-only hook: mutates normalized nodes/triples before caps + publish.
    * Used to exercise LIMIT_EXCEEDED without multi-GB fixtures.
@@ -421,6 +426,8 @@ export interface ProjectSyncOptions {
   communities?: boolean;
   /** Write GRAPH_REPORT after build (default: config gsd_graph.report_on_sync). */
   report?: boolean;
+  /** Progress updates for long sync (CLI spinner on stderr). */
+  onProgress?: GraphProgress;
 }
 
 /** Result of projectSync() — JSON-serializable for CLI/hooks. */
@@ -450,6 +457,8 @@ export interface EnableOptions {
   skipSync?: boolean;
   /** Override package root (skills/hooks source); auto-detected when omitted. */
   packageRoot?: string;
+  /** Progress updates for long enable (CLI spinner on stderr). */
+  onProgress?: GraphProgress;
 }
 
 /** Result of enable() — JSON-serializable for CLI. */

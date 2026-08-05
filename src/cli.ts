@@ -19,6 +19,7 @@ import {
 } from './pipeline/communities';
 import { diff } from './pipeline/diff';
 import { init } from './pipeline/init';
+import { withSpinner } from './cli/spinner';
 import { enable } from './pipeline/enable';
 import { projectSync } from './pipeline/project-sync';
 import { packSubgraph } from './pipeline/pack';
@@ -124,14 +125,17 @@ function buildProgram(): Command {
         cmd: Command,
       ) => {
         const dir = globalDir(cmd);
-        const result = enable({
-          cwd: process.cwd(),
-          ...(dir !== undefined ? { dir } : {}),
-          ...(opts.autoUpdate === false ? { autoUpdate: false } : {}),
-          ...(opts.report === false ? { report: false } : {}),
-          ...(opts.communities === true ? { communities: true } : {}),
-          ...(opts.skipSync === true ? { skipSync: true } : {}),
-        });
+        const result = withSpinner('Enabling gsd-graph…', (report) =>
+          enable({
+            cwd: process.cwd(),
+            ...(dir !== undefined ? { dir } : {}),
+            ...(opts.autoUpdate === false ? { autoUpdate: false } : {}),
+            ...(opts.report === false ? { report: false } : {}),
+            ...(opts.communities === true ? { communities: true } : {}),
+            ...(opts.skipSync === true ? { skipSync: true } : {}),
+            onProgress: report,
+          }),
+        );
         writeOk(result);
       },
     );
@@ -186,16 +190,21 @@ function buildProgram(): Command {
         cmd: Command,
       ) => {
         const dir = globalDir(cmd);
-        const result = projectSync({
-          cwd: process.cwd(),
-          ...(dir !== undefined ? { dir } : {}),
-          ...(opts.full === true ? { full: true } : {}),
-          ...(opts.corpus && opts.corpus.length > 0
-            ? { extraCorpus: opts.corpus }
-            : {}),
-          ...(opts.communities === true ? { communities: true } : {}),
-          ...(opts.report === true ? { report: true } : {}),
-        });
+        const result = withSpinner(
+          opts.full === true ? 'Full project sync…' : 'Project sync…',
+          (report) =>
+            projectSync({
+              cwd: process.cwd(),
+              ...(dir !== undefined ? { dir } : {}),
+              ...(opts.full === true ? { full: true } : {}),
+              ...(opts.corpus && opts.corpus.length > 0
+                ? { extraCorpus: opts.corpus }
+                : {}),
+              ...(opts.communities === true ? { communities: true } : {}),
+              ...(opts.report === true ? { report: true } : {}),
+              onProgress: report,
+            }),
+        );
         writeOk(result);
       },
     );

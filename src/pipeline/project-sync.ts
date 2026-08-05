@@ -183,6 +183,7 @@ export function projectSync(opts?: ProjectSyncOptions): ProjectSyncResult {
   const cfg = readGraphProjectConfig(cwd, opts?.dir);
   const dir = opts?.dir ?? cfg?.store_dir;
   const full = opts?.full === true;
+  const progress = opts?.onProgress;
   const communities =
     opts?.communities === true ||
     (opts?.communities !== false && cfg?.communities_on_sync === true);
@@ -192,6 +193,7 @@ export function projectSync(opts?: ProjectSyncOptions): ProjectSyncResult {
     (opts?.report !== false &&
       (cfg?.report_on_sync === true || cfg?.report_on_sync === undefined));
 
+  progress?.('Resolving project corpus…');
   const resolveOpts: {
     extra?: string[];
     configCorpus?: string[] | null;
@@ -211,20 +213,26 @@ export function projectSync(opts?: ProjectSyncOptions): ProjectSyncResult {
     );
   }
 
+  progress?.(
+    `Corpus: ${corpus.length} root${corpus.length === 1 ? '' : 's'} — initializing store…`,
+  );
   const initResult = init({
     cwd,
     ...(dir !== undefined ? { dir } : {}),
   });
 
+  progress?.(full ? 'Building graph (full extract)…' : 'Building graph…');
   const buildResult: BuildResult = build({
     corpus,
     ...(dir !== undefined ? { dir } : {}),
     full,
     writeReportOnBuild: report === true,
+    ...(progress !== undefined ? { onProgress: progress } : {}),
   });
 
   let communities_written = false;
   if (communities) {
+    progress?.('Detecting communities…');
     try {
       detectCommunities({ dir: buildResult.store_dir });
       communities_written = true;
@@ -236,6 +244,7 @@ export function projectSync(opts?: ProjectSyncOptions): ProjectSyncResult {
 
   let report_written = false;
   if (report) {
+    progress?.('Writing GRAPH_REPORT.md…');
     try {
       writeGraphReport({ dir: buildResult.store_dir });
       report_written = true;

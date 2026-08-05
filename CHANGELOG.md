@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] - 2026-08-05
+
+### Added
+
+- **stderr spinner / progress** for `gsd-graph enable` and `gsd-graph sync` (TTY only; stdout remains pure JSON)
+  - Stages: skill/hooks/config → corpus resolve → extract N/M files → normalize → publish
+  - Disable: `GSD_GRAPH_NO_SPINNER=1` · plain lines: `GSD_GRAPH_PROGRESS=1` (for non-TTY logs)
+
 ## [0.2.3] - 2026-08-05
 
 ### Fixed

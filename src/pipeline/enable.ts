@@ -179,18 +179,23 @@ export function enable(opts?: EnableOptions): EnableResult {
   const communities = opts?.communities === true;
   const skipSync = opts?.skipSync === true;
   const dir = opts?.dir;
+  const progress = opts?.onProgress;
 
   const resolveOpts: { cwd: string; dir?: string } = { cwd };
   if (dir !== undefined) resolveOpts.dir = dir;
+  progress?.('Preparing store…');
   const storeRoot = resolveStoreRoot(resolveOpts);
   fs.mkdirSync(storeRoot, { recursive: true });
 
   const pkgRoot = opts?.packageRoot ?? resolvePackageRoot();
+  progress?.('Installing agent skill…');
   const skills_installed = pkgRoot ? installSkill(pkgRoot) : [];
+  progress?.('Installing continuous-update hooks…');
   const hooks_dir = pkgRoot
     ? installHooks(pkgRoot, storeRoot)
     : path.join(storeRoot, 'hooks');
 
+  progress?.('Writing config…');
   const configPaths = writeEnableConfig({
     cwd,
     storeRoot,
@@ -201,14 +206,24 @@ export function enable(opts?: EnableOptions): EnableResult {
 
   let sync: ProjectSyncResult | null = null;
   if (!skipSync) {
+    progress?.('Starting full project sync…');
     sync = projectSync({
       cwd,
       ...(dir !== undefined ? { dir } : {}),
       full: true,
       report,
       ...(communities ? { communities: true } : {}),
+      ...(progress !== undefined ? { onProgress: progress } : {}),
     });
+  } else {
+    progress?.('Skipping corpus sync (--skip-sync)…');
   }
+
+  progress?.(
+    sync
+      ? `Done — ${sync.build.node_count} nodes, ${sync.build.triple_count} triples`
+      : 'Done — skill/hooks installed',
+  );
 
   return {
     store_dir: sync?.store_dir ?? storeRoot,

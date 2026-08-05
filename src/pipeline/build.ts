@@ -198,6 +198,9 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
   const built_at = new Date().toISOString();
   const full = opts.full === true;
   const diagnostics: ExtractDiagnostic[] = [];
+  const progress = opts.onProgress;
+
+  progress?.(full ? 'Discovering corpus (full rebuild)…' : 'Discovering corpus…');
 
   const ontology = loadOntologyPack({
     packIdOrPath: opts.ontology ?? 'general',
@@ -208,6 +211,9 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
     opts.globs !== undefined ? { globs: opts.globs } : {},
   );
   diagnostics.push(...discovered.diagnostics);
+  progress?.(
+    `Found ${discovered.files.length} source file${discovered.files.length === 1 ? '' : 's'}…`,
+  );
 
   const priorManifest = loadPriorManifest(storeRoot);
   const priorGraph = loadPriorGraph(storeRoot);
@@ -274,7 +280,18 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
     }
   }
 
-  for (const file of toExtract) {
+  if (sources_extracted === 0) {
+    progress?.(
+      `All ${discovered.files.length} source(s) fresh — skipping extract…`,
+    );
+  }
+
+  for (let i = 0; i < toExtract.length; i++) {
+    const file = toExtract[i]!;
+    const base = path.basename(file);
+    progress?.(
+      `Extracting ${i + 1}/${toExtract.length}: ${base}`,
+    );
     const fp = fingerprintStat(file);
     let extracted;
     try {
@@ -314,6 +331,7 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
     };
   }
 
+  progress?.('Normalizing nodes and triples…');
   let normalized = normalize({
     ontology,
     nodes: workingNodes,
@@ -366,6 +384,9 @@ function runBuild(storeRoot: string, opts: BuildOptions): BuildResult {
 
   const ontologyLock = buildOntologyLock(ontology);
 
+  progress?.(
+    `Publishing graph (${normalized.nodes.length} nodes, ${normalized.triples.length} triples)…`,
+  );
   const writeProjection = opts.writeProjection ?? DEFAULT_WRITE_PROJECTION;
   const projection = writeProjection ? projectGraph(graphV1) : null;
 
