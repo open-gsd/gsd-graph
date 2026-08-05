@@ -28,6 +28,11 @@ import {
   isSelfMetaArgv,
   selfUpdate,
 } from './cli/self-update';
+import {
+  mcpDoctor,
+  mcpInstall,
+  type McpHostId,
+} from './cli/mcp-install';
 import { enable } from './pipeline/enable';
 import { projectSync } from './pipeline/project-sync';
 import { packSubgraph } from './pipeline/pack';
@@ -241,6 +246,10 @@ function buildProgram(): Command {
     .option('--no-report', 'skip GRAPH_REPORT.md on first sync')
     .option('--communities', 'run communities detect after first sync')
     .option('--skip-sync', 'install skill/hooks/config only (no corpus build)')
+    .option(
+      '--mcp',
+      'register MCP with Claude / Codex / Cursor + project .mcp.json',
+    )
     .action(
       (
         opts: {
@@ -248,6 +257,7 @@ function buildProgram(): Command {
           report?: boolean;
           communities?: boolean;
           skipSync?: boolean;
+          mcp?: boolean;
         },
         cmd: Command,
       ) => {
@@ -260,6 +270,7 @@ function buildProgram(): Command {
             ...(opts.report === false ? { report: false } : {}),
             ...(opts.communities === true ? { communities: true } : {}),
             ...(opts.skipSync === true ? { skipSync: true } : {}),
+            ...(opts.mcp === true ? { mcp: true } : {}),
             onProgress: report,
           }),
         );
@@ -267,6 +278,95 @@ function buildProgram(): Command {
         writeOkHumanCommand(result);
       },
     );
+
+  // MCP host registration
+  const mcpCmd = program
+    .command('mcp')
+    .description('Register or diagnose gsd-graph MCP for Claude / Codex / Cursor');
+
+  mcpCmd
+    .command('install')
+    .description(
+      'Write MCP config for detected hosts (Claude, Codex, Cursor) + project .mcp.json',
+    )
+    .option(
+      '--host <id>',
+      'host to configure (repeatable): claude|codex|cursor|project',
+      (val: string, prev: string[]) => {
+        prev.push(val);
+        return prev;
+      },
+      [] as string[],
+    )
+    .option('--allow-build', 'enable graph_build MCP tool')
+    .option('--allow-review-write', 'enable graph_review_resolve MCP tool')
+    .action(
+      (
+        opts: {
+          host?: string[];
+          allowBuild?: boolean;
+          allowReviewWrite?: boolean;
+        },
+        cmd: Command,
+      ) => {
+        const dir = globalDir(cmd);
+        const hosts = (opts.host ?? [])
+          .map((h) => h.toLowerCase())
+          .filter((h): h is McpHostId =>
+            ['claude', 'codex', 'cursor', 'project'].includes(h),
+          );
+        const result = withSpinner('Installing gsd-graph MCP…', (report) =>
+          mcpInstall({
+            cwd: process.cwd(),
+            ...(dir !== undefined ? { dir } : {}),
+            ...(hosts.length > 0 ? { hosts } : {}),
+            ...(opts.allowBuild === true ? { allowBuild: true } : {}),
+            ...(opts.allowReviewWrite === true
+              ? { allowReviewWrite: true }
+              : {}),
+            onProgress: report,
+          }),
+        );
+        // Always print a short human summary on stderr for install
+        if (process.stderr.isTTY || process.env.GSD_GRAPH_PROGRESS === '1') {
+          process.stderr.write(
+            `\n✔ MCP install\n` +
+              result.hosts
+                .map(
+                  (h) =>
+                    `  ${h.ok ? '✔' : '✖'} ${h.host}: ${h.message}`,
+                )
+                .join('\n') +
+              `\n\n  Next: restart Claude / Codex / Cursor\n  Then: gsd-graph mcp doctor\n\n`,
+          );
+        }
+        writeOk(result);
+      },
+    );
+
+  mcpCmd
+    .command('doctor')
+    .description('Check graph store + MCP host registration')
+    .action((_opts: unknown, cmd: Command) => {
+      const dir = globalDir(cmd);
+      const result = mcpDoctor({
+        cwd: process.cwd(),
+        ...(dir !== undefined ? { dir } : {}),
+      });
+      if (process.stderr.isTTY || process.env.GSD_GRAPH_PROGRESS === '1') {
+        process.stderr.write(
+          `\n${result.ok ? '✔' : '✖'} gsd-graph mcp doctor\n` +
+            result.checks
+              .map((c) => `  ${c.ok ? '✔' : '✖'} ${c.message}`)
+              .join('\n') +
+            (result.next.length
+              ? `\n\n  Next:\n${result.next.map((n) => `    ${n}`).join('\n')}`
+              : '') +
+            '\n\n',
+        );
+      }
+      writeOk(result);
+    });
 
   program
     .command('init')

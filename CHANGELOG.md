@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.11] - 2026-08-05
+
+### Added
+
+- **Easy MCP setup** for Claude Code, Codex, Cursor, and project `.mcp.json`
+  - `gsd-graph enable --mcp` — register hosts during one-shot enable
+  - `gsd-graph mcp install` — write host configs (repeatable; merges existing)
+  - `gsd-graph mcp doctor` — check store + host registration
+  - `--host claude|codex|cursor|project` (repeatable), `--allow-build`, `--allow-review-write`
+  - Project `.mcp.json` uses portable `npx` launch (safe to commit); user-local hosts prefer absolute package bin
+
 ## [0.2.10] - 2026-08-05
 
 ### Changed

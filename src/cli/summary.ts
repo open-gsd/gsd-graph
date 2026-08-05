@@ -66,10 +66,34 @@ export function printEnableWrapup(
     lines.push(line('Graph', pc.dim('not built (--skip-sync)')));
   }
 
+  if (result.mcp) {
+    const okHosts = result.mcp.hosts.filter((h) => h.ok && h.action !== 'skipped');
+    const failed = result.mcp.hosts.filter((h) => !h.ok);
+    lines.push(
+      line(
+        'MCP',
+        failed.length === 0
+          ? pc.green(
+              `registered (${okHosts.map((h) => h.host).join(', ') || 'none'})`,
+            )
+          : pc.yellow(
+              `partial — ${failed.map((h) => h.host).join(', ')} failed`,
+            ),
+      ),
+    );
+  } else {
+    lines.push(
+      line('MCP', pc.dim('not installed — gsd-graph mcp install')),
+    );
+  }
+
   lines.push('');
   lines.push(pc.bold('  Next'));
   lines.push(`    ${pc.cyan(result.next.ask)}`);
   lines.push(`    ${pc.cyan(result.next.status)}`);
+  if (result.next.mcp) {
+    lines.push(`    ${pc.cyan(result.next.mcp)}`);
+  }
   if (result.auto_update) {
     lines.push(
       `    ${pc.dim('Hook:')} ${rel(result.next.hook, cwd)} ${pc.dim('(PostToolUse Bash)')}`,

@@ -207,6 +207,19 @@ export type {
   UpdateResult,
   InstallKind,
 } from './cli/self-update';
+export {
+  mcpInstall,
+  mcpDoctor,
+  resolveMcpLaunch,
+  resolveMcpStoreDir,
+  upsertCodexMcpServer,
+} from './cli/mcp-install';
+export type {
+  McpHostId,
+  McpInstallResult,
+  McpDoctorResult,
+  McpLaunch,
+} from './cli/mcp-install';
 
 // Maintain invalidation (03-02 / MNT-01)
 export {

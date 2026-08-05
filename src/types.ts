@@ -459,6 +459,11 @@ export interface EnableOptions {
   packageRoot?: string;
   /** Progress updates for long enable (CLI spinner on stderr). */
   onProgress?: GraphProgress;
+  /**
+   * Register MCP with Claude/Codex/Cursor + project .mcp.json.
+   * Default false; CLI may pass true for interactive enable --mcp.
+   */
+  mcp?: boolean;
 }
 
 /** Result of enable() — JSON-serializable for CLI. */
@@ -470,11 +475,25 @@ export interface EnableResult {
   planning_config: string | null;
   auto_update: boolean;
   sync: ProjectSyncResult | null;
+  /** Present when enable ran MCP host registration. */
+  mcp?: {
+    store_dir: string;
+    launch: { command: string; args: string[] };
+    hosts: Array<{
+      host: string;
+      ok: boolean;
+      action: string;
+      path?: string;
+      message: string;
+    }>;
+    next: string[];
+  };
   next: {
     ask: string;
     sync: string;
     status: string;
     hook: string;
+    mcp?: string;
   };
 }
 

@@ -31,11 +31,18 @@ extract → normalize → store → query → ground → maintain
 ```bash
 npm install -g @opengsd/gsd-graph
 
-# one shot: skill + hooks + config + full brownfield graph
-gsd-graph enable
+# one shot: skill + hooks + config + full brownfield graph (+ MCP)
+gsd-graph enable --mcp
 
 # multi-hop Q&A with citations
 gsd-graph ask "why is phase 4 blocked by phase 3?"
+```
+
+MCP for Claude / Codex / Cursor (if you skipped `--mcp`):
+
+```bash
+gsd-graph mcp install
+gsd-graph mcp doctor   # after restarting the host
 ```
 
 The global install keeps this CLI separate from a project's dependency tree. To
@@ -56,7 +63,7 @@ npx -y -p @opengsd/gsd-graph gsd-graph enable
 ```
 
 For reproducible automation, replace the unversioned package with an exact release,
-for example `@opengsd/gsd-graph@0.2.2`.
+for example `@opengsd/gsd-graph@0.2.11`.
 
 ### Local library dependency
 
@@ -70,11 +77,13 @@ After a local install, `npx gsd-graph …` also works via `node_modules/.bin`.
 
 | Command | When |
 |---------|------|
-| `gsd-graph enable` | First time in a repo |
+| `gsd-graph enable --mcp` | First time in a repo (+ register MCP hosts) |
 | `gsd-graph sync` | After docs / planning change (incremental) |
 | `gsd-graph ask "…"` | Grounded multi-hop answer |
 | `gsd-graph status` | Counts / freshness |
 | `gsd-graph query <term>` | Seed-expand search |
+| `gsd-graph mcp install` | Wire Claude / Codex / Cursor + project `.mcp.json` |
+| `gsd-graph mcp doctor` | Check store + MCP registration |
 
 Agent skill (installed by `enable`): **`/skill:gsd-graph`**
 
@@ -159,7 +168,8 @@ gsd-graph path Concept:a Concept:b
 gsd-graph communities detect
 gsd-graph review list
 gsd-graph snapshot save pre-refactor
-npx -y -p @opengsd/gsd-graph@0.2.2 gsd-graph-mcp
+gsd-graph mcp install
+# or: npx -y -p @opengsd/gsd-graph@0.2.11 gsd-graph-mcp
 ```
 
 Machine contract: **JSON on stdout** (K22). Library: `require('@opengsd/gsd-graph')`.

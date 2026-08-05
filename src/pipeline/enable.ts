@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { mcpInstall } from '../cli/mcp-install';
 import { DEFAULT_STORE_DIR, resolveStoreRoot, storeFile } from '../io/paths';
 import type { EnableOptions, EnableResult, ProjectSyncResult } from '../types';
 import { projectSync } from './project-sync';
@@ -180,6 +181,7 @@ export function enable(opts?: EnableOptions): EnableResult {
   const skipSync = opts?.skipSync === true;
   const dir = opts?.dir;
   const progress = opts?.onProgress;
+  const wantMcp = opts?.mcp === true;
 
   const resolveOpts: { cwd: string; dir?: string } = { cwd };
   if (dir !== undefined) resolveOpts.dir = dir;
@@ -219,13 +221,41 @@ export function enable(opts?: EnableOptions): EnableResult {
     progress?.('Skipping corpus sync (--skip-sync)…');
   }
 
+  let mcp: EnableResult['mcp'];
+  if (wantMcp) {
+    progress?.('Registering MCP with Claude / Codex / Cursor…');
+    const mcpResult = mcpInstall({
+      cwd,
+      dir: storeRoot,
+      ...(progress !== undefined ? { onProgress: progress } : {}),
+    });
+    mcp = {
+      store_dir: mcpResult.store_dir,
+      launch: mcpResult.launch,
+      hosts: mcpResult.hosts,
+      next: mcpResult.next,
+    };
+  }
+
   progress?.(
     sync
       ? `Done — ${sync.build.node_count} nodes, ${sync.build.triple_count} triples`
       : 'Done — skill/hooks installed',
   );
 
-  return {
+  const next: EnableResult['next'] = {
+    ask: 'gsd-graph ask "your multi-hop question"',
+    sync: 'gsd-graph sync',
+    status: 'gsd-graph status',
+    hook: path.join(hooks_dir, 'gsd-graph-update.sh'),
+  };
+  if (!wantMcp) {
+    next.mcp = 'gsd-graph mcp install   # Claude / Codex / Cursor';
+  } else {
+    next.mcp = 'Restart Claude / Codex / Cursor, then: gsd-graph mcp doctor';
+  }
+
+  const result: EnableResult = {
     store_dir: sync?.store_dir ?? storeRoot,
     skills_installed,
     hooks_dir,
@@ -233,11 +263,8 @@ export function enable(opts?: EnableOptions): EnableResult {
     planning_config: configPaths.planning_config,
     auto_update: autoUpdate,
     sync,
-    next: {
-      ask: 'gsd-graph ask "your multi-hop question"',
-      sync: 'gsd-graph sync',
-      status: 'gsd-graph status',
-      hook: path.join(hooks_dir, 'gsd-graph-update.sh'),
-    },
+    next,
   };
+  if (mcp !== undefined) result.mcp = mcp;
+  return result;
 }

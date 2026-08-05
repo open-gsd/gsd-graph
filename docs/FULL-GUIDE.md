@@ -112,8 +112,8 @@ npx -y -p @opengsd/gsd-graph gsd-graph-mcp
 Pin an exact release in CI and other reproducible automation:
 
 ```bash
-npx -y @opengsd/gsd-graph@0.2.2 status
-npx -y -p @opengsd/gsd-graph@0.2.2 gsd-graph-mcp
+npx -y @opengsd/gsd-graph@0.2.11 status
+npx -y -p @opengsd/gsd-graph@0.2.11 gsd-graph-mcp
 ```
 
 ### Local library dependency
@@ -522,12 +522,42 @@ Snapshots store full `graph.v1` copies under `snapshots/`. Restore recovers grap
 
 Durable agent access without re-pasting the graph.
 
+### Easy install (recommended)
+
+```bash
+# with first-time enable
+gsd-graph enable --mcp
+
+# or later, anytime
+gsd-graph mcp install
+gsd-graph mcp doctor
+```
+
+`mcp install` registers **gsd-graph** with detected hosts:
+
+| Host | Config |
+|------|--------|
+| Claude Code | `claude mcp add` or `~/.claude/settings.json` |
+| Codex | `~/.codex/config.toml` (`[mcp_servers.gsd-graph]`) |
+| Cursor | `~/.cursor/mcp.json` |
+| Project | `.mcp.json` (portable `npx` launch — safe to commit) |
+
+Then **restart** Claude / Codex / Cursor and run `gsd-graph mcp doctor`.
+
+```bash
+gsd-graph mcp install --host claude --host project
+gsd-graph mcp install --allow-build          # opt-in graph_build tool
+gsd-graph mcp install --allow-review-write   # opt-in graph_review_resolve
+```
+
+### Manual launch
+
 ```bash
 # global CLI installation
 gsd-graph-mcp
 
 # zero-install (pin an exact version for production)
-npx -y -p @opengsd/gsd-graph@0.2.2 gsd-graph-mcp
+npx -y -p @opengsd/gsd-graph@0.2.11 gsd-graph-mcp
 ```
 
 ### Tools (default read)
@@ -547,15 +577,14 @@ npx -y -p @opengsd/gsd-graph@0.2.2 gsd-graph-mcp
 | `graph_build` | `--allow-build` / `mcp.allow_build` |
 | `graph_review_resolve` | `--allow-review-write` / `mcp.allow_review_write` |
 
-Example MCP client config (shape varies by host):
+Manual MCP client config (prefer `gsd-graph mcp install` instead):
 
 ```json
 {
   "mcpServers": {
     "gsd-graph": {
       "command": "npx",
-      "args": ["-y", "-p", "@opengsd/gsd-graph@0.2.2", "gsd-graph-mcp"],
-      "env": { "GSD_GRAPH_DIR": ".gsd-graph" }
+      "args": ["-y", "-p", "@opengsd/gsd-graph@0.2.11", "gsd-graph-mcp", "--dir", ".gsd-graph"]
     }
   }
 }

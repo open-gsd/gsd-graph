@@ -41,9 +41,9 @@ describe('package identity (PKG-01, PKG-02)', () => {
     assert.match(nodeEngine as string, />=\s*22/);
   });
 
-  it('package version is 0.2.10 (no JSON dump by default)', () => {
+  it('package version is 0.2.11 (MCP install/doctor)', () => {
     const pkg = readPackageJson();
-    assert.equal(pkg.version, '0.2.10');
+    assert.equal(pkg.version, '0.2.11');
   });
 
   it('description positions Graph Engineering toolkit', () => {

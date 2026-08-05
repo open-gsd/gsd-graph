@@ -22,11 +22,18 @@ Get a local knowledge graph running in minutes. For depth (MCP, ontology, mainta
 ```bash
 npm install -g @opengsd/gsd-graph
 
-# skill + hooks + config + full brownfield graph
-gsd-graph enable
+# skill + hooks + config + full brownfield graph + MCP hosts
+gsd-graph enable --mcp
 
 # multi-hop Q&A with citations
 gsd-graph ask "why is phase 4 blocked by phase 3?"
+```
+
+**MCP** (Claude / Codex / Cursor): `enable --mcp` registers hosts. Or later:
+
+```bash
+gsd-graph mcp install && gsd-graph mcp doctor
+# restart the host so tools appear
 ```
 
 **Zero-install** (scoped package — use the package name so npx finds the bin):
