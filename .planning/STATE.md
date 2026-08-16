@@ -16,7 +16,14 @@ progress:
 # Project State
 
 **Project:** gsd-graph  
-**Updated:** 2026-08-03  
+**Updated:** 2026-08-16  
+
+## Project Reference
+
+See: .planning/PROJECT.md (updated 2026-08-16)
+
+**Core value:** Relationship answers with citations beat keyword dumps — multi-hop path/pack over triples works offline without an LLM.
+**Current focus:** Planning next milestone
 
 ## Current position
 
