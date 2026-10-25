@@ -794,7 +794,7 @@ Resolution: **store config overrides / merges with planning** via `readGraphProj
 | Empty / abstain answers | Need structured links or JSONL; free prose offline is weak |
 | Hook never runs | `enabled`+`auto_update`; default branch; not CI; Bash+git commit pattern; CLI on PATH |
 | Stale graph | `gsd-graph sync` or `sync --full`; check `.last-sync-status.json` |
-| `build_locked` (exit 3) | Wait for other writer; remove stale `.build.lock` if PID dead |
+| `build_locked` (exit 3) | Another writer is running; wait for it. A `.build.lock` left by a process that no longer exists is taken over automatically |
 | Huge noisy graph | Don’t point corpus at repo root / all of `src/` |
 | Review pile-up | `review list`; accept/reject; consider ontology pack fit |
 | MCP can’t build | Expected — enable `--allow-build` deliberately |

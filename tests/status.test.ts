@@ -2,6 +2,7 @@
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -170,6 +171,37 @@ describe('status() STAT-01', () => {
 
     const after = mod.status({ dir: store });
     assert.equal(after.build_in_progress, false);
+  });
+
+  it('build_in_progress false when the lock owner has exited (#5)', () => {
+    const corpus = tempDir('gsd-status-dead-c-');
+    const store = tempDir('gsd-status-dead-s-');
+    copyFixture('structured-edges.md', corpus);
+    mod.build({ corpus, dir: store });
+
+    const writeLock = (pid: number): void => {
+      fs.writeFileSync(
+        path.join(store, '.build.lock'),
+        JSON.stringify({
+          pid,
+          started_at: new Date().toISOString(),
+          owner: 'cli',
+          cwd: corpus,
+        }) + '\n',
+        'utf8',
+      );
+    };
+
+    // Lock left behind by a process that no longer exists
+    const exited = spawnSync(process.execPath, ['-e', '']);
+    assert.equal(typeof exited.pid, 'number');
+    writeLock(exited.pid!);
+    assert.equal(mod.status({ dir: store }).build_in_progress, false);
+
+    // Same lock file with a live owner pid still reports a build in progress
+    writeLock(process.pid);
+    assert.equal(mod.status({ dir: store }).build_in_progress, true);
+    fs.unlinkSync(path.join(store, '.build.lock'));
   });
 
   it('stale true when a manifest source path is missing on disk', () => {

@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadGraphV1Cached } from '../io/graph-cache';
-import { STALE_MS } from '../io/lock';
+import { lockOwnerState } from '../io/lock';
 import { resolveStoreRoot, storeFile } from '../io/paths';
 import { readJsonFile } from '../io/safe-json';
 import { fingerprintFile } from '../sources/fingerprint';
@@ -21,7 +21,6 @@ import { loadReviewQueue } from './review';
 
 interface LockPayloadLite {
   pid?: number;
-  started_at?: string;
 }
 
 interface LastBuildStatus {
@@ -41,37 +40,26 @@ function readLastBuildStatus(storeRoot: string): LastBuildStatus | null {
   }
 }
 
-function isPidAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /**
- * build_in_progress when .build.lock exists.
- * Stale locks (age > STALE_MS or dead PID) still report true if the file exists
- * (Phase 2: presence-based; steal is build's job).
+ * build_in_progress when .build.lock exists and its owner may still run.
+ *
+ * A lock whose recorded pid no longer exists (ESRCH) was left behind by a
+ * build that died without releasing it; the next writer takes it over
+ * (acquireBuildLock), so it is not reported as a build in progress. A lock
+ * older than STALE_MS whose pid is alive still counts: the build may simply
+ * be long-running. An unreadable lock still counts too (it may be mid-write).
  */
 function lockInProgress(storeRoot: string): boolean {
   const lockPath = storeFile(storeRoot, '.build.lock');
   if (!fs.existsSync(lockPath)) return false;
-  // Presence is enough for status; optionally annotate via payload parse
   try {
     const raw = fs.readFileSync(lockPath, 'utf8');
     const payload = JSON.parse(raw) as LockPayloadLite;
-    if (typeof payload.started_at === 'string') {
-      const started = Date.parse(payload.started_at);
-      if (Number.isFinite(started) && Date.now() - started > STALE_MS) {
-        // Still in progress from reader's POV if file remains (steal not run)
-        return true;
-      }
-    }
-    if (typeof payload.pid === 'number' && !isPidAlive(payload.pid)) {
-      return true;
+    if (
+      typeof payload.pid === 'number' &&
+      lockOwnerState(payload.pid) === 'dead'
+    ) {
+      return false;
     }
   } catch {
     // unreadable lock still means a build may be/was in progress
