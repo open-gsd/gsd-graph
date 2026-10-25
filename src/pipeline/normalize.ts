@@ -348,8 +348,10 @@ function canonicalizeNodes(nodes: GraphNode[]): GraphNode[] {
  * - Same type where one's label/alias slug equals the other's id local part → merge
  * - Cross-type clashes → entity_merge review (no auto-merge)
  * - No fuzzy/Levenshtein matching
+ *
+ * Exported for tests only (not part of the package index).
  */
-function mergeExactSameType(
+export function mergeExactSameType(
   nodes: GraphNode[],
   ctx: {
     now: string;
@@ -357,9 +359,15 @@ function mergeExactSameType(
     reviewSeen: Set<string>;
     onProgress?: (message: string) => void;
   },
-): { nodes: GraphNode[]; idRewrite: Map<string, string> } {
+): {
+  nodes: GraphNode[];
+  idRewrite: Map<string, string>;
+  /** Candidate keeper pairs visited in pass 2 (work counter for tests). */
+  candidatePairs: number;
+} {
   const idRewrite = new Map<string, string>();
   const byId = new Map<string, GraphNode>();
+  const aliasSets = new Map<GraphNode, Set<string>>();
 
   // Pass 1: merge exact same id (same type). Different type same id → review.
   for (const n of nodes) {
@@ -369,7 +377,7 @@ function mergeExactSameType(
       continue;
     }
     if (existing.type === n.type) {
-      mergeInto(existing, n);
+      mergeInto(existing, n, aliasSets);
       idRewrite.set(n.id, existing.id);
     } else {
       // Cross-type id collision — never auto-merge
@@ -399,28 +407,75 @@ function mergeExactSameType(
     }
   }
 
-  // Pass 2: exact same-type alias / label slug matches against keeper id local part
-  // O(n²) over keepers — this is often the long pause after extract; report progress.
+  // Pass 2: exact same-type alias / label slug matches against keeper id
+  // local part.
+  //
+  // Semantics are those of a pairwise scan: for each keeper a (in order) and
+  // each later, not-yet-dropped keeper b (in order), compare a — including
+  // aliases absorbed earlier in the same scan — with b. Only pairs that share
+  // a slug (exact merge / cross-type clash) or a plural/acronym form (alias
+  // suggestion) can produce anything, so candidates come from indexes instead
+  // of an all-pairs loop, and are visited in ascending keeper order so merges,
+  // keepers and review items come out in the same order as the pairwise scan.
   const keepers = [...byId.values()];
-  const dropped = new Set<string>();
   const nKeepers = keepers.length;
+  const dropped = new Uint8Array(nKeepers);
   const mergeStep = Math.max(1, Math.floor(nKeepers / 50) || 1);
+  // Slug sets are computed once per keeper; only the current keeper `a` can
+  // change (it absorbs aliases), and its set is updated on each merge.
+  const slugs: Set<string>[] = keepers.map(nodeSlugs);
+  const acronyms: Set<string>[] = slugs.map(slugAcronyms);
+  // slug → ascending keeper indices with that slug (any type).
+  const bySlug = new Map<string, number[]>();
+  // type + acronym → ascending keeper indices with a slug of that acronym.
+  const byAcronym = new Map<string, number[]>();
+  for (let k = 0; k < nKeepers; k++) {
+    for (const s of slugs[k]!) appendIndex(bySlug, s, k);
+    const type = keepers[k]!.type;
+    for (const ac of acronyms[k]!) appendIndex(byAcronym, `${type}\0${ac}`, k);
+  }
+  // Merged-away id → keeper id; resolved with path compression at the end.
+  const absorbedBy = new Map<string, string>();
+  let candidatePairs = 0;
 
-  for (let i = 0; i < keepers.length; i++) {
+  for (let i = 0; i < nKeepers; i++) {
     if (i === 0 || (i + 1) % mergeStep === 0 || i + 1 === nKeepers) {
       ctx.onProgress?.(
         `Normalizing: alias merge ${i + 1}/${nKeepers.toLocaleString('en-US')}…`,
       );
     }
+    if (dropped[i] === 1) continue;
     const a = keepers[i]!;
-    if (dropped.has(a.id)) continue;
-    for (let j = i + 1; j < keepers.length; j++) {
+    const queue = new CandidateQueue(dropped);
+    const enqueued = new Set<string>();
+    // Queue every later keeper that could match slug `s` of `a`.
+    const enqueue = (s: string, after: number): void => {
+      if (enqueued.has(s)) return;
+      enqueued.add(s);
+      queue.pushAfter(bySlug.get(s), after);
+      if (s.length < 2) return;
+      queue.pushAfter(bySlug.get(`${s}s`), after);
+      if (s.endsWith('s')) queue.pushAfter(bySlug.get(s.slice(0, -1)), after);
+      const ac = slugAcronym(s);
+      if (ac !== null) queue.pushAfter(bySlug.get(ac), after);
+      queue.pushAfter(byAcronym.get(`${a.type}\0${s}`), after);
+    };
+    for (const s of slugs[i]!) enqueue(s, i);
+
+    let last = -1;
+    while (queue.size > 0) {
+      const j = queue.pop();
+      candidatePairs += 1;
+      if (j === last) continue;
+      last = j;
+      if (dropped[j] === 1) continue;
       const b = keepers[j]!;
-      if (dropped.has(b.id)) continue;
+      const aSlugs = slugs[i]!;
+      const bSlugs = slugs[j]!;
 
       if (a.type !== b.type) {
         // Cross-type same label/alias slug → advisory review, no merge
-        if (sharesNormalizedLabel(a, b)) {
+        if (sharesNormalizedLabel(aSlugs, bSlugs)) {
           pushReview(
             ctx.reviewItems,
             ctx.reviewSeen,
@@ -438,22 +493,34 @@ function mergeExactSameType(
         continue;
       }
 
-      if (exactAliasMatch(a, b)) {
+      if (exactAliasMatch(aSlugs, bSlugs)) {
         // Keep first-seen (lower index)
-        mergeInto(a, b);
-        idRewrite.set(b.id, a.id);
-        // Chain any prior rewrites pointing at b → a
-        for (const [from, to] of idRewrite) {
-          if (to === b.id) idRewrite.set(from, a.id);
+        const labelBefore = a.label;
+        const added = mergeInto(a, b, aliasSets);
+        // Later keepers matching the absorbed aliases are candidates too.
+        if (a.label !== labelBefore) {
+          slugs[i] = nodeSlugs(a);
+          acronyms[i] = slugAcronyms(slugs[i]!);
+          for (const s of slugs[i]!) enqueue(s, j);
+        } else {
+          for (const v of added) {
+            const s = slugifyLabel(v);
+            aSlugs.add(s);
+            const ac = s.length >= 2 ? slugAcronym(s) : null;
+            if (ac !== null) acronyms[i]!.add(ac);
+            enqueue(s, j);
+          }
         }
+        idRewrite.set(b.id, a.id);
+        absorbedBy.set(b.id, a.id);
         byId.delete(b.id);
-        dropped.add(b.id);
+        dropped[j] = 1;
         continue;
       }
 
       // Near-alias (plural / acronym) — suggest-only via review queue,
       // never auto-merge (NORM-02: no fuzzy merges without a human).
-      if (suggestsAliasMatch(a, b)) {
+      if (suggestsAliasMatch(aSlugs, bSlugs, acronyms[i]!, acronyms[j]!)) {
         pushReview(
           ctx.reviewItems,
           ctx.reviewSeen,
@@ -471,7 +538,121 @@ function mergeExactSameType(
     }
   }
 
-  return { nodes: [...byId.values()], idRewrite };
+  // Chain rewrites that point at a merged-away keeper → its final keeper.
+  if (absorbedBy.size > 0) {
+    for (const [from, to] of idRewrite) {
+      const target = resolveAbsorbed(absorbedBy, to);
+      if (target !== to) idRewrite.set(from, target);
+    }
+  }
+
+  return { nodes: [...byId.values()], idRewrite, candidatePairs };
+}
+
+function appendIndex(
+  index: Map<string, number[]>,
+  key: string,
+  k: number,
+): void {
+  const list = index.get(key);
+  if (list === undefined) index.set(key, [k]);
+  else if (list[list.length - 1] !== k) list.push(k);
+}
+
+/** Find with path compression over the merged-away → keeper map. */
+function resolveAbsorbed(absorbedBy: Map<string, string>, id: string): string {
+  let root = id;
+  let next = absorbedBy.get(root);
+  while (next !== undefined) {
+    root = next;
+    next = absorbedBy.get(root);
+  }
+  let cur = id;
+  while (cur !== root) {
+    const parent = absorbedBy.get(cur)!;
+    absorbedBy.set(cur, root);
+    cur = parent;
+  }
+  return root;
+}
+
+/**
+ * Candidate keeper indices for one keeper `a`, popped in ascending order
+ * (binary min-heap; duplicates allowed, the caller skips repeats).
+ *
+ * Callers push with a non-decreasing `after` (the current position), so an
+ * index list pushed once already covers every later push of the same list and
+ * is skipped. Dropped keepers are pruned from index lists as they are scanned,
+ * so a slug shared by many merged-away nodes is not rescanned for every later
+ * keeper.
+ */
+class CandidateQueue {
+  private readonly items: number[] = [];
+  private readonly pushed = new Set<number[]>();
+
+  constructor(private readonly dropped: Uint8Array) {}
+
+  get size(): number {
+    return this.items.length;
+  }
+
+  /**
+   * Push every live index in the ascending `list` that is greater than
+   * `after`; dropped indices in that range are removed from `list`.
+   */
+  pushAfter(list: number[] | undefined, after: number): void {
+    if (list === undefined || this.pushed.has(list)) return;
+    this.pushed.add(list);
+    let lo = 0;
+    let hi = list.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (list[mid]! <= after) lo = mid + 1;
+      else hi = mid;
+    }
+    let w = lo;
+    for (let k = lo; k < list.length; k++) {
+      const v = list[k]!;
+      if (this.dropped[v] === 1) continue;
+      list[w++] = v;
+      this.push(v);
+    }
+    list.length = w;
+  }
+
+  push(value: number): void {
+    const items = this.items;
+    let idx = items.length;
+    items.push(value);
+    while (idx > 0) {
+      const parent = (idx - 1) >>> 1;
+      if (items[parent]! <= value) break;
+      items[idx] = items[parent]!;
+      idx = parent;
+    }
+    items[idx] = value;
+  }
+
+  pop(): number {
+    const items = this.items;
+    const top = items[0]!;
+    const tail = items.pop()!;
+    if (items.length > 0) {
+      let idx = 0;
+      const n = items.length;
+      for (;;) {
+        const l = 2 * idx + 1;
+        if (l >= n) break;
+        const r = l + 1;
+        const c = r < n && items[r]! < items[l]! ? r : l;
+        if (items[c]! >= tail) break;
+        items[idx] = items[c]!;
+        idx = c;
+      }
+      items[idx] = tail;
+    }
+    return top;
+  }
 }
 
 function cloneNode(n: GraphNode): GraphNode {
@@ -501,17 +682,24 @@ function nodeSlugs(n: GraphNode): Set<string> {
 }
 
 /** Exact same-type alias: one's label/alias slug equals the other's id local part or label slug. */
-function exactAliasMatch(a: GraphNode, b: GraphNode): boolean {
-  const aSlugs = nodeSlugs(a);
-  const bSlugs = nodeSlugs(b);
-  for (const s of aSlugs) {
-    if (bSlugs.has(s)) return true;
+function exactAliasMatch(
+  aSlugs: ReadonlySet<string>,
+  bSlugs: ReadonlySet<string>,
+): boolean {
+  // Iterate the smaller set: a keeper that absorbed many aliases is large.
+  const [small, large] =
+    aSlugs.size <= bSlugs.size ? [aSlugs, bSlugs] : [bSlugs, aSlugs];
+  for (const s of small) {
+    if (large.has(s)) return true;
   }
   return false;
 }
 
-function sharesNormalizedLabel(a: GraphNode, b: GraphNode): boolean {
-  return exactAliasMatch(a, b);
+function sharesNormalizedLabel(
+  aSlugs: ReadonlySet<string>,
+  bSlugs: ReadonlySet<string>,
+): boolean {
+  return exactAliasMatch(aSlugs, bSlugs);
 }
 
 /** "ledger-service" → "ls" (initials of slug words, ≥2 words only). */
@@ -521,33 +709,83 @@ function slugAcronym(slug: string): string | null {
   return words.map((w) => w[0]!).join('');
 }
 
+/** Acronyms of the slugs that take part in alias suggestions (length ≥ 2). */
+function slugAcronyms(slugs: ReadonlySet<string>): Set<string> {
+  const out = new Set<string>();
+  for (const s of slugs) {
+    if (s.length < 2) continue;
+    const ac = slugAcronym(s);
+    if (ac !== null) out.add(ac);
+  }
+  return out;
+}
+
 /**
  * Conservative near-alias detection for suggest-only merges:
  * - plural: one slug is the other + trailing "s" ("service" / "services")
  * - acronym: one slug equals the initials of the other's words ("ls" / "ledger-service")
+ * Only slugs of length ≥ 2 on both sides count.
  * Never used for auto-merge — only feeds entity_merge review items.
+ *
+ * The relation is symmetric, so this walks the smaller slug set and looks the
+ * plural / singular / acronym forms up in the larger one (`*Acronyms` are
+ * `slugAcronyms` of the matching slug set).
  */
-function suggestsAliasMatch(a: GraphNode, b: GraphNode): boolean {
-  const aSlugs = nodeSlugs(a);
-  const bSlugs = nodeSlugs(b);
-  for (const sa of aSlugs) {
-    for (const sb of bSlugs) {
-      if (sa.length < 2 || sb.length < 2) continue;
-      if (sa === `${sb}s` || sb === `${sa}s`) return true;
-      const acA = slugAcronym(sa);
-      const acB = slugAcronym(sb);
-      if (acA !== null && acA === sb) return true;
-      if (acB !== null && acB === sa) return true;
+function suggestsAliasMatch(
+  aSlugs: ReadonlySet<string>,
+  bSlugs: ReadonlySet<string>,
+  aAcronyms: ReadonlySet<string>,
+  bAcronyms: ReadonlySet<string>,
+): boolean {
+  const aSmaller = aSlugs.size <= bSlugs.size;
+  const small = aSmaller ? aSlugs : bSlugs;
+  const large = aSmaller ? bSlugs : aSlugs;
+  const largeAcronyms = aSmaller ? bAcronyms : aAcronyms;
+  for (const s of small) {
+    if (s.length < 2) continue;
+    // plural on the large side
+    if (large.has(`${s}s`)) return true;
+    // plural on the small side (the singular must keep length ≥ 2)
+    if (s.length >= 3 && s.endsWith('s') && large.has(s.slice(0, -1))) {
+      return true;
     }
+    // small slug's initials name a large-side slug (acronyms have length ≥ 2)
+    const ac = slugAcronym(s);
+    if (ac !== null && large.has(ac)) return true;
+    // a large-side slug's initials name the small slug
+    if (largeAcronyms.has(s)) return true;
   }
   return false;
 }
 
-function mergeInto(keeper: GraphNode, drop: GraphNode): void {
-  const aliasSet = new Set<string>(keeper.aliases ?? []);
-  aliasSet.add(slugifyLabel(drop.label));
+/**
+ * Merge `drop` into `keeper`; returns the alias values offered to the keeper.
+ *
+ * `aliasSets` caches each keeper's alias set across merges, so a keeper that
+ * absorbs many nodes appends to its alias list instead of rebuilding it each
+ * time. The resulting list is the same: existing aliases (deduplicated, first
+ * occurrence kept) followed by new values in the order they were offered.
+ */
+function mergeInto(
+  keeper: GraphNode,
+  drop: GraphNode,
+  aliasSets: Map<GraphNode, Set<string>>,
+): string[] {
+  let aliasSet = aliasSets.get(keeper);
+  if (aliasSet === undefined) {
+    aliasSet = new Set<string>(keeper.aliases ?? []);
+    keeper.aliases = [...aliasSet];
+    aliasSets.set(keeper, aliasSet);
+  }
+  const aliases = keeper.aliases!;
+  const added = [slugifyLabel(drop.label)];
   if (drop.aliases) {
-    for (const a of drop.aliases) aliasSet.add(slugifyLabel(a));
+    for (const a of drop.aliases) added.push(slugifyLabel(a));
+  }
+  for (const a of added) {
+    if (aliasSet.has(a)) continue;
+    aliasSet.add(a);
+    aliases.push(a);
   }
   // Prefer non-empty description
   if (!keeper.description && drop.description) {
@@ -557,7 +795,7 @@ function mergeInto(keeper: GraphNode, drop: GraphNode): void {
   if (!keeper.label && drop.label) {
     keeper.label = drop.label;
   }
-  keeper.aliases = [...aliasSet];
+  return added;
 }
 
 function provenanceKey(e: ProvenanceEntry): string {
